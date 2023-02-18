@@ -33,3 +33,5 @@ MANIFEST
 
 # Test file
 gtlsTest.py
+
+env/

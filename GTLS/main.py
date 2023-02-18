@@ -10,7 +10,7 @@ from validate import validate_inputs,validateAndChooseDevice,validate_args
 import core as core
 import tls_constants as tls_constants
 from grid import duration_grid, period_grid
-from transit import reference_transit, fractional_transit, get_cache
+from transit import get_cache
 from stats import spectra
 
 class gtls(object):

@@ -2,8 +2,8 @@ from __future__ import division, print_function
 import numpy
 import warnings
 import multiprocessing
-from transitleastsquares.helpers import cleaned_array, impact_to_inclination
-import transitleastsquares.tls_constants as tls_constants
+from helpers import cleaned_array, impact_to_inclination
+import tls_constants as tls_constants
 import cupy as cp
 
 def validateAndChooseDevice(device_id):

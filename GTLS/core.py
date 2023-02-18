@@ -1,13 +1,10 @@
 import numpy
 import numpy as np
-import numba
-from transitleastsquares.grid import T14
-from transitleastsquares.helpers import running_mean
-import transitleastsquares.tls_constants as tls_constants
+# from transitleastsquares.grid import T14
+# from transitleastsquares.helpers import running_mean
+# import transitleastsquares.tls_constants as tls_constants
 import time
-import multiprocessing
 import cupy as cp
-import cupyFun
 from tqdm import tqdm
 
 def calcGridBlockSize(size):
