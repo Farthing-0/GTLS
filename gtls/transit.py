@@ -1,8 +1,8 @@
 from __future__ import division, print_function
 import batman  # https://www.cfa.harvard.edu/~lkreidberg/batman/
 import numpy
-import tls_constants as tls_constants
-from interpolation import interp1d
+import gtls.tls_constants as tls_constants
+from gtls.interpolation import interp1d
 
 
 def reference_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):

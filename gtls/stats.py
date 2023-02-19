@@ -1,8 +1,8 @@
 from __future__ import division, print_function
 import numpy
 from os import path
-import tls_constants as tls_constants
-from helpers import running_median, transit_mask
+import gtls.tls_constants as tls_constants
+from gtls.helpers import running_median, transit_mask
 # from tqdm import tqdm
 # from transitleastsquares.core import fold
 

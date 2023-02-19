@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 # import numba
-import tls_constants as tls_constants
+import gtls.tls_constants as tls_constants
 import numpy
 from numpy import pi, sqrt, arccos, degrees, floor, ceil
 import warnings

@@ -6,12 +6,12 @@
 
 import numpy as np
 import cupy as cp
-from validate import validate_inputs,validateAndChooseDevice,validate_args
-import core as core
-import tls_constants as tls_constants
-from grid import duration_grid, period_grid
-from transit import get_cache
-from stats import spectra
+from gtls.validate import validate_inputs,validateAndChooseDevice,validate_args
+import gtls.core as core
+import gtls.tls_constants as tls_constants
+from gtls.grid import duration_grid, period_grid
+from gtls.transit import get_cache
+from gtls.stats import spectra
 
 class gtls(object):
     """Compute the transit least squares of limb-darkened transit models using GPU"""

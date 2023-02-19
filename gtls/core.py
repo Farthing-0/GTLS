@@ -7,6 +7,8 @@ import time
 import cupy as cp
 from tqdm import tqdm
 
+import gtls.cupyFun as cupyFun
+
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
     # MAX_BLOCK_SIZE = 256
@@ -16,35 +18,6 @@ def calcGridBlockSize(size):
         blockSize = MAX_BLOCK_SIZE
     gridSizeX = int((size / blockSize) + 1)
     return blockSize,gridSizeX
-
-def runningMeanBulkGPU2(data, width_signals):
-    # width_signals Should be sorted
-    """Returns the running mean in a given window"""
-    cumsums = cp.cumsum(data, axis=1)
-    meanSize = data.shape[1]-width_signals[0] + 1
-    mean = cp.zeros((data.shape[0],width_signals.shape[0], meanSize.item()))
-    for data_index,cumsum in enumerate(cumsums):
-        for index,width_signal in enumerate(width_signals):
-            if(index == 0):
-                mean[data_index][index][1:] = (cumsum[width_signal:] - cumsum[:-width_signal]) / float(width_signal)
-            else:
-                mean[data_index][index][1:-((width_signal) - width_signals[0])] = (cumsum[width_signal:] - cumsum[:-width_signal]) / float(width_signal)
-            mean[data_index][index][0] = data[data_index][:width_signal].mean()
-    return mean
-
-def runningMeanBulkGPU3(data, width_signals):
-    # width_signals Should be sorted
-    """Returns the running mean in a given window"""
-    cumsums = cp.cumsum(data, axis=1)
-    meanSize = data.shape[1]-width_signals[0] 
-    mean = cp.zeros((width_signals.shape[0],data.shape[0], meanSize.item()))
-
-    for index,width_signal in enumerate(width_signals):
-        if(index == 0):
-            mean[index] = (cumsums[:, width_signal:] - cumsums[:, :-width_signal]) / float(width_signal)
-        else:
-            mean[index,:,:-(width_signal-width_signals[0])] = (cumsums[:, width_signal:] - cumsums[:, :-width_signal]) / float(width_signal)
-    return mean
 
 def search_multi_periods(
     periods,
@@ -65,10 +38,13 @@ def search_multi_periods(
     singleCalcPeriods = 130
     start = time.time()
     print('Running PreProcess')
-    with open ('cupyFun.cu', 'r') as myfile:
-        myCode=myfile.read()
-
-    module = cp.RawModule(code=myCode)
+    try:
+        with open ('cupyFun0.cu', 'r') as myfile:
+            cupyCode=myfile.read()
+    except IOError:
+        cupyCode = cupyFun.getCuPyFun()
+ 
+    module = cp.RawModule(code=cupyCode)
 
     periods = np.sort(periods)
     periods_arr = np.array(periods).astype(numpy.float32)

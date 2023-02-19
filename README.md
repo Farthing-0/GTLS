@@ -1,2 +1,32 @@
-# GTLS
-A GPU Algorithm for Speeding up Periodic Transit Detection
+# GTLS (GPU Transit Least Squares)
+A GPU algorithm for speeding up periodic transit detection based on [TLS](https://github.com/hippke/tls).
+
+## Installation
+### Requirements
+A CUDA-capable GPU is required. For now, the GRAM of GPU should be 12GB or more. For the future, we will try our best to reduce the memory usage.
+
+### Install
+This program is based on cupy. So, you need to install cupy first. 
+Please refer to [the official document](https://docs.cupy.dev/en/stable/install.html#installing-cupy) for installation.
+
+After installing cupy, you can install this program by running the following command:
+```bash
+pip install gputls
+```
+
+### Usage
+```python
+#Assume that you have a time series data: time, flux
+from gtls import gtls
+model = gtls(time, flux)
+period, duration, depth, T0, SDE = model.power()
+```
+
+For now, There are no detailed documents. Please refer to the [TLS](https://github.com/hippke/tls) first, since the usage of this program is almost the same as TLS.
+
+## License
+The GTLS(GPU Transit Least Squares) algorithm is adapted from the TLS(Transit Least Squares) algorithm by Michael Hippke & René Heller (2019).
+
+The TLS is an open source software with MIT license. The copyright of the TLS algorithm is held by its authors.
+
+The GTLS is also an open source software with MIT license.
