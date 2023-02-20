@@ -100,6 +100,7 @@ def search_multi_periods(
     durationsGPU = cp.asarray(durations).astype(cp.int32)
     durationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
     iterFlagGPU = cp.asarray(np.array([0])).astype(cp.int32)
+    fullSumGPU = cp.empty((singleCalcPeriods,len(durations)),dtype=cp.float32)
     ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
     lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
     depthsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
@@ -113,10 +114,10 @@ def search_multi_periods(
     tempResultResidualsGPU = cp.empty((ResSize),dtype=np.float32)
     tempResultDepthsGPU = cp.empty((ResSize),dtype=cp.float32)
     # print('ootrSize',ootrGPU.nbytes/1024 **3,'GB')
-    print('memPool',mempool.used_bytes()/1024 **3,'GB')
+    # print('memPool',mempool.used_bytes()/1024 **3,'GB')
     # while True:
     #     time.sleep(1)
-    print('preProcessTime',time.time()-start)
+    # print('preProcessTime',time.time()-start)
 
     # # ##calculate durations
     # # Not apply the duration filter for now
@@ -178,6 +179,13 @@ def search_multi_periods(
             if((iterFlag * singleCalcPeriods + i) < len(periods)):
                 cumsumGPU[i] = cp.cumsum(patchedDatasGPU[i + iterFlag * singleCalcPeriods])
 
+        calcAllFullSumGPU = module.get_function('calcAllFullSumNew')
+        blockSize,gridSizeX = calcGridBlockSize(len(durations))
+        calcAllFullSumGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
+        (fullSumGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
+        patchedDatasSizeGPU,durationsGPU,durationsSizeGPU,
+        iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
+
         calcAllOutOfTransitResiduals_step1_2GPU = module.get_function('calcAllOutOfTransitResiduals_step1_2GPU')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         calcAllOutOfTransitResiduals_step1_2GPU((gridSizeX,len(durations),singleCalcPeriods),
@@ -186,13 +194,23 @@ def search_multi_periods(
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
         ootrGPU = np.cumsum(ootrGPU,axis=-1)
-        calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
-        blockSize,gridSizeX = calcGridBlockSize(len(durations))
-        calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,singleCalcPeriods,1),
+        calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2V2')
+        blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,patchedDatasGPU,
-        inverseSquaredPatchedDysGPU,durationsGPU,durationsSizeGPU,
-        patchedDatasSizeGPU,meanXSizeGPU,
+        inverseSquaredPatchedDysGPU,durationsGPU,durationsSizeGPU,patchedDatasSizeGPU,
+        meanSizeGPU,meanXSizeGPU,fullSumGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
+
+
+        # ootrGPU = np.cumsum(ootrGPU,axis=-1)
+        # calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
+        # blockSize,gridSizeX = calcGridBlockSize(len(durations))
+        # calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,singleCalcPeriods,1),
+        # (blockSize,1,1),(ootrGPU,patchedDatasGPU,
+        # inverseSquaredPatchedDysGPU,durationsGPU,durationsSizeGPU,
+        # patchedDatasSizeGPU,meanXSizeGPU,
+        # iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPU')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)

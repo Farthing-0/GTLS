@@ -6,15 +6,17 @@ A GPU algorithm for speeding up periodic transit detection based on [TLS](https:
 A CUDA-capable GPU is required. For now, the GRAM of GPU should be 12GB or more. For the future, we will try our best to reduce the memory usage.
 
 ### Install
-This program is based on cupy. So, you need to install cupy first. 
-Please refer to [the official document](https://docs.cupy.dev/en/stable/install.html#installing-cupy) for installation.
+This program is based on cupy. Due to there are many versions of cupy, we cannot specify the version of cupy in the package.
+So, you need to install cupy manually first.
+ 
+Please refer to [the official document](https://docs.cupy.dev/en/stable/install.html#installing-cupy), and install the version of cupy that is suitable for your environment.
 
 After installing cupy, you can install this program by running the following command:
 ```bash
 pip install gputls
 ```
 
-### Usage
+## Usage
 ```python
 #Assume that you have a time series data: time, flux
 from gtls import gtls

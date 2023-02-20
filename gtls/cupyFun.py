@@ -54,6 +54,37 @@ extern "C"{
         return fullsum;
     }
 
+    __global__ void calcAllFullSumNew(float* fullsums,float *in_patched_data,
+    float *in_inverse_squared_patched_dy,int *patched_data_size,int *in_duration,int *duration_size,
+    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    {
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // tid:durations
+        int y = blockIdx.y * blockDim.y + threadIdx.y;    // y:periods
+
+        if(y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){// && tid < (*single_calc_periods_arr_gpu)){
+            int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+
+            // fullsum = numpy.sum(((1 - patched_data) ** 2) * inverse_squared_patched_dy)
+
+            float *patched_data = in_patched_data + y_input*(*patched_data_size);
+            float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + y_input*(*patched_data_size);
+
+            float fullsum = 0;
+            for (int i = 0; i < *patched_data_size; i++) {
+                fullsum = fullsum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
+            }
+
+            if(tid < (*duration_size)){
+                int window = in_duration[tid];
+                float window_sum = 0;
+                for (int i = 0; i < window; i++) {
+                    window_sum = window_sum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
+                }
+                fullsums[tid + y*(*duration_size)] = fullsum - window_sum;
+            }
+        }
+    }
+
     __global__ void calcAllOutOfTransitResiduals_step1_2GPU(float *temp_ootr,
     float *in_patched_data, int *in_duration,int *duration_size,
     float *in_inverse_squared_patched_dy, int *patched_data_size,int *mean_x_size,
@@ -118,6 +149,33 @@ extern "C"{
                     temp0 = ootr[i + tid*(*mean_x_size)];
                     ootr[i + tid*(*mean_x_size)] = start + temp0;
                 }
+            }
+        }
+    }
+    
+    __global__ void calcAllOutOfTransitResiduals_step2_2V2(float *in_ootr,
+    float *in_patched_data,
+    float *in_inverse_squared_patched_dy,int *in_duration,
+    int *duration_size,int *patched_data_size,int *in_mean_size,
+    int *mean_x_size,float *in_fullsum,
+    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;//i is point index
+        int tid = blockIdx.y * blockDim.y + threadIdx.y;    //tid is duration index
+        int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is period index
+
+        int mean_size = in_mean_size[tid];
+
+        if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
+            if(tid < *duration_size &&  i < mean_size){
+                int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+                int window = in_duration[tid];
+                float *patched_data = in_patched_data + z_input*(*patched_data_size);
+                float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + z_input*(*patched_data_size);
+                float *fullsum = in_fullsum + z*(*duration_size);
+                float *ootr = in_ootr + z*(*mean_x_size)*(*duration_size);
+                float start = fullsum[tid];
+                ootr[i+tid*(*mean_x_size)] = start + ootr[i+tid*(*mean_x_size)];
             }
         }
     }
