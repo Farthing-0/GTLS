@@ -179,7 +179,7 @@ def search_multi_periods(
             if((iterFlag * singleCalcPeriods + i) < len(periods)):
                 cumsumGPU[i] = cp.cumsum(patchedDatasGPU[i + iterFlag * singleCalcPeriods])
 
-        calcAllFullSumGPU = module.get_function('calcAllFullSumNew')
+        calcAllFullSumGPU = module.get_function('calcAllFullSum')
         blockSize,gridSizeX = calcGridBlockSize(len(durations))
         calcAllFullSumGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
         (fullSumGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
@@ -194,23 +194,13 @@ def search_multi_periods(
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
         ootrGPU = np.cumsum(ootrGPU,axis=-1)
-        calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2V2')
+        calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,patchedDatasGPU,
         inverseSquaredPatchedDysGPU,durationsGPU,durationsSizeGPU,patchedDatasSizeGPU,
         meanSizeGPU,meanXSizeGPU,fullSumGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
-
-
-        # ootrGPU = np.cumsum(ootrGPU,axis=-1)
-        # calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
-        # blockSize,gridSizeX = calcGridBlockSize(len(durations))
-        # calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,singleCalcPeriods,1),
-        # (blockSize,1,1),(ootrGPU,patchedDatasGPU,
-        # inverseSquaredPatchedDysGPU,durationsGPU,durationsSizeGPU,
-        # patchedDatasSizeGPU,meanXSizeGPU,
-        # iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPU')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)

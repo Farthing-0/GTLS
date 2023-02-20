@@ -52,7 +52,7 @@ extern "C"{
         return fullsum;
     }
 
-    __global__ void calcAllFullSumNew(float* fullsums,float *in_patched_data,
+    __global__ void calcAllFullSum(float* fullsums,float *in_patched_data,
     float *in_inverse_squared_patched_dy,int *patched_data_size,int *in_duration,int *duration_size,
     int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
     {
@@ -114,44 +114,8 @@ extern "C"{
             }
         }
     }
-
-    __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr,
-    float *in_patched_data,
-    float *in_inverse_squared_patched_dy,
-    int *in_duration,int *duration_size,int *patched_data_size,int *mean_x_size,
-    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
-    {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-        if(y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
-            if(tid < *duration_size){
-                int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
-
-                int window = in_duration[tid];
-                float *patched_data = in_patched_data + y_input*(*patched_data_size);
-                float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + y_input*(*patched_data_size);
-                
-
-                float fullsum = calcFullSum(y,in_patched_data,in_inverse_squared_patched_dy,patched_data_size,iter_flag_gpu,single_calc_periods_arr_gpu,period_size_gpu);      
-                float *ootr = in_ootr + y*(*mean_x_size)*(*duration_size);
-
-                float window_sum = 0;
-                for (int i = 0; i < window; i++) {
-                    window_sum = window_sum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
-                }
-                float start = fullsum - window_sum;
-
-                float temp0 = 0;
-                for (int i = 0; i < *patched_data_size - window + 1; i++) {
-                    temp0 = ootr[i + tid*(*mean_x_size)];
-                    ootr[i + tid*(*mean_x_size)] = start + temp0;
-                }
-            }
-        }
-    }
     
-    __global__ void calcAllOutOfTransitResiduals_step2_2V2(float *in_ootr,
+    __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr,
     float *in_patched_data,
     float *in_inverse_squared_patched_dy,int *in_duration,
     int *duration_size,int *patched_data_size,int *in_mean_size,
@@ -219,7 +183,15 @@ extern "C"{
                 }
             if(tid < mean_size && calc_mean > transit_depth_min){
                 int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
-                float* ootr = in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size);
+                
+                float ootr = 0;
+                if(tid == 0){
+                    ootr = *(in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size) + tid);
+                }
+                else{
+                    ootr = *(in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+                }
+
                 float *patched_data = in_patched_datas + z_input*(*in_patched_datas_size);
                 int duration = in_duration[y];
                 int signal_x_size = in_signal_x_size[y];
@@ -250,11 +222,10 @@ extern "C"{
                     sigi = (1 - signal[i]) * reverse_scale;
                     intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
                 }
-                float current_stat = intransit_residual + ootr[tid] - summed_edge_effect_correction;
+                float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
                 depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
             }
         }
     }
-
 }
