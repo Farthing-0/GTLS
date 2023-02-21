@@ -24,6 +24,11 @@ model = gtls(time, flux)
 period, duration, depth, T0, SDE = model.power()
 ```
 
+You can also use the test script in the repository:
+```bash
+python3 gtlsTest.py
+```
+
 For now, There are no detailed documents. Please refer to the [TLS](https://github.com/hippke/tls) first, since the usage of this program is almost the same as TLS.
 
 ## License

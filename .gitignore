@@ -33,7 +33,7 @@ venv/
 .ipynb_checkpoints
 
 # Test file
-gtlsTest.*
+# gtlsTest.*
 env/
 
 #Pushed to Pypi
