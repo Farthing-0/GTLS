@@ -79,13 +79,17 @@ def search_multi_periods(
     patchedDatasGPU = cp.empty((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
     patchedDysGPU = cp.empty((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
     patchedDatasSizeGPU = cp.asarray(np.array([len(t) + maxWidthInSamples])).astype(cp.int32)
+    maxWidthInSamplesGPU = cp.asarray(np.array([maxWidthInSamples])).astype(cp.int32)
     patchedDatasSize = int(len(t) + maxWidthInSamples)
+    tSizeGPU = cp.asarray(np.array([len(t)])).astype(cp.int32)
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
-
-    for i in range(len(periods)):
-        patchedDatasGPU[i] = cp.append(yGPU[sortIndexGPU[i]],yGPU[sortIndexGPU[i]][:maxWidthInSamples])
-        patchedDysGPU[i] = cp.append(dyGPU[sortIndexGPU[i]],dyGPU[sortIndexGPU[i]][:maxWidthInSamples])
+    
+    fastFoldGPU = module.get_function('patchData')
+    blockSize,gridSizeX = calcGridBlockSize(len(t) + maxWidthInSamples)
+    fastFoldGPU((gridSizeX,len(periods),),(blockSize,),
+    (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
+    maxWidthInSamplesGPU,yGPU,dyGPU,tSizeGPU,periodsSizeGPU))
 
     del yGPU, dyGPU, sortIndexGPU
 

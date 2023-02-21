@@ -8,6 +8,26 @@ extern "C"{
         }
     }
 
+    __global__ void patchData(float *in_patchedData,float* in_patchedDys,
+    int *patchedDataSize,int *in_sortIndex,int *maxWidthInSamples,
+    float *flux,float *dy,int *tSize,int *periodSize){
+        int tid = blockIdx.x * blockDim.x + threadIdx.x; //patchedData index
+        int y = blockIdx.y * blockDim.y + threadIdx.y; //period index
+
+        float *patchedData = in_patchedData + y*(*patchedDataSize);
+        float *patchedDys = in_patchedDys + y*(*patchedDataSize);
+        int *sortIndex = in_sortIndex + y*(*tSize);
+
+        if(tid < (*tSize)){
+            patchedData[tid] = flux[sortIndex[tid]];
+            patchedDys[tid] = dy[sortIndex[tid]];
+        }
+        else if(tid < (*tSize + *maxWidthInSamples)){
+            patchedData[tid] = flux[sortIndex[tid - (*tSize)]];
+            patchedDys[tid] = dy[sortIndex[tid - (*tSize)]];
+        }
+    }
+
     __global__ void calcInverseSquaredPatchedDy(float *out,
     float *patched_dys,int *patched_data_size){
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
