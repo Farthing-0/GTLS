@@ -1,6 +1,8 @@
 # GTLS (GPU Transit Least Squares)
 A GPU algorithm for speeding up periodic transit detection based on [TLS](https://github.com/hippke/tls).
 
+__This project is still under development. The results may not be accurate.__
+
 ## Installation
 ### Requirements
 A CUDA-capable GPU is required. For now, the GRAM of GPU should be 12GB or more. For the future, we will try our best to reduce the memory usage.
