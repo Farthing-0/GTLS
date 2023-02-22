@@ -5,7 +5,10 @@ __This project is still under development. The results may not be accurate.__
 
 ## Installation
 ### Requirements
-A CUDA-capable GPU is required. For now, the GRAM of GPU should be 12GB or more. For the future, we will try our best to reduce the memory usage.
+A CUDA-capable GPU is required. 
+
+For now, the GRAM usage of GPU can not be controlled. So, the program may crash if the GRAM of GPU is not enough.
+I will fix this problem in the future.
 
 ### Install
 This program is based on cupy. Due to there are many versions of cupy, we cannot specify the version of cupy in the package.
