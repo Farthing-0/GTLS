@@ -1,6 +1,7 @@
 # from main import gtls
 from gtls import gtls
 import batman
+import time
 
 if __name__ == "__main__":
     import numpy
@@ -11,7 +12,7 @@ if __name__ == "__main__":
     data_duration = 100
     samples_per_day = 480
     samples = int(data_duration * samples_per_day)
-    time = numpy.linspace(time_start, time_start + data_duration, samples)
+    x_time = numpy.linspace(time_start, time_start + data_duration, samples)
 
     # Use batman to create transits
     ma = batman.TransitParams()
@@ -25,7 +26,7 @@ if __name__ == "__main__":
     ma.w = 90  # longitude of periastron (in degrees)
     ma.u = [0.4, 0.4]  # limb darkening coefficients
     ma.limb_dark = "quadratic"  # limb darkening model
-    m = batman.TransitModel(ma, time)  # initializes model
+    m = batman.TransitModel(ma, x_time)  # initializes model
     synthetic_signal = m.light_curve(ma)  # calculates light curve
 
     # Create noise and merge with flux
@@ -40,14 +41,15 @@ if __name__ == "__main__":
 
     # plt.figure()
     # ax = plt.gca()
-    # ax.scatter(time, flux, color='black', s=1)
+    # ax.scatter(x_time, flux, color='black', s=1)
     # ax.set_ylabel("Flux")
-    # ax.set_xlabel("Time (days)")
-    # plt.xlim(min(time), max(time))
+    # ax.set_xlabel("x_time (days)")
+    # plt.xlim(min(x_time), max(x_time))
     # plt.ylim(0.999, 1.001);
 
-    model = gtls(time, flux)
-
+    modelStart = time.time()
+    model = gtls(x_time, flux)
     period, duration, depth, T0, SDE = model.power()
+    print('Time to run gtls:', time.time() - modelStart, 'seconds')
     print('period', period, 'duration', duration, 'depth', depth, 'T0', T0)
     print('SDE', SDE)

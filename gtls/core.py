@@ -8,6 +8,7 @@ import cupy as cp
 from tqdm import tqdm
 
 import gtls.cupyFun as cupyFun
+from gtls.stats import spectra,all_transit_times,calculate_transit_duration_in_days
 
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
@@ -18,6 +19,10 @@ def calcGridBlockSize(size):
         blockSize = MAX_BLOCK_SIZE
     gridSizeX = int((size / blockSize) + 1)
     return blockSize,gridSizeX
+
+def foldfastCPU(time, period):
+    """Fast phase folding with T0=0 hardcoded"""
+    return time / period - numpy.floor(time / period)
 
 def search_multi_periods(
     periods,
@@ -32,7 +37,8 @@ def search_multi_periods(
     lc_arr,
     lc_cache_overview,
     T0_fit_margin,
-    show_progress_bar
+    show_progress_bar,
+    oversampling_factor
 ):
     #PreProcess
     singleCalcPeriods = 130
@@ -112,16 +118,7 @@ def search_multi_periods(
     datapointsGPU = cp.array([len(y)]).astype(cp.int32)
     meanSizeGPU = cp.array([(patchedDatasSize - x + 1) for x in durations]).astype(np.int32)
     LowestResidualsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
-
-    ResSize = int(np.ceil(len(periods) / singleCalcPeriods))
-    tempResultIndexsGPU = cp.empty((ResSize),dtype=np.int)
-    tempResultResidualsGPU = cp.empty((ResSize),dtype=np.float32)
-    tempResultDepthsGPU = cp.empty((ResSize),dtype=cp.float32)
-    # print('ootrSize',ootrGPU.nbytes/1024 **3,'GB')
-    # print('memPool',mempool.used_bytes()/1024 **3,'GB')
-    # while True:
-    #     time.sleep(1)
-    # print('preProcessTime',time.time()-start)
+    locationGPU = cp.empty(len(periods),dtype=cp.int32)
 
     # # ##calculate durations
     # # Not apply the duration filter for now
@@ -137,7 +134,6 @@ def search_multi_periods(
     # duration_max_in_samples = int(numpy.ceil(duration_max * len(y) * correction_factor))
     # durations = durations[durations >= duration_min_in_samples]
     # durations = durations[durations <= duration_max_in_samples]
-
 
     remain_index = []
     for duration in durations:
@@ -216,12 +212,16 @@ def search_multi_periods(
         overshootGPU,ootrGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,#meanGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
-        locationGPU = lowestResidualsGPU.argmin()
-        minValue = lowestResidualsGPU.min()
-        tempResultIndexsGPU[iterFlag] = locationGPU.item()
-        tempResultResidualsGPU[iterFlag] = minValue
-        sub_location = cp.unravel_index(locationGPU, lowestResidualsGPU.shape)
-        tempResultDepthsGPU[iterFlag] = depthsGPU[sub_location[0]][sub_location[1]][sub_location[2]]
+        # locationGPU = lowestResidualsGPU.argmin()
+        # minValue = lowestResidualsGPU.min()
+        # tempResultIndexsGPU[iterFlag] = locationGPU.item()
+        # tempResultResidualsGPU[iterFlag] = minValue
+        # sub_location = cp.unravel_index(locationGPU, lowestResidualsGPU.shape)
+        # tempResultDepthsGPU[iterFlag] = depthsGPU[sub_location[0]][sub_location[1]][sub_location[2]]
+
+        for i in range(singleCalcPeriods):
+            if(iterFlag*singleCalcPeriods + i < len(periods)):
+                locationGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].argmin()
 
         if((iterFlag+1)*singleCalcPeriods < len(periods)):
             LowestResidualsEachPeriodGPU[(iterFlag)*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods] = lowestResidualsGPU.min(axis=(1,2))
@@ -237,11 +237,24 @@ def search_multi_periods(
     # minRes = tempResultResidualsGPU.min()
     # print('minRes',minRes)
     
-    location = np.argmin(tempResultResidualsGPU.get())
-    subLocation = cp.unravel_index(tempResultIndexsGPU[location], lowestResidualsGPU.shape)
-    bestPeriod = periods[location * singleCalcPeriods + subLocation[0].item()]
-    rawDuration = durations[subLocation[1].item()]
-    bestT0 = (bestPeriod/len(t))*(subLocation[2].item()+rawDuration)
-    bestDuration = (rawDuration*bestPeriod) / len(t)
-    bestDepth = 1 - tempResultDepthsGPU[location].item()
-    return LowestResidualsEachPeriodGPU.get(),bestPeriod,bestDuration,bestDepth,bestT0
+    #TODO: FIX if T0 at the edge of the data
+    chi2 = LowestResidualsEachPeriodGPU.get()
+    SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
+    index_highest_power = numpy.argmax(power)
+    period = periods[index_highest_power]
+    bestLocation = locationGPU[index_highest_power].item()
+    bestRow = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
+    bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
+    phases = np.sort(foldfastCPU(t, period))
+    bestT0Phase = phases[bestRowT0]
+    bestT0 = np.min(t) + bestT0Phase * period
+
+    rawDuration = lc_cache_overview["duration"][bestRow]
+    transit_times = all_transit_times(bestT0, t, period)
+    transit_duration_in_days = calculate_transit_duration_in_days(
+        t, period, transit_times, rawDuration
+    )
+    bestPeriod = period
+    bestDuration = transit_duration_in_days
+    bestDepth = None
+    return bestPeriod,bestDuration,bestDepth,bestT0,SDE

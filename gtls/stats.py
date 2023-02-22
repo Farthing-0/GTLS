@@ -240,62 +240,62 @@ def spectra(chi2, oversampling_factor):
 #         return model_lightcurve_model, model_lightcurve_time
 
 
-# def all_transit_times(T0, t, period):
-#     """Return all mid-transit times within t"""
+def all_transit_times(T0, t, period):
+    """Return all mid-transit times within t"""
 
-#     if T0 < min(t):
-#         transit_times = [T0 + period]
-#     else:
-#         transit_times = [T0]
-#     previous_transit_time = transit_times[0]
-#     transit_number = 0
-#     while True:
-#         transit_number = transit_number + 1
-#         next_transit_time = previous_transit_time + period
-#         if next_transit_time < (numpy.min(t) + (numpy.max(t) - numpy.min(t))):
-#             transit_times.append(next_transit_time)
-#             previous_transit_time = next_transit_time
-#         else:
-#             break
-#     return transit_times
-
-
-# def calculate_transit_duration_in_days(t, period, transit_times, duration):
-#     """Return estimate for transit duration in days"""
-
-#     # Difference between (time series duration / period) and epochs
-#     transit_duration_in_days_raw = (
-#         duration * calculate_stretch(t, period, transit_times) * period
-#     )
-
-#     # Correct the duration for gaps in the data
-#     transit_duration_in_days = transit_duration_in_days_raw * calculate_fill_factor(t)
-
-#     return transit_duration_in_days
+    if T0 < min(t):
+        transit_times = [T0 + period]
+    else:
+        transit_times = [T0]
+    previous_transit_time = transit_times[0]
+    transit_number = 0
+    while True:
+        transit_number = transit_number + 1
+        next_transit_time = previous_transit_time + period
+        if next_transit_time < (numpy.min(t) + (numpy.max(t) - numpy.min(t))):
+            transit_times.append(next_transit_time)
+            previous_transit_time = next_transit_time
+        else:
+            break
+    return transit_times
 
 
-# def calculate_stretch(t, period, transit_times):
-#     """Return difference between (time series duration / period) and epochs
-#         Example: 
-#         - Time series duration = 100 days
-#         - Period = 40 days
-#         - Epochs = 2 at t0s = [30, 70] days
-#         ==> stretch = (100 / 40) / 2 = 1.25"""
+def calculate_transit_duration_in_days(t, period, transit_times, duration):
+    """Return estimate for transit duration in days"""
 
-#     duration_timeseries = (numpy.max(t) - numpy.min(t)) / period
-#     epochs = len(transit_times)
-#     stretch = duration_timeseries / epochs
-#     return stretch
+    # Difference between (time series duration / period) and epochs
+    transit_duration_in_days_raw = (
+        duration * calculate_stretch(t, period, transit_times) * period
+    )
+
+    # Correct the duration for gaps in the data
+    transit_duration_in_days = transit_duration_in_days_raw * calculate_fill_factor(t)
+
+    return transit_duration_in_days
 
 
-# def calculate_fill_factor(t):
-#     """Return the fraction of existing cadences, assuming constant cadences"""
+def calculate_stretch(t, period, transit_times):
+    """Return difference between (time series duration / period) and epochs
+        Example: 
+        - Time series duration = 100 days
+        - Period = 40 days
+        - Epochs = 2 at t0s = [30, 70] days
+        ==> stretch = (100 / 40) / 2 = 1.25"""
 
-#     average_cadence = numpy.median(numpy.diff(t))
-#     span = max(t) - min(t)
-#     theoretical_cadences = span / average_cadence
-#     fill_factor = (len(t) - 1) / theoretical_cadences
-#     return fill_factor
+    duration_timeseries = (numpy.max(t) - numpy.min(t)) / period
+    epochs = len(transit_times)
+    stretch = duration_timeseries / epochs
+    return stretch
+
+
+def calculate_fill_factor(t):
+    """Return the fraction of existing cadences, assuming constant cadences"""
+
+    average_cadence = numpy.median(numpy.diff(t))
+    span = max(t) - min(t)
+    theoretical_cadences = span / average_cadence
+    fill_factor = (len(t) - 1) / theoretical_cadences
+    return fill_factor
 
 
 # def count_stats(t, y, transit_times, transit_duration_in_days):

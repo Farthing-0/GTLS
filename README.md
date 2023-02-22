@@ -13,7 +13,7 @@ Please refer to [the official document](https://docs.cupy.dev/en/stable/install.
 
 After installing cupy, you can install this program by running the following command:
 ```bash
-pip install gputls
+pip3 install gputls
 ```
 
 ## Usage

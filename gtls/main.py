@@ -11,7 +11,6 @@ import gtls.core as core
 import gtls.tls_constants as tls_constants
 from gtls.grid import duration_grid, period_grid
 from gtls.transit import get_cache
-from gtls.stats import spectra
 
 class gtls(object):
     """Compute the transit least squares of limb-darkened transit models using GPU"""
@@ -62,7 +61,7 @@ class gtls(object):
             verbose=self.verbose
         )
 
-        chi2,period,duration,depth,T0 = core.search_multi_periods(
+        period,duration,depth,T0,SDE = core.search_multi_periods(
             periods=periods,
             t=self.t,
             y=self.y,
@@ -76,6 +75,6 @@ class gtls(object):
             lc_cache_overview=lc_cache_overview,
             T0_fit_margin=self.T0_fit_margin,
             show_progress_bar=self.show_progress_bar,
+            oversampling_factor=self.oversampling_factor
         )
-        SR, power_raw, power, SDE_raw, SDE = spectra(chi2, self.oversampling_factor)
         return period, duration, depth, T0, SDE
