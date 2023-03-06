@@ -1,29 +1,29 @@
 from __future__ import division, print_function
-# import numba
-import gtls.tls_constants as tls_constants
+import numba
+import constants as constants
 import numpy
 from numpy import pi, sqrt, arccos, degrees, floor, ceil
 import warnings
 
 
-# @numba.jit(fastmath=True, parallel=False, nopython=True)
+@numba.jit(fastmath=True, parallel=False, nopython=True)
 def T14(
-    R_s, M_s, P, upper_limit=tls_constants.FRACTIONAL_TRANSIT_DURATION_MAX, small=False
+    R_s, M_s, P, upper_limit=constants.FRACTIONAL_TRANSIT_DURATION_MAX, small=False
 ):
     """Input:  Stellar radius and mass; planetary period
                Units: Solar radius and mass; days
        Output: Maximum planetary transit duration T_14max
                Unit: Fraction of period P"""
 
-    P = P * tls_constants.SECONDS_PER_DAY
-    R_s = tls_constants.R_sun * R_s
-    M_s = tls_constants.M_sun * M_s
+    P = P * constants.SECONDS_PER_DAY
+    R_s = constants.R_sun * R_s
+    M_s = constants.M_sun * M_s
 
     if small:  # small planet assumption
-        T14max = R_s * ((4 * P) / (pi * tls_constants.G * M_s)) ** (1 / 3)
+        T14max = R_s * ((4 * P) / (pi * constants.G * M_s)) ** (1 / 3)
     else:  # planet size 2 R_jup
-        T14max = (R_s + 2 * tls_constants.R_jup) * (
-            (4 * P) / (pi * tls_constants.G * M_s)
+        T14max = (R_s + 2 * constants.R_jup) * (
+            (4 * P) / (pi * constants.G * M_s)
         ) ** (1 / 3)
 
     result = T14max / P
@@ -32,17 +32,17 @@ def T14(
     return result
 
 
-def duration_grid(periods, shortest, log_step=tls_constants.DURATION_GRID_STEP):
+def duration_grid(periods, shortest, log_step=constants.DURATION_GRID_STEP):
     
     duration_max = T14(
-        R_s=tls_constants.R_STAR_MAX,
-        M_s=tls_constants.M_STAR_MAX,
+        R_s=constants.R_STAR_MAX,
+        M_s=constants.M_STAR_MAX,
         P=min(periods),
         small=False  # large planet for long transit duration
     )
     duration_min = T14(
-        R_s=tls_constants.R_STAR_MIN,
-        M_s=tls_constants.M_STAR_MIN,
+        R_s=constants.R_STAR_MIN,
+        M_s=constants.M_STAR_MIN,
         P=max(periods),
         small=True  # small planet for short transit duration
     )
@@ -62,8 +62,8 @@ def period_grid(
     time_span,
     period_min=0,
     period_max=float("inf"),
-    oversampling_factor=tls_constants.OVERSAMPLING_FACTOR,
-    n_transits_min=tls_constants.N_TRANSITS_MIN,
+    oversampling_factor=constants.OVERSAMPLING_FACTOR,
+    n_transits_min=constants.N_TRANSITS_MIN,
 ):
     """Returns array of optimal sampling periods for transit search in light curves
        Following Ofir (2014, A&A, 561, A138)"""
@@ -104,20 +104,20 @@ def period_grid(
         warnings.warn(text)
         M_star = 1000
 
-    R_star = R_star * tls_constants.R_sun
-    M_star = M_star * tls_constants.M_sun
-    time_span = time_span * tls_constants.SECONDS_PER_DAY  # seconds
+    R_star = R_star * constants.R_sun
+    M_star = M_star * constants.M_sun
+    time_span = time_span * constants.SECONDS_PER_DAY  # seconds
 
     # boundary conditions
     f_min = n_transits_min / time_span
-    f_max = 1.0 / (2 * pi) * sqrt(tls_constants.G * M_star / (3 * R_star) ** 3)
+    f_max = 1.0 / (2 * pi) * sqrt(constants.G * M_star / (3 * R_star) ** 3)
 
     # optimal frequency sampling, Equations (5), (6), (7)
     A = (
         (2 * pi) ** (2.0 / 3)
         / pi
         * R_star
-        / (tls_constants.G * M_star) ** (1.0 / 3)
+        / (constants.G * M_star) ** (1.0 / 3)
         / (time_span * oversampling_factor)
     )
     C = f_min ** (1.0 / 3) - A / 3.0
@@ -128,7 +128,7 @@ def period_grid(
     P_x = 1 / f_x
 
     # Cut to given (optional) selection of periods
-    periods = P_x / tls_constants.SECONDS_PER_DAY
+    periods = P_x / constants.SECONDS_PER_DAY
     selected_index = numpy.where(
         numpy.logical_and(periods > period_min, periods <= period_max)
     )
@@ -143,14 +143,14 @@ def period_grid(
         )
         warnings.warn(text)
 
-    if number_of_periods < tls_constants.MINIMUM_PERIOD_GRID_SIZE:
-        if time_span < 5 * tls_constants.SECONDS_PER_DAY:
-            time_span = 5 * tls_constants.SECONDS_PER_DAY
+    if number_of_periods < constants.MINIMUM_PERIOD_GRID_SIZE:
+        if time_span < 5 * constants.SECONDS_PER_DAY:
+            time_span = 5 * constants.SECONDS_PER_DAY
         warnings.warn(
             "period_grid defaults to R_star=1 and M_star=1 as given density yielded grid with too few values"
         )
         return period_grid(
-            R_star=1, M_star=1, time_span=time_span / tls_constants.SECONDS_PER_DAY
+            R_star=1, M_star=1, time_span=time_span / constants.SECONDS_PER_DAY
         )
     else:
         return periods[selected_index]  # periods in [days]

@@ -2,17 +2,9 @@ from __future__ import division, print_function
 import numpy
 import warnings
 import multiprocessing
-from gtls.helpers import cleaned_array, impact_to_inclination
-import gtls.tls_constants as tls_constants
-import cupy as cp
+from helpers import cleaned_array, impact_to_inclination
+import constants as constants
 
-def validateAndChooseDevice(device_id):
-    try:
-        dev0 = cp.cuda.Device(device_id).use()
-        return dev0
-    except cp.cuda.runtime.CUDARuntimeError:
-        print("Invalid device ID")
-        return None
 
 def validate_inputs(t, y, dy):
     """Check the consistency of the inputs"""
@@ -56,76 +48,75 @@ def validate_inputs(t, y, dy):
 
 def validate_args(self, kwargs):
 
-    self.verbose = kwargs.get("verbose", tls_constants.VERBOSE)
+    self.verbose = kwargs.get("verbose", constants.VERBOSE)
 
     # Warn user if unknown parameters
     for key, value in kwargs.items():
-        if key not in tls_constants.VALID_PARAMETERS:
+        if key not in constants.VALID_PARAMETERS:
             text = "Ignoring unknown parameter: " + str(key)
             warnings.warn(text)
 
     """Validate **kwargs and set to defaults where missing"""
     self.show_progress_bar = kwargs.get("show_progress_bar", True)
     self.transit_depth_min = kwargs.get(
-        "transit_depth_min", tls_constants.TRANSIT_DEPTH_MIN
+        "transit_depth_min", constants.TRANSIT_DEPTH_MIN
     )
-    self.R_star = kwargs.get("R_star", tls_constants.R_STAR)
-    self.M_star = kwargs.get("M_star", tls_constants.M_STAR)
+    self.R_star = kwargs.get("R_star", constants.R_STAR)
+    self.M_star = kwargs.get("M_star", constants.M_STAR)
     self.oversampling_factor = kwargs.get(
-        "oversampling_factor", tls_constants.OVERSAMPLING_FACTOR
+        "oversampling_factor", constants.OVERSAMPLING_FACTOR
     )
     self.period_max = kwargs.get("period_max", float("inf"))
     self.period_min = kwargs.get("period_min", 0)
-    self.n_transits_min = kwargs.get("n_transits_min", tls_constants.N_TRANSITS_MIN)
+    self.n_transits_min = kwargs.get("n_transits_min", constants.N_TRANSITS_MIN)
 
-    self.R_star_min = kwargs.get("R_star_min", tls_constants.R_STAR_MIN)
-    self.R_star_max = kwargs.get("R_star_max", tls_constants.R_STAR_MAX)
-    self.M_star_min = kwargs.get("M_star_min", tls_constants.M_STAR_MIN)
-    self.M_star_max = kwargs.get("M_star_max", tls_constants.M_STAR_MAX)
+    self.R_star_min = kwargs.get("R_star_min", constants.R_STAR_MIN)
+    self.R_star_max = kwargs.get("R_star_max", constants.R_STAR_MAX)
+    self.M_star_min = kwargs.get("M_star_min", constants.M_STAR_MIN)
+    self.M_star_max = kwargs.get("M_star_max", constants.M_STAR_MAX)
     self.duration_grid_step = kwargs.get(
-        "duration_grid_step", tls_constants.DURATION_GRID_STEP
+        "duration_grid_step", constants.DURATION_GRID_STEP
     )
 
-    # self.use_threads = kwargs.get("use_threads", multiprocessing.cpu_count())
-    self.deviceId = kwargs.get("device_id", 0)
+    self.use_threads = kwargs.get("use_threads", multiprocessing.cpu_count())
 
-    self.per = kwargs.get("per", tls_constants.DEFAULT_PERIOD)
-    self.rp = kwargs.get("rp", tls_constants.DEFAULT_RP)
-    self.a = kwargs.get("a", tls_constants.DEFAULT_A)
+    self.per = kwargs.get("per", constants.DEFAULT_PERIOD)
+    self.rp = kwargs.get("rp", constants.DEFAULT_RP)
+    self.a = kwargs.get("a", constants.DEFAULT_A)
 
-    self.T0_fit_margin = kwargs.get("T0_fit_margin", tls_constants.T0_FIT_MARGIN)
+    self.T0_fit_margin = kwargs.get("T0_fit_margin", constants.T0_FIT_MARGIN)
 
     # If an impact parameter is given, it overrules the supplied inclination
     if "b" in kwargs:
         self.b = kwargs.get("b")
         self.inc = impact_to_inclination(b=self.b, semimajor_axis=self.a)
     else:
-        self.inc = kwargs.get("inc", tls_constants.DEFAULT_INC)
+        self.inc = kwargs.get("inc", constants.DEFAULT_INC)
 
-    self.ecc = kwargs.get("ecc", tls_constants.DEFAULT_ECC)
-    self.w = kwargs.get("w", tls_constants.DEFAULT_W)
-    self.u = kwargs.get("u", tls_constants.DEFAULT_U)
-    self.limb_dark = kwargs.get("limb_dark", tls_constants.DEFAULT_LIMB_DARK)
+    self.ecc = kwargs.get("ecc", constants.DEFAULT_ECC)
+    self.w = kwargs.get("w", constants.DEFAULT_W)
+    self.u = kwargs.get("u", constants.DEFAULT_U)
+    self.limb_dark = kwargs.get("limb_dark", constants.DEFAULT_LIMB_DARK)
 
     self.transit_template = kwargs.get("transit_template", "default")
     if self.transit_template == "default":
-        self.per = tls_constants.DEFAULT_PERIOD
-        self.rp = tls_constants.DEFAULT_RP
-        self.a = tls_constants.DEFAULT_A
-        self.inc = tls_constants.DEFAULT_INC
+        self.per = constants.DEFAULT_PERIOD
+        self.rp = constants.DEFAULT_RP
+        self.a = constants.DEFAULT_A
+        self.inc = constants.DEFAULT_INC
 
     elif self.transit_template == "grazing":
-        self.b = tls_constants.GRAZING_B
+        self.b = constants.GRAZING_B
         self.inc = impact_to_inclination(b=self.b, semimajor_axis=self.a)
 
     elif self.transit_template == "box":
-        self.per = tls_constants.BOX_PERIOD
-        self.rp = tls_constants.BOX_RP
-        self.a = tls_constants.BOX_A
-        self.b = tls_constants.BOX_B
-        self.inc = tls_constants.BOX_INC
-        self.u = tls_constants.BOX_U
-        self.limb_dark = tls_constants.BOX_LIMB_DARK
+        self.per = constants.BOX_PERIOD
+        self.rp = constants.BOX_RP
+        self.a = constants.BOX_A
+        self.b = constants.BOX_B
+        self.inc = constants.BOX_INC
+        self.u = constants.BOX_U
+        self.limb_dark = constants.BOX_LIMB_DARK
 
     else:
         raise ValueError(
@@ -179,8 +170,8 @@ def validate_args(self, kwargs):
     if self.n_transits_min < 1:
         raise ValueError("n_transits_min must be an integer value >= 1")
 
-    # if not isinstance(self.use_threads, int) or self.use_threads < 1:
-    #     raise ValueError("use_threads must be an integer value >= 1")
+    if not isinstance(self.use_threads, int) or self.use_threads < 1:
+        raise ValueError("use_threads must be an integer value >= 1")
 
     # Assert 0 < T0_fit_margin < 0.1
     if self.T0_fit_margin < 0:

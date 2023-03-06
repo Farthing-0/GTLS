@@ -1,17 +1,16 @@
 from __future__ import division, print_function
-import sys
 from os import path
-# import transitleastsquares.version as tls_version
+import version as tls_version
 
 """Magic constants"""
 resources_dir = path.join(path.dirname(__file__))
-# TLS_VERSION = (
-#     "Transit Least Squares TLS "
-#     + tls_version.TLS_VERSIONING
-#     + " ("
-#     + tls_version.TLS_DATE
-#     + ")"
-# )
+TLS_VERSION = (
+    "GPU Transit Least Squares GTLS "
+    + tls_version.TLS_VERSIONING
+    + " ("
+    + tls_version.TLS_DATE
+    + ")"
+)
 
 # In the default, print status information during search
 VERBOSE = True

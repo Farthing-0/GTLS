@@ -1,38 +1,31 @@
-# The GTLS(GPU Transit Least Squares) algorithm is adapted from the TLS(Transit Least Squares) algorithm by Michael Hippke & René Heller (2019)
-# The TLS is an open source software with MIT license. The copyright of the TLS algorithm is held by the authors.
-# You can find the original paper here: https://ui.adsabs.harvard.edu/abs/2019A%26A...623A..39H/abstract
+from __future__ import division, print_function
+import numpy
 
-# The GTLS algorithm is also an open source software with MIT license.
+import constants as constants
+from grid import duration_grid, period_grid
+from transit import get_cache
+from validate import validate_inputs, validate_args
+import core as core
 
-import numpy as np
-import cupy as cp
-from gtls.validate import validate_inputs,validateAndChooseDevice,validate_args
-import gtls.core as core
-import gtls.tls_constants as tls_constants
-from gtls.grid import duration_grid, period_grid
-from gtls.transit import get_cache
+class transitleastsquares(object):
+    """Compute the transit least squares of limb-darkened transit models"""
 
-class gtls(object):
-    """Compute the transit least squares of limb-darkened transit models using GPU"""
-
-    def __init__(self,t,y,dy = None,verbose = False):
+    def __init__(self, t, y, dy=None, verbose=True):
         self.t, self.y, self.dy = validate_inputs(t, y, dy)
         self.verbose = verbose
-    
-    def power(self,**kwargs):
+
+    def power(self, **kwargs):
+        """Compute the periodogram for a set of user-defined parameters"""
         self, kwargs = validate_args(self, kwargs)
-        # self.show_progress_bar = True
-        self.device = validateAndChooseDevice(self.deviceId)
-        if self.device == None:
-            return
-        # if self.verbose:
-        #     print(tls_constants.TLS_VERSION)
+
+        if self.verbose:
+            print(constants.TLS_VERSION)
 
         # Generate possible periods
         periods = period_grid(
             R_star=self.R_star,
             M_star=self.M_star,
-            time_span=np.max(self.t) - np.min(self.t),
+            time_span=numpy.max(self.t) - numpy.min(self.t),
             period_min=self.period_min,
             period_max=self.period_max,
             oversampling_factor=self.oversampling_factor,
@@ -43,8 +36,8 @@ class gtls(object):
         durations = duration_grid(
             periods, shortest=1 / len(self.t), log_step=self.duration_grid_step
         )
-        # maxwidth_in_samples : durations width in the longest transit
-        maxwidth_in_samples = int(np.max(durations) * np.size(self.y))
+
+        maxwidth_in_samples = int(numpy.max(durations) * numpy.size(self.y))
         if maxwidth_in_samples % 2 != 0:
             maxwidth_in_samples = maxwidth_in_samples + 1
         lc_cache_overview, lc_arr = get_cache(
@@ -60,8 +53,22 @@ class gtls(object):
             limb_dark=self.limb_dark,
             verbose=self.verbose
         )
+        if self.verbose:
+            print(
+                "Searching "
+                + str(len(self.y))
+                + " data points, "
+                + str(len(periods))
+                + " periods from "
+                + str(round(min(periods), 3))
+                + " to "
+                + str(round(max(periods), 3))
+                + " days"
+            )
 
-        period,duration,depth,T0,SDE = core.search_multi_periods(
+        periods = numpy.sort(periods)
+
+        periods,period,transit_duration_in_days,Depth,bestT0,SDE,chi2 = core.search_multi_periods(
             periods=periods,
             t=self.t,
             y=self.y,
@@ -74,7 +81,7 @@ class gtls(object):
             lc_arr=lc_arr,
             lc_cache_overview=lc_cache_overview,
             T0_fit_margin=self.T0_fit_margin,
-            show_progress_bar=self.show_progress_bar,
-            oversampling_factor=self.oversampling_factor
+            oversampling_factor = self.oversampling_factor,
+            verbose=self.verbose,
         )
-        return period, duration, depth, T0, SDE
+        return periods,period,transit_duration_in_days,Depth,bestT0,SDE,chi2

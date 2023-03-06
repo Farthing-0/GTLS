@@ -1,18 +1,17 @@
 from __future__ import division, print_function
-# import numba
+import numba
 import numpy
 from numpy import arccos, degrees
-# from transitleastsquares.interpolation import interp1d
+from interpolation import interp1d
 
+def resample(time, flux, factor):
+    # New method without scipy
+    time_grid = int(len(flux) / factor)
+    time_resampled = numpy.linspace(min(time), max(time), time_grid)
+    f = interp1d(time_resampled, time)
+    flux_resampled = f(flux)
 
-# def resample(time, flux, factor):
-#     # New method without scipy
-#     time_grid = int(len(flux) / factor)
-#     time_resampled = numpy.linspace(min(time), max(time), time_grid)
-#     f = interp1d(time_resampled, time)
-#     flux_resampled = f(flux)
-
-#     return time_resampled, flux_resampled
+    return time_resampled, flux_resampled
 
 
 def cleaned_array(t, y, dy=None):

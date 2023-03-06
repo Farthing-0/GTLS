@@ -1,16 +1,16 @@
 from __future__ import division, print_function
 import batman  # https://www.cfa.harvard.edu/~lkreidberg/batman/
 import numpy
-import gtls.tls_constants as tls_constants
-from gtls.interpolation import interp1d
+import constants as constants
+from interpolation import interp1d
 
 
 def reference_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):
     """Returns an Earth-like transit of width 1 and depth 1"""
 
-    f = numpy.ones(tls_constants.SUPERSAMPLE_SIZE)
+    f = numpy.ones(constants.SUPERSAMPLE_SIZE)
     duration = 1  # transit duration in days. Increase for exotic cases
-    t = numpy.linspace(-duration * 0.5, duration * 0.5, tls_constants.SUPERSAMPLE_SIZE)
+    t = numpy.linspace(-duration * 0.5, duration * 0.5, constants.SUPERSAMPLE_SIZE)
     ma = batman.TransitParams()
     ma.t0 = 0  # time of inferior conjunction
     ma.per = per  # orbital period, use Earth as a reference
@@ -126,7 +126,7 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
         scaled_transit = fractional_transit(
             duration=duration,
             maxwidth=numpy.max(durations),
-            depth=tls_constants.SIGNAL_DEPTH,
+            depth=constants.SIGNAL_DEPTH,
             samples=maxwidth_in_samples,
             per=per,
             rp=rp,
@@ -142,7 +142,7 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
         used_samples = int((duration / numpy.max(durations)) * maxwidth_in_samples)
         lc_cache_overview["width_in_samples"][row] = used_samples
         full_values = numpy.where(
-            scaled_transit < (1 - tls_constants.NUMERICAL_STABILITY_CUTOFF)
+            scaled_transit < (1 - constants.NUMERICAL_STABILITY_CUTOFF)
         )
         first_sample = numpy.min(full_values)
         last_sample = numpy.max(full_values) + 1
