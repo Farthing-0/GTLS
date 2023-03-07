@@ -1,8 +1,8 @@
 import numpy
 import numpy as np
-import time
 import cupy as cp
 from .stats import spectra,all_transit_times,calculate_transit_duration_in_days
+from . import GPUFun
 
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
@@ -36,10 +36,10 @@ def search_multi_periods(
 
     singleCalcPeriods = 130
 
-    with open ('GPUFun.cu', 'r') as myfile:
-        myCode=myfile.read()
-
-    module = cp.RawModule(code=myCode)
+    # with open ('GPUFun.cu', 'r') as myfile:
+    #     myCode=myfile.read()
+    GPUCode = GPUFun.getGPUCode()
+    module = cp.RawModule(code=GPUCode)
 
     periodsGPU = cp.array(periods, dtype=cp.float64)
     durationsMaxGPU = cp.array(periods, dtype=cp.int32)

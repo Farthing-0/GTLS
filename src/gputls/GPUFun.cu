@@ -154,11 +154,6 @@ extern "C"{
                     float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
                     float weight = add_visible_left - remove_invisible_right;
                     temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = weight;
-                    // if(z == 1 && weight == 0){
-                    //     printf("temp_ootr:%f,add_visible_left:%f,remove_invisible_right:%f,windows:%d,inverse_squared_patched[becomes_visible]:%f,patched_data[becomes_visible]:%f\n",
-                    //     weight,add_visible_left,remove_invisible_right,window,inverse_squared_patched[becomes_visible],patched_data[becomes_visible]);
-                    // }
-
                 }
                 else{
                     temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = 0;
@@ -181,11 +176,6 @@ extern "C"{
             float *fullsum = in_fullsum + z*(*duration_size);
             float *ootr = in_ootr + z*(*mean_x_size)*(*duration_size);
             float start = fullsum[tid];
-            // if( z ==2 && i == 12410 && tid == 12 && *iter_flag_gpu == 0){
-            //     // printf("current_stat:%.20f,intransit_residual:%.20f,ootr:%.20f,summed_edge_effect_correction:%.20f\n",
-            //     // current_stat,intransit_residual,ootr,summed_edge_effect_correction);
-            //     printf("fullsum:%.20f,ootr:%.20f,start:%.20f\n",fullsum[tid],ootr[i+tid*(*mean_x_size)],start);
-            // }
             if(i < mean_size){
                 ootr[i+tid*(*mean_x_size)] = start + ootr[i+tid*(*mean_x_size)];
             }
