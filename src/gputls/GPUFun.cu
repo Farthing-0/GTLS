@@ -268,7 +268,7 @@ extern "C"{
                 }
             }else{
                 if(tid < *mean_x_size){
-                    //0x7f800000 => infinity, according to IEEE-754
+                    //0x7f800000 => infinity in float, according to IEEE-754
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
                     depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
                 }
