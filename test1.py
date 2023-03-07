@@ -107,13 +107,13 @@ if __name__ == '__main__':
 
     time0 = time.time()
     model = gtls(t = times, y = fluxes, dy = dy)
-    periods,period,transit_duration_in_days,Depth,bestT0,SDE,chi2 = model.power()
+    gtlsResult = model.power()
     print('Time taken for GPU',time.time() - time0)
     print('CPU results')
     print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE)
 
     print('GPU results')
-    print('period', period, 'duration', transit_duration_in_days, 'depth', Depth, 'T0', bestT0,'SDE', SDE)
+    print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
     # plt.plot(periods,chi2,'x',label = 'GPU',color = 'black',alpha = 0.3,markersize = 5)
