@@ -1,13 +1,13 @@
 from __future__ import division, print_function
 import numpy
 
-import constants as constants
-from grid import duration_grid, period_grid
-from transit import get_cache
-from validate import validate_inputs, validate_args
-import core as core
+from . import constants as constants
+from .grid import duration_grid, period_grid
+from .transit import get_cache
+from .validate import validate_inputs, validate_args
+from . import core as core
 
-class transitleastsquares(object):
+class gtls(object):
     """Compute the transit least squares of limb-darkened transit models"""
 
     def __init__(self, t, y, dy=None, verbose=True):

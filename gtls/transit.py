@@ -1,8 +1,8 @@
 from __future__ import division, print_function
 import batman  # https://www.cfa.harvard.edu/~lkreidberg/batman/
 import numpy
-import constants as constants
-from interpolation import interp1d
+from . import constants as constants
+from .interpolation import interp1d
 
 
 def reference_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):

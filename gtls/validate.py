@@ -2,8 +2,8 @@ from __future__ import division, print_function
 import numpy
 import warnings
 import multiprocessing
-from helpers import cleaned_array, impact_to_inclination
-import constants as constants
+from .helpers import cleaned_array, impact_to_inclination
+from . import constants as constants
 
 
 def validate_inputs(t, y, dy):

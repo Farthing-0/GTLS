@@ -1,8 +1,8 @@
 from __future__ import division, print_function
 import numpy
 from os import path
-import constants as constants
-from helpers import running_median, transit_mask
+from .import constants as constants
+from .helpers import running_median, transit_mask
 from tqdm import tqdm
 # from core import fold
 

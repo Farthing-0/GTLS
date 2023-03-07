@@ -3,7 +3,7 @@ import numpy as np
 import numba
 import time
 import cupy as cp
-from stats import spectra,all_transit_times,calculate_transit_duration_in_days
+from .stats import spectra,all_transit_times,calculate_transit_duration_in_days
 
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
@@ -48,7 +48,7 @@ def search_multi_periods(
 
     singleCalcPeriods = 130
 
-    with open ('cupyFun.cu', 'r') as myfile:
+    with open ('GPUFun.cu', 'r') as myfile:
         myCode=myfile.read()
 
     module = cp.RawModule(code=myCode)

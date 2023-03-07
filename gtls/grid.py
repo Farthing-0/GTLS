@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 import numba
-import constants as constants
+from . import constants as constants
 import numpy
 from numpy import pi, sqrt, arccos, degrees, floor, ceil
 import warnings

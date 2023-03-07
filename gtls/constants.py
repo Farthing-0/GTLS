@@ -1,14 +1,14 @@
 from __future__ import division, print_function
 from os import path
-import version as tls_version
+from . import version as version
 
 """Magic constants"""
 resources_dir = path.join(path.dirname(__file__))
 TLS_VERSION = (
     "GPU Transit Least Squares GTLS "
-    + tls_version.TLS_VERSIONING
+    + version.TLS_VERSIONING
     + " ("
-    + tls_version.TLS_DATE
+    + version.TLS_DATE
     + ")"
 )
 
