@@ -180,24 +180,6 @@ def search_multi_periods(
                 LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
                 depthsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = depthsGPU[i][int(locationGPU[iterFlag*singleCalcPeriods + i] / lowestResidualsGPU.shape[2])][locationGPU[iterFlag*singleCalcPeriods + i] % lowestResidualsGPU.shape[2]]
 
-                # print('depth',depthsGPU[i][locationGPU[int(np.floor((iterFlag*singleCalcPeriods + i)/len(durations)))]][int((iterFlag*singleCalcPeriods + i)%len(durations))])
-        # periodNum = 2548
-        # if(int(periodNum / singleCalcPeriods) == iterFlag):
-        #     chi2 = []
-        #     temp_dur = []
-        #     periodIndex = periodNum % singleCalcPeriods
-        #     for index,duration in enumerate(durations):
-        #         if(duration > durationsMinGPU[periodNum].get() and duration < durationsMaxGPU[periodNum].get()):
-        #             chi2.append(lowestResidualsGPU[periodIndex][index].min().get())
-        #             temp_dur.append(duration)
-        #     plt.plot(temp_dur,chi2,'.')
-        #     # print(np.argmin(chi2))
-        #     # print('durGPU',temp_dur)
-        #     print('periodGPU',periods[periodNum])
-        #     # plt.ylim(0.0158,0.01583)
-        #     plt.savefig('chi2DurationGPU.png',dpi=300)
-        #     plt.close()
-
         iterFlagGPU = iterFlagGPU + 1
 
         if verbose:
