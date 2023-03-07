@@ -1,6 +1,5 @@
 import numpy
 import numpy as np
-import numba
 import time
 import cupy as cp
 from .stats import spectra,all_transit_times,calculate_transit_duration_in_days
@@ -12,17 +11,6 @@ def calcGridBlockSize(size):
         blockSize = MAX_BLOCK_SIZE
     gridSizeX = int((size / blockSize) + 1)
     return blockSize,gridSizeX
-
-@numba.jit(fastmath=True, parallel=False, nopython=True)
-def foldfastCPU(time, period):
-    """Fast phase folding with T0=0 hardcoded"""
-    return time / period - numpy.floor(time / period)
-
-@numba.jit(fastmath=True, parallel=False, nopython=True)
-def edge_effect_correction(flux, patched_data, dy, inverse_squared_patched_dy):
-    regular = numpy.sum(((1 - flux) ** 2) * 1 / dy ** 2)
-    patched = numpy.sum(((1 - patched_data) ** 2) * inverse_squared_patched_dy)
-    return patched - regular
 
 def search_multi_periods(
     periods,

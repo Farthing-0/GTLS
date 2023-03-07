@@ -49,7 +49,7 @@ def cleaned_array(t, y, dy=None):
         return clean_t, clean_y, clean_dy
 
 def findRandomLc():
-    dir = '../../../'
+    dir = '../../'
     lc_dir = None
     for file in os.listdir(dir):
         # print(file)
@@ -103,10 +103,10 @@ if __name__ == '__main__':
     # model = transitleastsquares(t = times, y = fluxes,dy = dy)
     # results = model.power()
 
-    from main import transitleastsquares
+    from gputls import gtls
 
     time0 = time.time()
-    model = transitleastsquares(t = times, y = fluxes, dy = dy)
+    model = gtls(t = times, y = fluxes, dy = dy)
     periods,period,transit_duration_in_days,Depth,bestT0,SDE,chi2 = model.power()
     print('Time taken for GPU',time.time() - time0)
     # print('CPU results')

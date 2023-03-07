@@ -1,12 +1,9 @@
 from __future__ import division, print_function
-import numba
 from . import constants as constants
 import numpy
 from numpy import pi, sqrt, arccos, degrees, floor, ceil
 import warnings
 
-
-@numba.jit(fastmath=True, parallel=False, nopython=True)
 def T14(
     R_s, M_s, P, upper_limit=constants.FRACTIONAL_TRANSIT_DURATION_MAX, small=False
 ):
