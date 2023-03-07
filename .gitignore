@@ -38,3 +38,4 @@ env/
 
 #Pushed to Pypi
 pushPypi.sh
+shellrun.sh
