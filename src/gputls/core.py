@@ -216,4 +216,4 @@ def search_multi_periods(
         T0 = assumeT0 + period
     else:
         T0 = assumeT0
-    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2
+    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,power

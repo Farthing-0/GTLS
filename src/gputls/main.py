@@ -6,6 +6,7 @@ from .grid import duration_grid, period_grid
 from .transit import get_cache
 from .validate import validate_inputs, validate_args
 from . import core as core
+from .results import gtlsResult
 
 class gtls(object):
     """Compute the transit least squares of limb-darkened transit models"""
@@ -68,7 +69,7 @@ class gtls(object):
 
         periods = numpy.sort(periods)
 
-        periods,period,transit_duration_in_days,Depth,bestT0,SDE,chi2 = core.search_multi_periods(
+        periods,period,duration,Depth,bestT0,SDE,chi2,power = core.search_multi_periods(
             periods=periods,
             t=self.t,
             y=self.y,
@@ -84,4 +85,5 @@ class gtls(object):
             oversampling_factor = self.oversampling_factor,
             verbose=self.verbose,
         )
-        return periods,period,transit_duration_in_days,Depth,bestT0,SDE,chi2
+        # return periods,period,duration,Depth,bestT0,SDE,chi2
+        return gtlsResult(periods,period,duration,Depth,bestT0,SDE,chi2,power)
