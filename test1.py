@@ -96,12 +96,12 @@ if __name__ == '__main__':
     times,fluxes,dy = cleaned_array(times,fluxes,dy)
     times,fluxes,dy = normalize(times,fluxes,dy)
 
-    from transitleastsquares import transitleastsquares
-    # # from main import transitleastsquares
+    # from transitleastsquares import transitleastsquares
+    # # # from main import transitleastsquares
 
-    # # model = transitleastsquares(t = times, y = fluxes, GPU = False ,dy = dy)
-    model = transitleastsquares(t = times, y = fluxes,dy = dy)
-    results = model.power()
+    # # # model = transitleastsquares(t = times, y = fluxes, GPU = False ,dy = dy)
+    # model = transitleastsquares(t = times, y = fluxes,dy = dy)
+    # results = model.power()
 
     from gputls import gtls
 
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     model = gtls(t = times, y = fluxes, dy = dy)
     gtlsResult = model.power()
     print('Time taken for GPU',time.time() - time0)
-    print('CPU results')
-    print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE)
+    # print('CPU results')
+    # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE)
 
     print('GPU results')
     print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE)

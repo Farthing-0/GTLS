@@ -3,6 +3,7 @@ import numpy as np
 import cupy as cp
 from .stats import spectra,all_transit_times,calculate_transit_duration_in_days
 from . import GPUFun
+import pynvml
 
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
@@ -34,7 +35,7 @@ def search_multi_periods(
     # the search time will reduce about 0.5s to 0.005s, which is not significant.
     # Maybe we can provide a "Fast" mode in the future.
 
-    singleCalcPeriods = 130
+    # singleCalcPeriods = 130
 
     # with open ('GPUFun.cu', 'r') as myfile:
     #     myCode=myfile.read()
@@ -80,30 +81,6 @@ def search_multi_periods(
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
 
-    #Other GPU variables, declare here to save time.
-    inverseSquaredPatchedDysGPU = cp.empty((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
-    edgeEffectCorrectionsGPU = cp.empty((len(periods)),dtype=cp.float32)
-    maxwidthInSamplesGPU = cp.asarray(np.array([maxWidthInSamples])).astype(cp.int32)
-    periodSizeGPU = cp.asarray(np.array([len(periods)])).astype(cp.int32)
-    singleCalcPeriodsGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
-    cumsumGPU = cp.empty((singleCalcPeriods,patchedDatasSize),dtype=cp.float32)
-    meanXSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
-    durationsGPU = cp.asarray(durations).astype(cp.int32)
-    durationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
-    iterFlagGPU = cp.asarray(np.array([0])).astype(cp.int32)
-    fullSumGPU = cp.empty((singleCalcPeriods,len(durations)),dtype=cp.float32)
-    ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-    lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-    locationGPU = cp.empty(len(periods),dtype=cp.int32)
-    depthsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-    overshootGPU = cp.array(lc_cache_overview["overshoot"]).astype(cp.float32)
-    datapointsGPU = cp.array([len(y)]).astype(cp.int32)
-    meanSizeGPU = cp.array([(patchedDatasSize - x + 1) for x in durations]).astype(np.int32)
-    LowestResidualsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
-    depthsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
-    transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
-    # T0FitMarginGPU = cp.array([1 / T0_fit_margin]).astype(cp.int32)
-
     lc_arr_len = np.array([len(x) for x in lc_arr]).astype(np.int32)
     lc_arr_max_len = np.array([np.max(lc_arr_len)]).astype(np.int32)
     lc_arr_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
@@ -111,6 +88,44 @@ def search_multi_periods(
     lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
     lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
 
+    #Other GPU variables, declare here to save time.
+    inverseSquaredPatchedDysGPU = cp.empty((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
+    edgeEffectCorrectionsGPU = cp.empty((len(periods)),dtype=cp.float32)
+    maxwidthInSamplesGPU = cp.asarray(np.array([maxWidthInSamples])).astype(cp.int32)
+    periodSizeGPU = cp.asarray(np.array([len(periods)])).astype(cp.int32)
+    durationsGPU = cp.asarray(durations).astype(cp.int32)
+    durationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
+    iterFlagGPU = cp.asarray(np.array([0])).astype(cp.int32)
+    locationGPU = cp.empty(len(periods),dtype=cp.int32)
+    overshootGPU = cp.array(lc_cache_overview["overshoot"]).astype(cp.float32)
+    datapointsGPU = cp.array([len(y)]).astype(cp.int32)
+    LowestResidualsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
+    depthsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
+    transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
+
+    pynvml.nvmlInit()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
+    nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    singleCalcPeriods = 700
+    print('gpu memory usage:',cp.get_default_memory_pool().total_bytes() / 1024 / 1024,'MB')
+    AssumeMemoryUsage = singleCalcPeriods * (patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*3 + 2*len(durations))
+    singleCalcPeriods_max = (nvmlinfo.free) / (3*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*3 + 2*len(durations)))
+    # singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
+    # print("singleCalcPeriods: " + str(singleCalcPeriods))
+    print('singleCalcPeriods_max:',singleCalcPeriods_max)
+    print('AssumeMemoryUsage:',(AssumeMemoryUsage + nvmlinfo.used ) / 1024 / 1024,'MB')
+
+    #GPU variables for the loop
+    singleCalcPeriodsGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
+    fullSumGPU = cp.empty((singleCalcPeriods,len(durations)),dtype=cp.float32)
+    cumsumGPU = cp.empty((singleCalcPeriods,patchedDatasSize),dtype=cp.float32)
+    meanXSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
+    ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+    lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+    depthsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+    meanSizeGPU = cp.array([(patchedDatasSize - x + 1) for x in durations]).astype(np.int32)
+    
+    #calculate patched data
     patchDataGPU = module.get_function('patchData')
     blockSize,gridSizeX = calcGridBlockSize(len(t) + maxWidthInSamples)
     patchDataGPU((gridSizeX,len(periods),),(blockSize,),
@@ -128,6 +143,8 @@ def search_multi_periods(
     calcEdgeEffectCorrectionsGPU((gridSizeX,1,1),(blockSize,1,1),
     (edgeEffectCorrectionsGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
     patchedDatasSizeGPU,maxwidthInSamplesGPU,periodSizeGPU,))
+
+    print('gpu memory usage:',cp.get_default_memory_pool().used_bytes() / 1024 / 1024,'MB')
 
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
