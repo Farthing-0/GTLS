@@ -226,7 +226,8 @@ extern "C"{
             int durationMin = durationsMin[z_input];
             int duration = in_duration[y];
 
-            if(duration >= durationMin && duration <= durationMax ){
+            // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
+            if(duration >= durationMin && duration <= durationMax){
                 float calc_mean = calcAverageFromCumsum(cumsumGPU,in_duration,in_duration_size,in_patched_datas_size,mean_x_size,tid,y,z,z_input);
                 float overshoot = in_overshoot[y];
                 if(tid < *mean_x_size){
@@ -270,7 +271,7 @@ extern "C"{
                 }
             }else{
                 if(tid < *mean_x_size){
-                    //0x7f800000 => infinity, according to IEEE-754
+                    //0x7f800000 => infinity in float, according to IEEE-754
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
                     depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
                 }
