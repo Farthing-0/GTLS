@@ -1,7 +1,8 @@
 import numpy
 import numpy as np
 import cupy as cp
-from .stats import spectra,all_transit_times,calculate_transit_duration_in_days
+from .stats import spectra,all_transit_times,calculate_transit_duration_in_days,intransit_stats,snr_stats
+from .helpers import transit_mask
 from . import GPUFun
 import pynvml
 
@@ -138,7 +139,7 @@ def search_multi_periods(
     (edgeEffectCorrectionsGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
     patchedDatasSizeGPU,maxwidthInSamplesGPU,periodSizeGPU,))
 
-    print('gpu memory usage:',cp.get_default_memory_pool().used_bytes() / 1024 / 1024,'MB')
+    # print('gpu memory usage:',cp.get_default_memory_pool().used_bytes() / 1024 / 1024,'MB')
 
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
@@ -227,4 +228,32 @@ def search_multi_periods(
         T0 = assumeT0 + period
     else:
         T0 = assumeT0
-    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,power
+
+    #SNR
+    depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
+    t, y, transit_times, transit_duration_in_days
+    )
+    all_flux_intransit = numpy.concatenate(
+        [all_flux_intransit_odd, all_flux_intransit_even]
+    )
+    # snr_per_transit, snr_pink_per_transit = snr_stats(
+    #     t=t,
+    #     y=y,
+    #     period=period,
+    #     duration=rawDuration,
+    #     T0=T0,
+    #     transit_times=transit_times,
+    #     transit_duration_in_days=transit_duration_in_days,
+    #     per_transit_count=per_transit_count,
+    # )
+    intransit = transit_mask(t, period, 2 * rawDuration, T0)
+    flux_ootr = y[~intransit]
+    depth_mean = numpy.mean(all_flux_intransit)
+    # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
+    #     per_transit_count
+    # ) ** (0.5)
+    snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(
+        all_flux_intransit
+    ) ** (0.5)
+
+    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,transit_times,power,snr#,snr_per_transit,snr_pink_per_transit

@@ -113,7 +113,8 @@ if __name__ == '__main__':
     # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE)
 
     print('GPU results')
-    print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE)
+    print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE,
+          'snr', gtlsResult.snr)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
     # plt.plot(periods,chi2,'x',label = 'GPU',color = 'black',alpha = 0.3,markersize = 5)
