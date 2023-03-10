@@ -223,13 +223,16 @@ def search_multi_periods(
     transit_duration_in_days = calculate_transit_duration_in_days(
         t, period, transit_times, rawDuration
     )
-    assumeT0 = T0 + transit_duration_in_days / 2
-    if(assumeT0 < min(t)):
-        T0 = assumeT0 + period
+    T0 = T0 + transit_duration_in_days / 2
+    transit_times = transit_times + transit_duration_in_days / 2
+    if(T0 < min(t)):
+        T0 = T0 + period
     else:
-        T0 = assumeT0
+        T0 = T0
 
     #SNR
+    # print('GPU transit_times',transit_times)
+    # print('GPU transit_duration_in_days',transit_duration_in_days)
     depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
     t, y, transit_times, transit_duration_in_days
     )
@@ -248,12 +251,14 @@ def search_multi_periods(
     # )
     intransit = transit_mask(t, period, 2 * rawDuration, T0)
     flux_ootr = y[~intransit]
+    
+    # print('GPU all_flux_intransit',all_flux_intransit)
     depth_mean = numpy.mean(all_flux_intransit)
+    # print('GPU depth_mean',depth_mean)
     # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
     #     per_transit_count
     # ) ** (0.5)
     snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(
         all_flux_intransit
     ) ** (0.5)
-
     return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,transit_times,power,snr#,snr_per_transit,snr_pink_per_transit

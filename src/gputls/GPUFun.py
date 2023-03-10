@@ -21,8 +21,10 @@ extern "C"{
 
         const double RsMin = R_sun * R_STAR_MIN;
         const double RsMax = R_sun * R_STAR_MAX;
-        const double piGMMax = 416970932280661395000; //pi * 6.673e-11 * 1.989 * 10 ** 30 (pi*G*M)
-        const double piGMMin = 41697093228066139500;  //pi * 6.673e-11 * 1.989 * 10 ** 30 * 0.1 (pi*G*M)
+        // const double piGMMax = 416970932280661395000; //pi * 6.673e-11 * 1.989 * 10 ** 30 (pi*G*M)
+        // const double piGMMin = 41697093228066139500;  //pi * 6.673e-11 * 1.989 * 10 ** 30 * 0.1 (pi*G*M)
+        const double piGMMax = 416970;
+        const double piGMMin = 41697;
 
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
         
@@ -34,9 +36,9 @@ extern "C"{
             double correction_factor = no_of_transits_worst / no_of_transits_naive;
 
             double period = periods[tid] * SECONDS_PER_DAY;
-            double T14Min = RsMin * pow((4 * period) / piGMMin, 1.0 / 3.0);
+            double T14Min = RsMin * pow((4 * period) / piGMMin / 1000000000000000, 1.0 / 3.0);
 
-            double T14Max = (RsMax + R_jup*2) * pow((4 * period) / piGMMax, 1.0 / 3.0);
+            double T14Max = (RsMax + R_jup*2) * pow((4 * period) / piGMMax / 1000000000000000, 1.0 / 3.0);
             double durationMin = T14Min / period;
             double durationMax = T14Max / period;
             if(durationMin > FRACTIONAL_TRANSIT_DURATION_MAX){
@@ -227,7 +229,7 @@ extern "C"{
             int duration = in_duration[y];
 
             // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
-            if(duration >= durationMin && duration <= durationMax){
+            if(duration >= durationMin && duration <= durationMax ){
                 float calc_mean = calcAverageFromCumsum(cumsumGPU,in_duration,in_duration_size,in_patched_datas_size,mean_x_size,tid,y,z,z_input);
                 float overshoot = in_overshoot[y];
                 if(tid < *mean_x_size){
