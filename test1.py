@@ -3,6 +3,7 @@ from astropy.io import fits
 import numpy as np
 import numpy
 import time
+import random
 
 def cleaned_array(t, y, dy=None):
     """Takes numpy arrays with masks and non-float values.
@@ -65,10 +66,10 @@ def findRandomLc():
     for lc_file in os.listdir(lc_dir):
         if(lc_file.endswith('.fits')):
             files.append(lc_file)
-    # lc_file = lc_dir + random.choice(files)
+    lc_file = lc_dir + random.choice(files)
     
     #35 can be a good example
-    lc_file = lc_dir + files[47]
+    # lc_file = lc_dir + files[47]
     # for lc_file in files:
     #     # if '0000000020640548' in lc_file:
     #     # if '0000000028473414' in lc_file:
@@ -96,12 +97,12 @@ if __name__ == '__main__':
     times,fluxes,dy = cleaned_array(times,fluxes,dy)
     times,fluxes,dy = normalize(times,fluxes,dy)
 
-    from transitleastsquares import transitleastsquares
-    # # # from main import transitleastsquares
+    # from transitleastsquares import transitleastsquares
+    # # # # from main import transitleastsquares
 
-    # # # model = transitleastsquares(t = times, y = fluxes, GPU = False ,dy = dy)
-    model = transitleastsquares(t = times, y = fluxes,dy = dy)
-    results = model.power()
+    # # # # model = transitleastsquares(t = times, y = fluxes, GPU = False ,dy = dy)
+    # model = transitleastsquares(t = times, y = fluxes,dy = dy)
+    # results = model.power()
 
     from gputls import gtls
 
@@ -109,12 +110,12 @@ if __name__ == '__main__':
     model = gtls(t = times, y = fluxes, dy = dy)
     gtlsResult = model.power()
     print('Time taken for GPU',time.time() - time0)
-    print('CPU results')
-    print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
+    # print('CPU results')
+    # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
 
     print('GPU results')
     print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE,
-          'snr', gtlsResult.snr)
+          'snr', gtlsResult.snr,'snrPink', gtlsResult.snrPink)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
     # plt.plot(periods,chi2,'x',label = 'GPU',color = 'black',alpha = 0.3,markersize = 5)

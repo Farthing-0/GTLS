@@ -236,29 +236,36 @@ def search_multi_periods(
     depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
     t, y, transit_times, transit_duration_in_days
     )
-    all_flux_intransit = numpy.concatenate(
-        [all_flux_intransit_odd, all_flux_intransit_even]
-    )
-    # snr_per_transit, snr_pink_per_transit = snr_stats(
-    #     t=t,
-    #     y=y,
-    #     period=period,
-    #     duration=rawDuration,
-    #     T0=T0,
-    #     transit_times=transit_times,
-    #     transit_duration_in_days=transit_duration_in_days,
-    #     per_transit_count=per_transit_count,
+    # all_flux_intransit = numpy.concatenate(
+    #     [all_flux_intransit_odd, all_flux_intransit_even]
     # )
-    intransit = transit_mask(t, period, 2 * rawDuration, T0)
-    flux_ootr = y[~intransit]
+    snr_per_transit, snr_pink_per_transit = snr_stats(
+        t=t,
+        y=y,
+        period=period,
+        duration=rawDuration,
+        T0=T0,
+        transit_times=transit_times,
+        transit_duration_in_days=transit_duration_in_days,
+        per_transit_count=per_transit_count,
+    )
+    # print('GPU snr_per_transit',snr_per_transit)
+    # print('GPU snr_pink_per_transit',snr_pink_per_transit)
+    # intransit = transit_mask(t, period, 2 * rawDuration, T0)
+    # flux_ootr = y[~intransit]
     
     # print('GPU all_flux_intransit',all_flux_intransit)
-    depth_mean = numpy.mean(all_flux_intransit)
+    # depth_mean = numpy.mean(all_flux_intransit)
     # print('GPU depth_mean',depth_mean)
     # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
     #     per_transit_count
     # ) ** (0.5)
-    snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(
-        all_flux_intransit
-    ) ** (0.5)
-    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,transit_times,power,snr#,snr_per_transit,snr_pink_per_transit
+    # snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(
+    #     all_flux_intransit
+    # ) ** (0.5)
+
+    #Fold N times, SNRFold = SNR / sqrt(N)
+    #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
+    snr = np.mean(snr_per_transit) / (len(transit_times)**(0.5))
+    snr_pink = np.mean(snr_pink_per_transit) / (len(transit_times)**(0.5))
+    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,transit_times,power,snr,snr_pink
