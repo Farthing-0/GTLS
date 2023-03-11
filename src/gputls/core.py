@@ -82,10 +82,11 @@ def search_multi_periods(
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
 
+
     lc_arr_len = np.array([len(x) for x in lc_arr]).astype(np.int32)
     lc_arr_max_len = np.array([np.max(lc_arr_len)]).astype(np.int32)
     lc_arr_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
-    lcArrLenGPU = cp.asarray(lc_arr_len).astype(cp.int32)
+    
     lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
     lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
 
@@ -180,7 +181,7 @@ def search_multi_periods(
         calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(lowestResidualsGPU,depthsGPU,meanSizeGPU,
         meanXSizeGPU,patchedDatasGPU,patchedDatasSizeGPU,durationsGPU,
-        durationsSizeGPU,lcArrFullLengthGPU,lcArrLenGPU,lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
+        durationsSizeGPU,lcArrFullLengthGPU,lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
         overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,#meanGPU,
         durationsMaxGPU,durationsMinGPU,transitDepthMinGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
@@ -254,7 +255,7 @@ def search_multi_periods(
     # intransit = transit_mask(t, period, 2 * rawDuration, T0)
     # flux_ootr = y[~intransit]
     
-    # print('GPU all_flux_intransit',all_flux_intransit)
+    # # print('GPU all_flux_intransit',all_flux_intransit)
     # depth_mean = numpy.mean(all_flux_intransit)
     # print('GPU depth_mean',depth_mean)
     # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
@@ -264,8 +265,8 @@ def search_multi_periods(
     #     all_flux_intransit
     # ) ** (0.5)
 
-    #Fold N times, SNRFold = SNR / sqrt(N)
+    #Fold N times, SNRFold = SNR * sqrt(N)
     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
-    snr = np.mean(snr_per_transit) / (len(transit_times)**(0.5))
-    snr_pink = np.mean(snr_pink_per_transit) / (len(transit_times)**(0.5))
+    snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
+    snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
     return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,transit_times,power,snr,snr_pink

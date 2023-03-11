@@ -4,6 +4,7 @@ import numpy as np
 import numpy
 import time
 import random
+from wotan import flatten
 
 def cleaned_array(t, y, dy=None):
     """Takes numpy arrays with masks and non-float values.
@@ -50,11 +51,11 @@ def cleaned_array(t, y, dy=None):
         return clean_t, clean_y, clean_dy
 
 def findRandomLc():
-    dir = '../../'
+    dir = '../../../HDD/'
     lc_dir = None
     for file in os.listdir(dir):
         # print(file)
-        if file.startswith('lightcurve'):
+        if file.endswith('lightcurve_58'):
             lc_dir = dir + file + '/'
             break
     if lc_dir == None:
@@ -66,10 +67,10 @@ def findRandomLc():
     for lc_file in os.listdir(lc_dir):
         if(lc_file.endswith('.fits')):
             files.append(lc_file)
-    lc_file = lc_dir + random.choice(files)
+    # lc_file = lc_dir + random.choice(files)
     
     #35 can be a good example
-    # lc_file = lc_dir + files[47]
+    lc_file = lc_dir + files[2]
     # for lc_file in files:
     #     # if '0000000020640548' in lc_file:
     #     # if '0000000028473414' in lc_file:
@@ -80,6 +81,7 @@ def findRandomLc():
     
     print(lc_file)
     fluxes = None
+    
     with fits.open(lc_file,mode = "readonly") as lc_file:
         fluxes = lc_file[1].data['PDCSAP_FLUX']
         times = lc_file[1].data['TIME']
@@ -97,21 +99,24 @@ if __name__ == '__main__':
     times,fluxes,dy = cleaned_array(times,fluxes,dy)
     times,fluxes,dy = normalize(times,fluxes,dy)
 
+    flatten_lc, trend_lc = flatten(times, fluxes, window_length=0.5, method='biweight', return_trend=True)
+
+
     # from transitleastsquares import transitleastsquares
     # # # # from main import transitleastsquares
 
-    # # # # model = transitleastsquares(t = times, y = fluxes, GPU = False ,dy = dy)
-    # model = transitleastsquares(t = times, y = fluxes,dy = dy)
+    # # # # model = transitleastsquares(t = times, y = flatten_lc, GPU = False ,dy = dy)
+    # model = transitleastsquares(t = times, y = flatten_lc,dy = dy)
     # results = model.power()
 
     from gputls import gtls
 
     time0 = time.time()
-    model = gtls(t = times, y = fluxes, dy = dy)
+    model = gtls(t = times, y = flatten_lc, dy = dy)
     gtlsResult = model.power()
     print('Time taken for GPU',time.time() - time0)
-    # print('CPU results')
-    # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
+    print('CPU results')
+    print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
 
     print('GPU results')
     print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE,

@@ -204,8 +204,8 @@ extern "C"{
     float *depths, int *in_mean_size,
     int *mean_x_size,float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
-    float *in_signal,int *in_signal_x_size,
-    int *in_max_signal_x_size,float *in_inverse_squared_patched_dys,
+    float *in_signal,int *in_max_signal_x_size,
+    float *in_inverse_squared_patched_dys,
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
     int *durationsMax,int *durationsMin, float *in_transit_depth_min,
@@ -226,8 +226,8 @@ extern "C"{
             int durationMin = durationsMin[z_input];
             int duration = in_duration[y];
 
-            // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
-            if(duration >= durationMin && duration <= durationMax ){
+            if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
+            // if(duration >= durationMin && duration <= durationMax ){
                 float calc_mean = calcAverageFromCumsum(cumsumGPU,in_duration,in_duration_size,in_patched_datas_size,mean_x_size,tid,y,z,z_input);
                 float overshoot = in_overshoot[y];
                 if(tid < *mean_x_size){
@@ -244,7 +244,8 @@ extern "C"{
                     }
 
                     float *patched_data = in_patched_datas + z_input*(*in_patched_datas_size);
-                    int signal_x_size = in_signal_x_size[y];
+                    // int signal_x_size = in_signal_x_size[y];
+                    int signal_x_size = duration;
                     float *signal = in_signal+y*(*in_max_signal_x_size);
                     
                     float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
