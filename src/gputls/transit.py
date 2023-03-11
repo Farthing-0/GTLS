@@ -101,8 +101,8 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
         maxwidth_in_samples and returns these LCs in a 2D array, together with 
         their metadata in a separate array."""
 
-    if verbose:
-        print("Creating model cache for", str(len(durations)), "durations")
+    # if verbose:
+    #     print("Creating model cache for", str(len(durations)), "durations")
     lc_arr = []
     rows = numpy.size(durations)
     lc_cache_overview = numpy.zeros(

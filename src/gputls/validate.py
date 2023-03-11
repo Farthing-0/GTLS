@@ -105,6 +105,17 @@ def validate_args(self, kwargs):
         self.a = constants.DEFAULT_A
         self.inc = constants.DEFAULT_INC
 
+        self.grazing_b = constants.GRAZING_B
+        self.grazing_inc = impact_to_inclination(b=self.grazing_b, semimajor_axis=self.a)
+
+        self.box_per = constants.BOX_PERIOD
+        self.box_rp = constants.BOX_RP
+        self.box_a = constants.BOX_A
+        self.box_b = constants.BOX_B
+        self.box_inc = constants.BOX_INC
+        self.box_u = constants.BOX_U
+        self.box_limb_dark = constants.BOX_LIMB_DARK
+
     elif self.transit_template == "grazing":
         self.b = constants.GRAZING_B
         self.inc = impact_to_inclination(b=self.b, semimajor_axis=self.a)

@@ -114,9 +114,9 @@ if __name__ == '__main__':
     time0 = time.time()
     model = gtls(t = times, y = flatten_lc, dy = dy)
     gtlsResult = model.power()
-    print('Time taken for GPU',time.time() - time0)
-    print('CPU results')
-    print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
+    # print('Time taken for GPU',time.time() - time0)
+    # print('CPU results')
+    # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
 
     print('GPU results')
     print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE,
