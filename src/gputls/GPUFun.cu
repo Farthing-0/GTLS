@@ -200,9 +200,10 @@ extern "C"{
         }
     }
 
-    __global__ void calcAllLowestResidualsGPU(float *out,
-    float *depths, int *in_mean_size,
-    int *mean_x_size,float *in_patched_datas,
+    __global__ void calcAllLowestResidualsGPU(
+    float *out,float *depths,float *outType,
+    int *in_mean_size,int *mean_x_size,
+    float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
     float *in_signal,float *in_signal_grazing,float *in_signal_box,
     int *in_max_signal_x_size,
@@ -234,6 +235,7 @@ extern "C"{
                 if(tid < *mean_x_size){
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = datapoints;
                     depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
+                    outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
                 }
                 if(tid < mean_size && calc_mean > transit_depth_min){
                     float ootr = 0;
@@ -293,6 +295,7 @@ extern "C"{
                     //0x7f800000 => infinity in float, according to IEEE-754
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
                     depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
+                    outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
                 }
             }
         }

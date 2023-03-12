@@ -39,6 +39,6 @@ env/
 #Pushed to Pypi
 pushPypi.sh
 shellrun.sh
-move.sh
+# move.sh
 debug.sh
 test.ipynb
