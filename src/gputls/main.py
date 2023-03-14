@@ -99,7 +99,7 @@ class gtls(object):
 
         periods = numpy.sort(periods)
 
-        periods,period,duration,Depth,bestT0,SDE,chi2,transitTimes,power,snr,snrPink = core.search_multi_periods(
+        periods,period,duration,Depth,bestT0,SDE,chi2,transitTimes,power,snr,snrPink,snrFit,snrFitPink = core.search_multi_periods(
             periods=periods,
             t=self.t,
             y=self.y,
@@ -118,4 +118,4 @@ class gtls(object):
             verbose=self.verbose,
         )
         # return periods,period,duration,Depth,bestT0,SDE,chi2
-        return gtlsResult(periods,period,duration,Depth,bestT0,SDE,chi2,transitTimes,power,snr,snrPink)
+        return gtlsResult(periods,period,duration,Depth,bestT0,SDE,chi2,transitTimes,power,snr,snrPink,snrFit,snrFitPink)

@@ -189,19 +189,17 @@ extern "C"{
     }
 
     __device__ float calcAverageFromCumsum(float *inPatchedDataCumsum,
-    int *duration,int *duration_size,int *patched_data_size,int *mean_x_size,
-    int tid,int y,int z,int z_input){
-        int window = duration[y];
+    int duration, int *patched_data_size, int tid, int z){
         if(tid == 0){
-            return 1 - inPatchedDataCumsum[z*(*patched_data_size) + window - 1] / window;
+            return 1 - inPatchedDataCumsum[z*(*patched_data_size) + duration - 1] / duration;
         }
         else{
-            return 1 - (inPatchedDataCumsum[z*(*patched_data_size) + tid + window - 1] - inPatchedDataCumsum[z*(*patched_data_size) + tid - 1]) / window;
+            return 1 - (inPatchedDataCumsum[z*(*patched_data_size) + tid + duration - 1] - inPatchedDataCumsum[z*(*patched_data_size) + tid - 1]) / duration;
         }
     }
 
     __global__ void calcAllLowestResidualsGPU(
-    float *out,float *depths,float *outType,
+    float *out,//float *depths,
     int *in_mean_size,int *mean_x_size,
     float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
@@ -230,12 +228,12 @@ extern "C"{
 
             // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
             if(duration >= durationMin && duration <= durationMax ){
-                float calc_mean = calcAverageFromCumsum(cumsumGPU,in_duration,in_duration_size,in_patched_datas_size,mean_x_size,tid,y,z,z_input);
+                float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,z);
                 float overshoot = in_overshoot[y];
                 if(tid < *mean_x_size){
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = datapoints;
-                    depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
-                    outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
+                    //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
+                    // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
                 }
                 if(tid < mean_size && calc_mean > transit_depth_min){
                     float ootr = 0;
@@ -246,7 +244,7 @@ extern "C"{
                         ootr = *(in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
                     }
 
-                    float *patched_data = in_patched_datas + z_input*(*in_patched_datas_size);
+                    float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
                     // int signal_x_size = in_signal_x_size[y];
                     int signal_x_size = duration;
                     float *signal = in_signal+y*(*in_max_signal_x_size);
@@ -255,11 +253,8 @@ extern "C"{
                     
                     float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
                     float summed_edge_effect_correction = in_summed_edge_effect_correction[z_input];
-                    int best_row = 0;
-                    int best_depth = 0;
                     float SIGNAL_DEPTH = 0.5;
 
-                    float *data = patched_data + tid;
                     float *dy = inverse_squared_patched_dy_arr + tid;
                     float target_depth = calc_mean * overshoot;
                     float reverse_scale = target_depth / SIGNAL_DEPTH;
@@ -288,17 +283,65 @@ extern "C"{
 
                     // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
-                    depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
+                    //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
                 }
             }else{
                 if(tid < *mean_x_size){
                     //0x7f800000 => infinity in float, according to IEEE-754
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
-                    depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
-                    outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
+                    //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
+                    // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
                 }
             }
         }
     }
 
+    // This function is used after the best period and duration are found, to calculate the SNR and some other metrics.
+    __global__ void trapezoidFit(float *results,
+    float *inData, float *inInverseSquaredDys,
+    int duration, int inT0Index,
+    float *transitMean, int tidMax ){
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        if (tid < tidMax) {
+            // printf("tid: %d", tid);
+            // printf("tidMax: %d", tidMax);
+            float *result = results + tid*(duration);
+            //TrapezoidDepth can not change since I use other fixed values in the kernel
+            float TrapezoidDepth = ((float)tidMax * (*transitMean) - 0.5*(float)tid)/((float)tidMax - 0.5*(float)tid);
+            // float meanSignal = (tid*(1+TrapezoidDepth)/2 + (tidMax - tid)*TrapezoidDepth)/tidMax;
+            float meanSignal = (tid*0.75 + (tidMax - tid)*TrapezoidDepth)/tidMax;
+            
+            // float scale = (*transitMean) / meanSignal;
+            // float overshoot = 1 / (2 - (meanSignal / TrapezoidDepth));
+
+            // float targetDepth = (*transitMean) * overshoot;
+            // float reverseScale = targetDepth / TrapezoidDepth;
+
+            float trapezoidQ = ((float)tid/(float)tidMax)*(float(duration)/2);
+            float signal;
+            float sigi = 0;
+            float intransitResidual = 0;
+
+            float *data = inData + inT0Index;
+            float *dy = inInverseSquaredDys + inT0Index;
+
+            //Warining: Might be a bug especially when duration is small
+            for (int i = 0; i < duration; i++) {
+                if (i == 0 and tid != 0) {
+                    signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
+                }
+                else if(i < trapezoidQ){
+                    signal = (1 - ((1-TrapezoidDepth)/(trapezoidQ))*i);
+                }
+                else if(i >= trapezoidQ && i < duration - trapezoidQ){
+                    signal = TrapezoidDepth;
+                }
+                else{
+                    signal = (1-((1-TrapezoidDepth)/(trapezoidQ))*(duration-i));
+                }
+                // result[i] = signal;
+                result[i] = (data[i] - signal) * (data[i] - signal) * dy[i];
+            }
+        }
+    }
 }

@@ -126,8 +126,8 @@ def search_multi_periods(
     meanXSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
     ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
     lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-    depthsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-    lowestResidualsTypeGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.int32)
+    # depthsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+    # lowestResidualsTypeGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.int32)
     meanSizeGPU = cp.array([(patchedDatasSize - x + 1) for x in durations]).astype(np.int32)
     
     #calculate patched data
@@ -136,6 +136,12 @@ def search_multi_periods(
     patchDataGPU((gridSizeX,len(periods),),(blockSize,),
     (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
     maxWidthInSamplesGPU,yGPU,dyGPU,tSizeGPU,periodsSizeGPU))
+
+    # import matplotlib.pyplot as plt
+    # plt.plot(patchedDatasGPU[1].get(),'.')
+    # plt.savefig('patchedDatasGPU.png')
+    # plt.close()
+    # exit()
 
     calcInverseSquaredPatchedDyGPU = module.get_function('calcInverseSquaredPatchedDy')
     blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize)
@@ -191,7 +197,7 @@ def search_multi_periods(
         #3 means no transit(Or not detect at all)
         #TODO:export all transit types output, distinguish them in the next step? or just use the lowest one? 
         calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
-        (blockSize,1,1),(lowestResidualsGPU,depthsGPU,lowestResidualsTypeGPU,
+        (blockSize,1,1),(lowestResidualsGPU,#depthsGPU,
         meanSizeGPU,meanXSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,durationsGPU,
         durationsSizeGPU,lcArrFullLengthGPU,lcArrGrazingFullLengthGPU,lcArrBoxFullLengthGPU,
@@ -205,7 +211,7 @@ def search_multi_periods(
             if(iterFlag*singleCalcPeriods + i < len(periods)):
                 locationGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].argmin()
                 LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
-                depthsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = depthsGPU[i][int(locationGPU[iterFlag*singleCalcPeriods + i] / lowestResidualsGPU.shape[2])][locationGPU[iterFlag*singleCalcPeriods + i] % lowestResidualsGPU.shape[2]]
+                # depthsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = depthsGPU[i][int(locationGPU[iterFlag*singleCalcPeriods + i] / lowestResidualsGPU.shape[2])][locationGPU[iterFlag*singleCalcPeriods + i] % lowestResidualsGPU.shape[2]]
 
         iterFlagGPU = iterFlagGPU + 1
 
@@ -218,7 +224,7 @@ def search_multi_periods(
 
     #Self Defined metrics
     HighestPowerIndex = numpy.argmax(power)
-    Depth = depthsEachPeriodGPU[HighestPowerIndex].item()    
+    # Depth = depthsEachPeriodGPU[HighestPowerIndex].item()    
     period = periods[HighestPowerIndex]
 
     # BestChi2Index = numpy.argmin(chi2)
@@ -228,6 +234,47 @@ def search_multi_periods(
     rawDuration = lc_cache_overview['duration'][bestRow]
 
     bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
+    # print('Period, Duration and T0 index:',HighestPowerIndex,durationIndex,bestRowT0)
+    transitMean = patchedDatasGPU[HighestPowerIndex][bestRowT0:bestRowT0+durations[durationIndex]].mean()
+    # print('transitMean:',type(transitMean.item()))
+    # print('transitMean:',type(transitMean))
+    # print('rawDuration:',durations[durationIndex])
+    # print('transit:',patchedDatasGPU[HighestPowerIndex][bestRowT0:bestRowT0+durations[durationIndex]])
+
+    #Technically, the "real" trapezoidFitSize = 2 * trapezoidFitSize
+    trapezoidFitSize = 100
+    trapezoidFitResultGPU = cp.empty((trapezoidFitSize,durations[durationIndex]),dtype=cp.float32)
+    # print(type(durations[durationIndex]))
+    # exit()
+    trapezoidFitGPU = module.get_function('trapezoidFit')
+    blockSize,gridSizeX = calcGridBlockSize(trapezoidFitSize)
+    trapezoidFitGPU((gridSizeX,1,1),(blockSize,1,1),(trapezoidFitResultGPU,
+    patchedDatasGPU[HighestPowerIndex],inverseSquaredPatchedDysGPU[HighestPowerIndex],
+    cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
+    bestFitTid = cp.sum(trapezoidFitResultGPU,axis=-1).argmin()
+    BestFitDepth = (trapezoidFitSize * (transitMean) - 0.5*bestFitTid)/(trapezoidFitSize - 0.5*bestFitTid)
+    dataOutTransitGPU = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
+    # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])   
+    snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(dataOutTransitGPU)
+
+    # print('BestFitDepth:',BestFitDepth)
+    # print('FirstDepth:',1-Depth)
+    # print('fitSNR:',fitSNR)
+
+
+    # print(trapezoidFitResultGPU)
+    # print(cp.sum(trapezoidFitResultGPU,axis=-1))
+    # import matplotlib.pyplot as plt
+    # plt.plot(trapezoidFitResultGPU[23].get(),'.r')
+    # plt.plot(patchedDatasGPU[HighestPowerIndex][bestRowT0:bestRowT0+durations[durationIndex]].get(),'.b')
+    # plt.plot(cp.sum(trapezoidFitResultGPU,axis=-1).get(),'.r')
+    # plt.plot(cp.std(trapezoidFitResultGPU,axis=-1).get(),'.b')
+    # plt.savefig('transit.png')
+    # plt.close()
+    # print('transitMean:',transitMean)
+    # exit()
+
+
     if bestRowT0 > len(t) - 1:
         bestRowT0 = bestRowT0 - len(t)
     bestSortIndex = sortIndexGPU[HighestPowerIndex]
@@ -235,6 +282,9 @@ def search_multi_periods(
     Tx = t[tIndex.get()]
     T0 = Tx - int((Tx-min(t)) / period) * period - period
     transit_times = all_transit_times(T0, t, period)
+    # print('transit_times',transit_times)
+    # exit()
+    snrFitPink = (1 - BestFitDepth)/((cp.std(trapezoidFitResultGPU[bestFitTid])**2/(durations[durationIndex])) + (cp.std(dataOutTransitGPU)**2/(len(transit_times))))**0.5
     transit_duration_in_days = calculate_transit_duration_in_days(
         t, period, transit_times, rawDuration
     )
@@ -283,4 +333,4 @@ def search_multi_periods(
     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
     snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
-    return periods,period,transit_duration_in_days,1 - Depth,T0,SDE,chi2,transit_times,power,snr,snr_pink
+    return periods,period,transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink

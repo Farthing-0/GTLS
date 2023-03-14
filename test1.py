@@ -67,16 +67,17 @@ def findRandomLc():
     for lc_file in os.listdir(lc_dir):
         if(lc_file.endswith('.fits')):
             files.append(lc_file)
+    
     # lc_file = lc_dir + random.choice(files)
     
     #35 can be a good example
-    lc_file = lc_dir + files[2]
+    lc_file = lc_dir + files[10]
     # for lc_file in files:
-    #     # if '0000000020640548' in lc_file:
+        # if '0000000005615060' in lc_file:
     #     # if '0000000028473414' in lc_file:
     # #     # if '0000000010596267' in lc_file:
     # #     if '0000000015422557' in lc_file:
-    #         break
+            # break
     # lc_file = lc_dir + lc_file
     
     print(lc_file)
@@ -120,7 +121,7 @@ if __name__ == '__main__':
 
     print('GPU results')
     print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE,
-          'snr', gtlsResult.snr,'snrPink', gtlsResult.snrPink)
+          'snr', gtlsResult.snr,'snrPink', gtlsResult.snrPink,'snrFit',gtlsResult.snrFit,'snrFitPink',gtlsResult.snrFitPink)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
     # plt.plot(periods,chi2,'x',label = 'GPU',color = 'black',alpha = 0.3,markersize = 5)
