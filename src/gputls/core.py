@@ -253,10 +253,14 @@ def search_multi_periods(
     cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
     bestFitTid = cp.sum(trapezoidFitResultGPU,axis=-1).argmin()
     BestFitDepth = (trapezoidFitSize * (transitMean) - 0.5*bestFitTid)/(trapezoidFitSize - 0.5*bestFitTid)
-    dataOutTransitGPU = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
+    dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
     # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])   
-    snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(dataOutTransitGPU)
-
+    snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
+    DataCumsum = np.cumsum(dataOutTransit)
+    DataSlideAvg = (DataCumsum[durations[durationIndex]:] - DataCumsum[:-durations[durationIndex]])/durations[durationIndex]
+    redNoise = np.std(DataSlideAvg)
+    # print('redNoise:',redNoise)
+    # print('redNoisestd',np.std(DataSlideAvg))
     # print('BestFitDepth:',BestFitDepth)
     # print('FirstDepth:',1-Depth)
     # print('fitSNR:',fitSNR)
@@ -282,9 +286,9 @@ def search_multi_periods(
     Tx = t[tIndex.get()]
     T0 = Tx - int((Tx-min(t)) / period) * period - period
     transit_times = all_transit_times(T0, t, period)
-    # print('transit_times',transit_times)
-    # exit()
-    snrFitPink = (1 - BestFitDepth)/((cp.std(trapezoidFitResultGPU[bestFitTid])**2/(durations[durationIndex])) + (cp.std(dataOutTransitGPU)**2/(len(transit_times))))**0.5
+
+    snrFitPink = (1 - BestFitDepth)/((np.std(dataOutTransit)**2/(durations[durationIndex])) + (redNoise**2/(len(transit_times))))**0.5
+
     transit_duration_in_days = calculate_transit_duration_in_days(
         t, period, transit_times, rawDuration
     )

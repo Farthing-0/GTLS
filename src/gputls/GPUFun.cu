@@ -270,11 +270,11 @@ extern "C"{
                         sigi = (1 - signal[i]) * reverse_scale;
                         intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
 
-                        sigi_grazing = (1 - signal_grazing[i]) * reverse_scale;
-                        intransit_residual_grazing = intransit_residual_grazing + ((data[i] - (1 - sigi_grazing)) * (data[i] - (1 - sigi_grazing))) * dy[i];
+                        // sigi_grazing = (1 - signal_grazing[i]) * reverse_scale;
+                        // intransit_residual_grazing = intransit_residual_grazing + ((data[i] - (1 - sigi_grazing)) * (data[i] - (1 - sigi_grazing))) * dy[i];
 
-                        sigi_box = (1 - signal_box[i]) * reverse_scale;
-                        intransit_residual_box = intransit_residual_box + ((data[i] - (1 - sigi_box)) * (data[i] - (1 - sigi_box))) * dy[i];
+                        // sigi_box = (1 - signal_box[i]) * reverse_scale;
+                        // intransit_residual_box = intransit_residual_box + ((data[i] - (1 - sigi_box)) * (data[i] - (1 - sigi_box))) * dy[i];
                     }
 
                     float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
@@ -282,7 +282,8 @@ extern "C"{
                     float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
 
                     // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
-                    out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
+                    out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat_box;
+                    // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
                     //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
                 }
             }else{

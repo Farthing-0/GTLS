@@ -68,15 +68,6 @@ def rp_rs_from_depth(depth, law, params):
             * (1 - params[0] / 5 - params[1] / 3 - 3 * params[2] / 7 - params[3] / 2)
         ) ** (1 / 2)
 
-
-def pink_noise(data, width):
-    std = 0
-    datapoints = len(data) - width + 1
-    for i in range(datapoints):
-        std += numpy.std(data[i : i + width]) / width ** 0.5
-    return std / datapoints
-
-
 def period_uncertainty(periods, power):
     # Determine estimate for uncertainty in period
     # Method: Full width at half maximum
@@ -410,6 +401,12 @@ def intransit_stats(t, y, transit_times, transit_duration_in_days):
         transit_depths_uncertainties,
     )
 
+def pink_noise(data, width):
+    std = 0
+    datapoints = len(data) - width + 1
+    for i in range(datapoints):
+        std += numpy.std(data[i : i + width])
+    return std / (datapoints * width ** 0.5)
 
 def snr_stats(
     t,
