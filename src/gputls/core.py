@@ -253,6 +253,7 @@ def search_multi_periods(
     cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
     bestFitTid = cp.sum(trapezoidFitResultGPU,axis=-1).argmin()
     BestFitDepth = (trapezoidFitSize * (transitMean) - 0.5*bestFitTid)/(trapezoidFitSize - 0.5*bestFitTid)
+    BestFitDepth = BestFitDepth.item()
     dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
     # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])   
     snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
@@ -337,4 +338,4 @@ def search_multi_periods(
     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
     snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
-    return periods,period,transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink
+    return periods,period,rawDuration,transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink

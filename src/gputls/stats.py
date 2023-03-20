@@ -278,7 +278,6 @@ def calculate_stretch(t, period, transit_times):
     stretch = duration_timeseries / epochs
     return stretch
 
-
 def calculate_fill_factor(t):
     """Return the fraction of existing cadences, assuming constant cadences"""
 
