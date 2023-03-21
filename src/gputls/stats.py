@@ -1,5 +1,5 @@
 from __future__ import division, print_function
-import numpy
+import numpy as np
 from os import path
 from .import constants as constants
 from .helpers import running_median, transit_mask
@@ -9,13 +9,13 @@ from tqdm import tqdm
 
 def FAP(SDE):
     """Returns FAP (False Alarm Probability) for a given SDE"""
-    data = numpy.genfromtxt(
+    data = np.genfromtxt(
         path.join(constants.resources_dir, "fap.csv"),
         dtype="f8, f8",
         delimiter=",",
         names=["FAP", "SDE"],
     )
-    return data["FAP"][numpy.argmax(data["SDE"] > SDE)]
+    return data["FAP"][np.argmax(data["SDE"] > SDE)]
 
 
 def rp_rs_from_depth(depth, law, params):
@@ -73,7 +73,7 @@ def period_uncertainty(periods, power):
     # Method: Full width at half maximum
     try:
         # Upper limit
-        index_highest_power = numpy.argmax(power)
+        index_highest_power = np.argmax(power)
         idx = index_highest_power
         while True:
             idx += 1
@@ -94,12 +94,12 @@ def period_uncertainty(periods, power):
 
 
 def spectra(chi2, oversampling_factor):
-    SR = numpy.min(chi2) / chi2
-    SDE_raw = (1 - numpy.mean(SR)) / numpy.std(SR)
+    SR = np.min(chi2) / chi2
+    SDE_raw = (1 - np.mean(SR)) / np.std(SR)
 
     # Scale SDE_power from 0 to SDE_raw
-    power_raw = SR - numpy.mean(SR)  # shift down to the mean being zero
-    scale = SDE_raw / numpy.max(power_raw)  # scale factor to touch max=SDE_raw
+    power_raw = SR - np.mean(SR)  # shift down to the mean being zero
+    scale = SDE_raw / np.max(power_raw)  # scale factor to touch max=SDE_raw
     power_raw = power_raw * scale
 
     # Detrended SDE, named "power"
@@ -111,10 +111,10 @@ def spectra(chi2, oversampling_factor):
         power = power_raw - my_median
         # Re-normalize to range between median = 0 and peak = SDE
         # shift down to the mean being zero
-        power = power - numpy.mean(power)
-        SDE = numpy.max(power / numpy.std(power))
+        power = power - np.mean(power)
+        SDE = np.max(power / np.std(power))
         # scale factor to touch max=SDE
-        scale = SDE / numpy.max(power)
+        scale = SDE / np.max(power)
         power = power * scale
     else:
         power = power_raw
@@ -132,7 +132,7 @@ def spectra(chi2, oversampling_factor):
 #     dur = len(signal)
 #     scale = constants.SIGNAL_DEPTH / (1 - depth)
 #     signal = 1 - ((1 - signal) / scale)
-#     samples_per_period = numpy.size(y)
+#     samples_per_period = np.size(y)
 
 #     if T0_fit_margin == 0:
 #         points = samples_per_period
@@ -143,8 +143,8 @@ def spectra(chi2, oversampling_factor):
 #         points = samples_per_period
 
 #     # Create all possible T0s from the start of [t] to [t+period] in [samples] steps
-#     T0_array = numpy.linspace(
-#         start=numpy.min(t), stop=numpy.min(t) + period, num=points
+#     T0_array = np.linspace(
+#         start=np.min(t), stop=np.min(t) + period, num=points
 #     )
 
 #     # Avoid showing progress bar when expected runtime is short
@@ -160,29 +160,29 @@ def spectra(chi2, oversampling_factor):
 #         print("Searching for best T0 for period", format(period, ".5f"), "days")
 
 #     if show_progress_info:
-#         pbar2 = tqdm(total=numpy.size(T0_array))
-#     signal_ootr = numpy.ones(len(y[dur:]))
+#         pbar2 = tqdm(total=np.size(T0_array))
+#     signal_ootr = np.ones(len(y[dur:]))
 
 #     # Future speed improvement possible: Add multiprocessing. Will be slower for
 #     # short data and T0_FIT_MARGIN > 0.01, but faster for large data with dense
 #     # sampling (T0_FIT_MARGIN=0)
 #     for Tx in T0_array:
 #         phases = fold(time=t, period=period, T0=Tx)
-#         sort_index = numpy.argsort(phases, kind="mergesort")  # 75% of CPU time
+#         sort_index = np.argsort(phases, kind="mergesort")  # 75% of CPU time
 #         phases = phases[sort_index]
 #         flux = y[sort_index]
 #         dy = dy[sort_index]
 
 #         # Roll so that the signal starts at index 0
-#         # Numpy roll is slow, so we replace it with less elegant concatenate
-#         # flux = numpy.roll(flux, roll_cadences)
-#         # dy = numpy.roll(dy, roll_cadences)
+#         # np roll is slow, so we replace it with less elegant concatenate
+#         # flux = np.roll(flux, roll_cadences)
+#         # dy = np.roll(dy, roll_cadences)
 #         roll_cadences = int(dur / 2) + 1
-#         flux = numpy.concatenate([flux[-roll_cadences:], flux[:-roll_cadences]])
-#         dy = numpy.concatenate([flux[-roll_cadences:], flux[:-roll_cadences]])
+#         flux = np.concatenate([flux[-roll_cadences:], flux[:-roll_cadences]])
+#         dy = np.concatenate([flux[-roll_cadences:], flux[:-roll_cadences]])
 
-#         residuals_intransit = numpy.sum((flux[:dur] - signal) ** 2 / dy[:dur] ** 2)
-#         residuals_ootr = numpy.sum((flux[dur:] - signal_ootr) ** 2 / dy[dur:] ** 2)
+#         residuals_intransit = np.sum((flux[:dur] - signal) ** 2 / dy[:dur] ** 2)
+#         residuals_ootr = np.sum((flux[dur:] - signal_ootr) ** 2 / dy[dur:] ** 2)
 #         residuals_total = residuals_intransit + residuals_ootr
 
 #         if show_progress_info:
@@ -201,11 +201,11 @@ def model_lightcurve(transit_times, period, t, model_transit_single):
     # Append one more transit after and before end of nominal time series
     # to fully cover beginning and end with out of transit calculations
     earlier_tt = transit_times[0] - period
-    extended_transit_times = numpy.append(earlier_tt, transit_times)
+    extended_transit_times = np.append(earlier_tt, transit_times)
     next_tt = transit_times[-1] + period
-    extended_transit_times = numpy.append(extended_transit_times, next_tt)
-    full_x_array = numpy.array([])
-    full_y_array = numpy.array([])
+    extended_transit_times = np.append(extended_transit_times, next_tt)
+    full_x_array = np.array([])
+    full_y_array = np.array([])
     rounds = len(extended_transit_times)
     internal_samples = (
         int(len(t) / len(transit_times))
@@ -215,15 +215,15 @@ def model_lightcurve(transit_times, period, t, model_transit_single):
     for i in range(rounds):
         xmin = extended_transit_times[i] - period / 2
         xmax = extended_transit_times[i] + period / 2
-        x_array = numpy.linspace(xmin, xmax, internal_samples)
-        full_x_array = numpy.append(full_x_array, x_array)
-        full_y_array = numpy.append(full_y_array, model_transit_single)
+        x_array = np.linspace(xmin, xmax, internal_samples)
+        full_x_array = np.append(full_x_array, x_array)
+        full_y_array = np.append(full_y_array, model_transit_single)
 
-    if numpy.all(numpy.isnan(full_x_array)):
+    if np.all(np.isnan(full_x_array)):
         return None, None
     else:  # Determine start and end of relevant time series, and crop it
-        start_cadence = numpy.nanargmax(full_x_array > min(t))
-        stop_cadence = numpy.nanargmax(full_x_array > max(t))
+        start_cadence = np.nanargmax(full_x_array > min(t))
+        stop_cadence = np.nanargmax(full_x_array > max(t))
         full_x_array = full_x_array[start_cadence:stop_cadence]
         full_y_array = full_y_array[start_cadence:stop_cadence]
         model_lightcurve_model = full_y_array
@@ -243,13 +243,35 @@ def all_transit_times(T0, t, period):
     while True:
         transit_number = transit_number + 1
         next_transit_time = previous_transit_time + period
-        if next_transit_time < (numpy.min(t) + (numpy.max(t) - numpy.min(t))):
+        if next_transit_time < (np.min(t) + (np.max(t) - np.min(t))):
             transit_times.append(next_transit_time)
             previous_transit_time = next_transit_time
         else:
             break
     return transit_times
 
+def calcDurationDays(times, period, StartT0, rawDuration):
+    """Return estimate for transit duration in days (Alternative method)"""
+
+    def find_nearest(array, value):
+        array = np.asarray(array)
+        idx = (np.abs(array - value)).argmin()
+        return idx
+
+    def centerFold(time, period, T0):
+        """Normal phase folding"""
+        T0 = T0 + period/2
+        return (time - T0) / period - np.floor((time - T0) / period)
+
+    phases = centerFold(times, period, StartT0)
+    phasesIndex = np.argsort(phases)
+    phases_sorted = phases[phasesIndex]
+    startIdx = find_nearest(phases_sorted,0.5)
+    endIdx = startIdx + (np.array(rawDuration) * len(times)).astype(int)
+    #Seems duration can not be longer than 0.5
+    endPhases = phases_sorted[endIdx]
+    DurationDays = (endPhases - 0.5) * period
+    return DurationDays
 
 def calculate_transit_duration_in_days(t, period, transit_times, duration):
     """Return estimate for transit duration in days"""
@@ -273,7 +295,7 @@ def calculate_stretch(t, period, transit_times):
         - Epochs = 2 at t0s = [30, 70] days
         ==> stretch = (100 / 40) / 2 = 1.25"""
 
-    duration_timeseries = (numpy.max(t) - numpy.min(t)) / period
+    duration_timeseries = (np.max(t) - np.min(t)) / period
     epochs = len(transit_times)
     stretch = duration_timeseries / epochs
     return stretch
@@ -281,7 +303,7 @@ def calculate_stretch(t, period, transit_times):
 def calculate_fill_factor(t):
     """Return the fraction of existing cadences, assuming constant cadences"""
 
-    average_cadence = numpy.median(numpy.diff(t))
+    average_cadence = np.median(np.diff(t))
     span = max(t) - min(t)
     theoretical_cadences = span / average_cadence
     fill_factor = (len(t) - 1) / theoretical_cadences
@@ -311,9 +333,9 @@ def count_stats(t, y, transit_times, transit_duration_in_days):
         )  # end of egress + 1 transit dur
 
         if T0 > min(t) and T5 < max(t):  # inside time
-            idx_intransit = numpy.where(numpy.logical_and(t > T1, t < T4))
-            idx_before_transit = numpy.where(numpy.logical_and(t > T0, t < T1))
-            idx_after_transit = numpy.where(numpy.logical_and(t > T4, t < T5))
+            idx_intransit = np.where(np.logical_and(t > T1, t < T4))
+            idx_before_transit = np.where(np.logical_and(t > T0, t < T1))
+            idx_after_transit = np.where(np.logical_and(t > T4, t < T5))
             points_in_this_in_transit = len(y[idx_intransit])
             points_in_this_before_transit = len(y[idx_before_transit])
             points_in_this_after_transit = len(y[idx_after_transit])
@@ -328,63 +350,63 @@ def count_stats(t, y, transit_times, transit_duration_in_days):
 def intransit_stats(t, y, transit_times, transit_duration_in_days):
     """Return all intransit odd and even flux points"""
 
-    all_flux_intransit_odd = numpy.array([])
-    all_flux_intransit_even = numpy.array([])
-    all_flux_intransit = numpy.array([])
-    all_idx_intransit = numpy.array([])
-    per_transit_count = numpy.zeros([len(transit_times)])
-    transit_depths = numpy.zeros([len(transit_times)])
-    transit_depths_uncertainties = numpy.zeros([len(transit_times)])
+    all_flux_intransit_odd = np.array([])
+    all_flux_intransit_even = np.array([])
+    all_flux_intransit = np.array([])
+    all_idx_intransit = np.array([])
+    per_transit_count = np.zeros([len(transit_times)])
+    transit_depths = np.zeros([len(transit_times)])
+    transit_depths_uncertainties = np.zeros([len(transit_times)])
 
     for i in range(len(transit_times)):
 
-        depth_mean_odd = numpy.nan
-        depth_mean_even = numpy.nan
-        depth_mean_odd_std = numpy.nan
-        depth_mean_even_std = numpy.nan
+        depth_mean_odd = np.nan
+        depth_mean_even = np.nan
+        depth_mean_odd_std = np.nan
+        depth_mean_even_std = np.nan
 
         mid_transit = transit_times[i]
         tmin = mid_transit - 0.5 * transit_duration_in_days
         tmax = mid_transit + 0.5 * transit_duration_in_days
-        if numpy.isnan(tmin) or numpy.isnan(tmax):
+        if np.isnan(tmin) or np.isnan(tmax):
             idx_intransit = []
             flux_intransit = []
-            mean_flux = numpy.nan
+            mean_flux = np.nan
         else:
-            idx_intransit = numpy.where(numpy.logical_and(t > tmin, t < tmax))
+            idx_intransit = np.where(np.logical_and(t > tmin, t < tmax))
             flux_intransit = y[idx_intransit]
             if len(y[idx_intransit]) > 0:
-                mean_flux = numpy.mean(y[idx_intransit])
+                mean_flux = np.mean(y[idx_intransit])
             else:
-                mean_flux = numpy.nan
-        intransit_points = numpy.size(y[idx_intransit])
+                mean_flux = np.nan
+        intransit_points = np.size(y[idx_intransit])
         transit_depths[i] = mean_flux
         if len(y[idx_intransit] > 0):
-            transit_depths_uncertainties[i] = numpy.std(y[idx_intransit]) / numpy.sqrt(
+            transit_depths_uncertainties[i] = np.std(y[idx_intransit]) / np.sqrt(
                 intransit_points
             )
         else:
-            transit_depths_uncertainties[i] = numpy.nan
+            transit_depths_uncertainties[i] = np.nan
         per_transit_count[i] = intransit_points
 
         # Check if transit odd/even to collect the flux for the mean calculations
         if i % 2 == 0:  # even
-            all_flux_intransit_even = numpy.append(
+            all_flux_intransit_even = np.append(
                 all_flux_intransit_even, flux_intransit
             )
         else:  # odd
-            all_flux_intransit_odd = numpy.append(
+            all_flux_intransit_odd = np.append(
                 all_flux_intransit_odd, flux_intransit
             )
         if len(all_flux_intransit_odd) > 0:
-            depth_mean_odd = numpy.mean(all_flux_intransit_odd)
+            depth_mean_odd = np.mean(all_flux_intransit_odd)
 
-            depth_mean_odd_std = numpy.std(all_flux_intransit_odd) / numpy.sum(
+            depth_mean_odd_std = np.std(all_flux_intransit_odd) / np.sum(
                 len(all_flux_intransit_odd)
             ) ** (0.5)
         if len(all_flux_intransit_even) > 0:
-            depth_mean_even = numpy.mean(all_flux_intransit_even)
-            depth_mean_even_std = numpy.std(all_flux_intransit_even) / numpy.sum(
+            depth_mean_even = np.mean(all_flux_intransit_even)
+            depth_mean_even_std = np.std(all_flux_intransit_even) / np.sum(
                 len(all_flux_intransit_even)
             ) ** (0.5)
 
@@ -404,7 +426,7 @@ def pink_noise(data, width):
     std = 0
     datapoints = len(data) - width + 1
     for i in range(datapoints):
-        std += numpy.std(data[i : i + width])
+        std += np.std(data[i : i + width])
     return std / (datapoints * width ** 0.5)
 
 def snr_stats(
@@ -419,40 +441,40 @@ def snr_stats(
 ):
     """Return snr_per_transit and snr_pink_per_transit"""
 
-    snr_per_transit = numpy.zeros([len(transit_times)])
-    snr_pink_per_transit = numpy.zeros([len(transit_times)])
+    snr_per_transit = np.zeros([len(transit_times)])
+    snr_pink_per_transit = np.zeros([len(transit_times)])
     intransit = transit_mask(t, period, 2 * duration, T0)
     flux_ootr = y[~intransit]
 
     try:
-        pinknoise = pink_noise(flux_ootr, int(numpy.mean(per_transit_count)))
+        pinknoise = pink_noise(flux_ootr, int(np.mean(per_transit_count)))
     except:
-        pinknoise = numpy.nan
+        pinknoise = np.nan
 
     # Estimate SNR and pink SNR
     # Second run because now the out of transit points are known
     if len(flux_ootr) > 0:
-        std = numpy.std(flux_ootr)
+        std = np.std(flux_ootr)
     else:
-        std = numpy.nan
+        std = np.nan
     for i in range(len(transit_times)):
         mid_transit = transit_times[i]
         tmin = mid_transit - 0.5 * transit_duration_in_days
         tmax = mid_transit + 0.5 * transit_duration_in_days
-        if numpy.isnan(tmin) or numpy.isnan(tmax):
+        if np.isnan(tmin) or np.isnan(tmax):
             idx_intransit = []
-            mean_flux = numpy.nan
+            mean_flux = np.nan
         else:
-            idx_intransit = numpy.where(numpy.logical_and(t > tmin, t < tmax))
+            idx_intransit = np.where(np.logical_and(t > tmin, t < tmax))
             if len(y[idx_intransit]) > 0:
-                mean_flux = numpy.mean(y[idx_intransit])
+                mean_flux = np.mean(y[idx_intransit])
             else:
-                mean_flux = numpy.nan
+                mean_flux = np.nan
 
-        intransit_points = numpy.size(y[idx_intransit])
+        intransit_points = np.size(y[idx_intransit])
         try:
             snr_pink_per_transit[i] = (1 - mean_flux) / pinknoise
-            if intransit_points > 0 and not numpy.isnan(std):
+            if intransit_points > 0 and not np.isnan(std):
                 std_binned = std / intransit_points ** 0.5
                 snr_per_transit[i] = (1 - mean_flux) / std_binned
             else:
