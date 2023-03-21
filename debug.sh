@@ -1,3 +1,6 @@
+#!/bin/bash
+BASEDIR=$(dirname "$0")
+cd "$BASEDIR"
 ./src/gputls/move.sh
 python3 -m pip uninstall -y gputls
 python3 -m build

@@ -117,37 +117,36 @@ class gtls(object):
             oversampling_factor = self.oversampling_factor,
             verbose=self.verbose,
         )
-        # return periods,period,duration,Depth,bestT0,SDE,chi2
+        self.rawDurations = durations
         return gtlsResult(self.periods,self.period,self.rawDuration,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink)
     
     def showFit(self):
-        # from .stats import calculate_fill_factor,calculate_stretch
-        # from .transit import fractional_transit
-        # # Folded model / model curve
-        # # Data phase 0.5 is not always at the midpoint (not at cadence: len(y)/2),
-        # # so we need to roll the model to match the model so that its mid-transit
-        # # is at phase=0.5
-        # fill_factor = calculate_fill_factor(self.t)
-        # fill_half = 1 - ((1 - fill_factor) * 0.5)
-        # stretch = calculate_stretch(self.t, self.period, self.transitTimes)
-        # # internal_samples = (
-        # #     int(len(self.y) / len(self.transitTimes))
-        # # ) * constants.OVERSAMPLE_MODEL_LIGHT_CURVE
+        def centerFold(time, period, T0):
+            """Normal phase folding"""
+            T0 = T0 + period/2
+            return (time - T0) / period - np.floor((time - T0) / period)
 
-        # # Folded model flux
-        # self.model_folded_model = fractional_transit(
-        #     duration=self.duration * self.maxwidth_in_samples * fill_half,
-        #     maxwidth=self.maxwidth_in_samples / stretch,
-        #     depth = 1 - self.Depth,
-        #     samples=int(len(self.t / len(self.transitTimes))),
-        #     per=self.per,
-        #     rp=self.rp,
-        #     a=self.a,
-        #     inc=self.inc,
-        #     ecc=self.ecc,
-        #     w=self.w,
-        #     u=self.u,
-        #     limb_dark=self.limb_dark,
-        # )
-        # # return self.model_folded_model
-        return self.lc_arr
+        phases = centerFold(self.t, self.period, self.bestT0)
+        phasesIndex = np.argsort(phases)
+        phasesSorted = phases[phasesIndex]
+        fluxesSorted = self.y[phasesIndex]
+
+        durationStart = (self.bestT0 - self.duration/2)
+
+        durationStartPhase = centerFold(durationStart, self.period, self.bestT0)
+        # durationEndPhase = centerFold(durationEnd, self.period, self.bestT0)
+        # durationCenterPhase = centerFold(durationCenter, self.period, self.bestT0)
+
+        lcArr = self.lc_arr
+        assumeCurve = lcArr[np.where(self.rawDurations == self.rawDuration)[0][0]]
+        assumeCurve = 1 - ((1- np.array(assumeCurve)) * 2 * (1 - self.Depth))
+        fitCurve = []
+        IntransitCount = 0
+        for point in phasesSorted:
+            if point > durationStartPhase and IntransitCount < len(assumeCurve):
+                fitCurve.append(assumeCurve[IntransitCount])
+                IntransitCount += 1
+            else:
+                fitCurve.append(1)
+
+        return fitCurve, phasesSorted, fluxesSorted
