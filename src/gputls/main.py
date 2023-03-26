@@ -149,4 +149,4 @@ class gtls(object):
             else:
                 fitCurve.append(1)
 
-        return fitCurve, phasesSorted, fluxesSorted
+        return fitCurve, phasesSorted, fluxesSorted 

@@ -119,8 +119,12 @@ def period_grid(
     )
     C = f_min ** (1.0 / 3) - A / 3.0
     N_opt = (f_max ** (1.0 / 3) - f_min ** (1.0 / 3) + A / 3) * 3 / A
+    
+    #add more points to the grid
+    # N_opt = N_opt * 5
 
     X = numpy.arange(N_opt) + 1
+
     f_x = (A / 3 * X + C) ** 3
     P_x = 1 / f_x
 
@@ -150,4 +154,10 @@ def period_grid(
             R_star=1, M_star=1, time_span=time_span / constants.SECONDS_PER_DAY
         )
     else:
+
+        # For TESS data debug only, remove later
+        # periods = list(numpy.linspace(0.02,14,11000))
+        # print('periods', periods)
+        # return periods
+
         return periods[selected_index]  # periods in [days]
