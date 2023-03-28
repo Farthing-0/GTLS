@@ -73,7 +73,7 @@ def findRandomLc():
     #35 can be a good example
     # lc_file = lc_dir + files[10]
     for lc_file in files:
-        if '0000000165551882' in lc_file:
+        if '0000000264301607' in lc_file:
     #     # if '0000000028473414' in lc_file:
     # #     # if '0000000010596267' in lc_file:
     # #     if '0000000015422557' in lc_file:

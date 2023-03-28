@@ -293,7 +293,6 @@ def search_multi_periods(
     bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
     transitMean = patchedDatasGPU[HighestPowerIndex][bestRowT0:bestRowT0+durations[durationIndex]].mean()
 
-    ## TODO: search all period's SNR? or just use the highest one?
     #Technically, the "real" trapezoidFitSize = 2 * trapezoidFitSize
     trapezoidFitSize = 100
     trapezoidFitResultGPU = cp.empty((trapezoidFitSize,durations[durationIndex]),dtype=cp.float32)
@@ -303,19 +302,36 @@ def search_multi_periods(
     patchedDatasGPU[HighestPowerIndex],inverseSquaredPatchedDysGPU[HighestPowerIndex],
     cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
 
-    bestFitTid = cp.sum(trapezoidFitResultGPU,axis=-1).argmin()
-    BestFitDepth = (trapezoidFitSize * (transitMean) - 0.5*bestFitTid)/(trapezoidFitSize - 0.5*bestFitTid)
-    BestFitDepth = BestFitDepth.item()
+    bestFitTid = cp.int32(cp.sum(trapezoidFitResultGPU,axis=-1).argmin().get())
+    BestFitDepthGPU = (trapezoidFitSize * (transitMean) - 0.5*bestFitTid)/(trapezoidFitSize - 0.5*bestFitTid)
+    BestFitDepth = BestFitDepthGPU.item()
     dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
-    # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])
 
+    # Generate Trapezoid Fit
+    bestTrapezoidFitGPU = cp.empty(durations[durationIndex],dtype=cp.float32)
+    generateTrapezoidFitGPU = module.get_function('generateTrapezoidFit')
+    blockSize,gridSizeX = calcGridBlockSize(durations[durationIndex])
+    generateTrapezoidFitGPU((gridSizeX,1,1),(blockSize,1,1),(bestTrapezoidFitGPU,
+    bestFitTid,cp.int32(durations[durationIndex]),cp.int32(trapezoidFitSize),cp.float32(BestFitDepth)))
+
+    # Find loss for each point
+    lossGPU = cp.empty(len(t),dtype=cp.float32)
+    trapezoidSNRAtomGPU = module.get_function('trapezoidSNRAtom')
+    blockSize,gridSizeX = calcGridBlockSize(len(t))
+    trapezoidSNRAtomGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
+    inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
+    if bestRowT0 > len(t) - 1:
+        bestRowT0 = bestRowT0 - len(t) 
+    T0loss = lossGPU[bestRowT0]
+    lossSDE = cp.abs(T0loss - cp.mean(lossGPU))/cp.std(lossGPU)
+
+    # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])
     snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durations[durationIndex]:] - DataCumsum[:-durations[durationIndex]])/durations[durationIndex]
     redNoise = np.std(DataSlideAvg)
 
-    if bestRowT0 > len(t) - 1:
-        bestRowT0 = bestRowT0 - len(t)
+
     bestSortIndex = sortIndexGPU[HighestPowerIndex]
     tIndex = bestSortIndex[bestRowT0]
     Tx = t[tIndex.get()]
@@ -361,4 +377,4 @@ def search_multi_periods(
     
     # cp.cuda.runtime.deviceSynchronize()
     # print('After main search, time used:',time.time() - start,'s')
-    return periods,period,rawDuration,transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink
+    return periods,period,rawDuration,transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE
