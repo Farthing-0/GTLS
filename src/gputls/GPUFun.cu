@@ -381,6 +381,45 @@ extern "C"{
         }
     }
 
+    __global__ void generateTrapezoidFit(float *results,
+    int bestFitTid, int duration, int trapezoidFitSize, float TrapezoidDepth){
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        if (tid < duration){
+            float trapezoidQ = ((float)bestFitTid/(float)trapezoidFitSize)*(float(duration)/2);
+            float signal;
+
+            if (tid == 0 and bestFitTid != 0) {
+                signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
+            }
+            else if(tid < trapezoidQ){
+                signal = (1 - ((1-TrapezoidDepth)/(trapezoidQ))*tid);
+            }
+            else if(tid >= trapezoidQ && tid < duration - trapezoidQ){
+                signal = TrapezoidDepth;
+            }
+            else{
+                signal = (1-((1-TrapezoidDepth)/(trapezoidQ))*(duration-tid));
+            }
+            results[tid] = signal;
+        }
+    }
+
+    // This function is used after the best period and duration are found, to calculate the "new" SNR, which will delete trapzoid fit form the light curve, 
+    // The difference is every single point will subtract the trapezoid fit to calculate the standard deviation of the residual.
+    __global__ void trapezoidSNRAtom(float *results,float *inData, float *inInverseSquaredDys,
+    int duration, int inT0Index, float* trapezoidFit){
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        float *data = inData + tid;
+        float *dy = inInverseSquaredDys + tid;
+        // float *result = results + tid; 
+
+        float tempResidual = 0;
+        for (int i = 0; i < duration; i++) {
+            tempResidual = tempResidual + (data[i] - trapezoidFit[i]) * (data[i] - trapezoidFit[i]) * dy[i];
+        }
+        results[tid] = tempResidual;
+    }
+
     // This function is used after the best period and duration are found, to calculate the SNR and some other metrics.
     // 'ForAll' means that it will calculate the loss for all the periods and durations in the trapezoid fit.
     __global__ void trapezoidFitForAll(float *resultsArray,

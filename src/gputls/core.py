@@ -224,7 +224,7 @@ def search_multi_periods(
     # cp.cuda.runtime.deviceSynchronize()
     # start = time.time()
 
-    # # ---Debug begin--- #
+    # # ---Mutliple Trapezoid Debug begin--- #
 
     # # bestLocation = locationGPU[HighestPowerIndex].item()
     # # durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
@@ -276,7 +276,7 @@ def search_multi_periods(
     # # print('sum',trapezoidFitResultAllGPU.sum(axis=-1)[-1][:20])
     # # cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
 
-    # # ---Debug end--- #
+    # # ---Mutliple Trapezoid Debug end--- #
 
 
     #Self Defined metrics
@@ -307,7 +307,8 @@ def search_multi_periods(
     BestFitDepth = (trapezoidFitSize * (transitMean) - 0.5*bestFitTid)/(trapezoidFitSize - 0.5*bestFitTid)
     BestFitDepth = BestFitDepth.item()
     dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
-    # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])   
+    # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])
+
     snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durations[durationIndex]:] - DataCumsum[:-durations[durationIndex]])/durations[durationIndex]
