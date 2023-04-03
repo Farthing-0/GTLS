@@ -1,10 +1,11 @@
 class gtlsResult(object):
     """The results of a GTLS search"""
 
-    def __init__(self, periods,period,rawDuration,rawDurations,duration,depth,T0,SDE,chi2,transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE):
+    def __init__(self, periods,period,rawDuration,durationPoints,rawDurations,duration,depth,T0,SDE,chi2,transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,outlineValue):
         self.periods = periods
         self.period = period
         self.rawDuration = rawDuration
+        self.durationPoints = durationPoints
         self.rawDurations = rawDurations
         self.duration = duration
         self.depth = 1 - depth
@@ -18,3 +19,4 @@ class gtlsResult(object):
         self.snrFit = snrFit
         self.snrFitPink = snrFitPink
         self.lossSDE = lossSDE
+        self.DFToutlineValue = outlineValue

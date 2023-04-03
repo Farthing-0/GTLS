@@ -73,7 +73,7 @@ def findRandomLc():
     #35 can be a good example
     # lc_file = lc_dir + files[10]
     for lc_file in files:
-        if '0000000264301607' in lc_file:
+        if '0000000021132157' in lc_file:
     #     # if '0000000028473414' in lc_file:
     # #     # if '0000000010596267' in lc_file:
     # #     if '0000000015422557' in lc_file:
@@ -125,6 +125,7 @@ if __name__ == '__main__':
           'snr', gtlsResult.snr,'snrPink', gtlsResult.snrPink,'snrFit',gtlsResult.snrFit,'snrFitPink',gtlsResult.snrFitPink)
 
     print('periods searched',(gtlsResult.periods))
+    print('DFToutlineValue',gtlsResult.DFToutlineValue)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
     # plt.plot(periods,chi2,'x',label = 'GPU',color = 'black',alpha = 0.3,markersize = 5)

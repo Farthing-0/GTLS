@@ -408,7 +408,7 @@ extern "C"{
 
     // This function is used after the best period and duration are found, to calculate the "new" SNR, which will delete trapzoid fit form the light curve, 
     // The difference is every single point will subtract the trapezoid fit to calculate the standard deviation of the residual.
-    __global__ void trapezoidSNRAtom(float *results,int resultSize,float *inData, float *inInverseSquaredDys,
+    __global__ void trapezoidSNRloss(float *results,int resultSize,float *inData, float *inInverseSquaredDys,
     int duration, float* trapezoidFit){
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
         if(tid < resultSize){
@@ -423,6 +423,22 @@ extern "C"{
             results[tid] = tempResidual;
         }
     }
+
+    // For debug
+    __global__ void trapezoidSNRlossAtom(float *results,int resultSize,float *inData, float *inInverseSquaredDys,
+    int duration, float* trapezoidFit){
+        int tid = blockIdx.x * blockDim.x + threadIdx.x; // every point's lost in a duration, tid < duration
+        int y = blockIdx.y * blockDim.y + threadIdx.y;  // every first point, y < len(t), which is resultSize
+
+        if(y < resultSize){
+            float *data = inData + y + tid;
+            float *dy = inInverseSquaredDys + y + tid;
+            float *result = results + y*duration + tid; 
+
+            *result  = (*data - trapezoidFit[tid]) * (*data - trapezoidFit[tid]) * (*dy);
+        }
+    }
+
 
     // // This function is used after the best period and duration are found, to calculate the SNR and some other metrics.
     // // 'ForAll' means that it will calculate the loss for all the periods and durations in the trapezoid fit.

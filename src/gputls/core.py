@@ -314,16 +314,50 @@ def search_multi_periods(
     generateTrapezoidFitGPU((gridSizeX,1,1),(blockSize,1,1),(bestTrapezoidFitGPU,
     bestFitTid,cp.int32(durations[durationIndex]),cp.int32(trapezoidFitSize),cp.float32(BestFitDepth)))
 
+    # # Normalize Trapezoid Fit and patched data
+    # patchDataMin = patchedDatasGPU[HighestPowerIndex].min()
+    # bestFoldedDataGPU = (patchedDatasGPU[HighestPowerIndex] - patchDataMin)/(1 - patchDataMin)
+    # bestTrapezoidFitGPU = (bestTrapezoidFitGPU - patchDataMin)/(1 - patchDataMin)
+
     # Find loss for each point
     lossGPU = cp.empty(len(t),dtype=cp.float32)
-    trapezoidSNRAtomGPU = module.get_function('trapezoidSNRAtom')
+    trapezoidSNRlossGPU = module.get_function('trapezoidSNRloss')
     blockSize,gridSizeX = calcGridBlockSize(len(t))
-    trapezoidSNRAtomGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
+    trapezoidSNRlossGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
     inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
     if bestRowT0 > len(t) - 1:
         bestRowT0 = bestRowT0 - len(t) 
     T0loss = lossGPU[bestRowT0]
     lossSDE = cp.abs(T0loss - cp.mean(lossGPU))/cp.std(lossGPU)
+
+    # --debug ----
+    # lossAtomGPU = cp.empty((len(t),durations[durationIndex]),dtype=cp.float32)
+    # trapezoidSNRlossAtomGPU = module.get_function('trapezoidSNRlossAtom')
+    # blockSize,gridSizeX = calcGridBlockSize(len(t))
+    # trapezoidSNRlossAtomGPU((durations[durationIndex],gridSizeX,1),(1,blockSize,1),(lossAtomGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
+    # inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
+
+    # lossStd = cp.std(lossAtomGPU,axis=-1)
+    # T0loss = lossStd[bestRowT0]
+    # lossSDE = cp.abs(T0loss - cp.mean(lossStd))/cp.std(lossStd)
+    # print('lossSDE',lossSDE.get())
+    
+    # import matplotlib.pyplot as plt
+    # print('bestTrapezoidFitGPU',bestTrapezoidFitGPU.shape)
+
+    # # plt.plot(bestTrapezoidFitGPU.get())
+    # plt.plot(lossGPU.get())
+    # # plt.plot(lossStd.get())
+    # # plt.ylim(0,10**-6)
+    # plt.axvline(bestRowT0)
+    # plt.savefig('lossGPU.png')
+    # plt.close()
+
+    # -- debug end ----
+
+    # dft = cp.abs(cp.fft.rfft(patchedDatasGPU[HighestPowerIndex]))[50:]
+    # line = dft[100:].mean() + 3 * dft[100:].std()
+    # outlineValue = len([x for x in dft[100:] if x > line])
 
     # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])
     snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
@@ -377,4 +411,5 @@ def search_multi_periods(
     
     # cp.cuda.runtime.deviceSynchronize()
     # print('After main search, time used:',time.time() - start,'s')
-    return periods,period,rawDuration,transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE
+    outlineValue = None
+    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,outlineValue
