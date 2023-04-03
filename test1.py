@@ -125,7 +125,7 @@ if __name__ == '__main__':
           'snr', gtlsResult.snr,'snrPink', gtlsResult.snrPink,'snrFit',gtlsResult.snrFit,'snrFitPink',gtlsResult.snrFitPink)
 
     print('periods searched',(gtlsResult.periods))
-    print('DFToutlineValue',gtlsResult.DFToutlineValue)
+    # print('DFToutlineValue',gtlsResult.DFToutlineValue)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
     # plt.plot(periods,chi2,'x',label = 'GPU',color = 'black',alpha = 0.3,markersize = 5)

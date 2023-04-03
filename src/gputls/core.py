@@ -411,5 +411,39 @@ def search_multi_periods(
     
     # cp.cuda.runtime.deviceSynchronize()
     # print('After main search, time used:',time.time() - start,'s')
-    outlineValue = None
-    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,outlineValue
+    # outlineValue = None
+
+    # KLoss and KLossStd, can be optimized
+    def centerFold(time, period, T0):
+        """Normal phase folding"""
+        T0 = T0 + period/2
+        return (time - T0) / period - np.floor((time - T0) / period)
+
+    phases = centerFold(t, period, T0)
+    phasesIndex = np.argsort(phases)
+    phasesSorted = phases[phasesIndex]
+    fluxesSorted = y[phasesIndex]
+    def chunks(lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+
+    # KLoss and KLossStd
+    polyFitSize = int(durations[durationIndex] / 2)
+    leftLimit = int(len(t)/2 - durations[durationIndex]/2)
+    rightLimit = int(len(t)/2 + durations[durationIndex]/2)
+    splitFluxes = list(chunks(fluxesSorted[0:leftLimit],polyFitSize))
+    splitFluxes = splitFluxes + (list(chunks(fluxesSorted[rightLimit:],polyFitSize)))
+    para = []
+    for flux in splitFluxes:
+        if len(flux) < 2:
+            continue
+        p = np.polyfit(range(len(flux)),flux,1)
+        para.append(p)
+
+    standardK = (2*(1-BestFitDepth))/durations[durationIndex]
+    fluxK = (np.array(para)[:,0])**2
+    KLossStd = np.std(fluxK) / standardK**2
+    KLossMean = np.sum(fluxK) / standardK**2 / len(para)
+
+    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd

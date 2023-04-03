@@ -99,7 +99,7 @@ class gtls(object):
 
         periods = np.sort(periods)
 
-        self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,outlineValue = core.search_multi_periods(
+        self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd = core.search_multi_periods(
             periods=periods,
             t=self.t,
             y=self.y,
@@ -118,7 +118,7 @@ class gtls(object):
             verbose=self.verbose,
         )
         self.rawDurations = durations
-        return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,outlineValue)
+        return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd)
     
     def showFit(self):
         def centerFold(time, period, T0):
