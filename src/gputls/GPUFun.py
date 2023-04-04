@@ -2,6 +2,10 @@ def getGPUCode():
     GPUCode = """
 extern "C"{
 
+    // #include <cuda.h>
+    // #include <cuda_device_runtime_api.h>
+    // cuda.h and cuda_device_runtime_api.h
+
     __global__ void foldFast(const double* time,const double* periods, double* phase,int* periodSize,int* timeSize) {
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
         int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -200,6 +204,117 @@ extern "C"{
         }
     }
 
+    // __global__ void calcAllLowestResidualsAtomGPU(int signal_x_size,float* signal,float* data,float* dy,float reverse_scale,float* intransit_residuals){
+    //     // for (int i = 0; i < signal_x_size; i++) {
+    //     //     sigi = (1 - signal[i]) * reverse_scale;
+    //     //     intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
+    //     // }
+    //     int tid = blockIdx.x * blockDim.x + threadIdx.x; //tid is point index, tid < signal_x_size
+
+    //     if(tid < signal_x_size){
+    //         float sigi = (1 - signal[tid]) * reverse_scale;
+    //         intransit_residuals[tid] = ((data[tid] - (1 - sigi)) * (data[tid] - (1 - sigi))) * dy[tid];
+    //     }
+    // }
+
+    // __global__ void calcAllLowestResidualsGPU(
+    // float *out,//float *depths,
+    // int *in_mean_size,int *mean_x_size,
+    // float *in_patched_datas,
+    // int *in_patched_datas_size,int *in_duration,int *in_duration_size,
+    // float *in_signal,float *in_signal_grazing,float *in_signal_box,
+    // int *in_max_signal_x_size,
+    // float *in_inverse_squared_patched_dys,
+    // float *in_overshoot, float *in_ootr,float *in_fullsum,
+    // float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
+    // int *durationsMax,int *durationsMin, float *in_transit_depth_min,
+    // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu
+    // )
+    // {
+    //     int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
+    //     int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
+    //     int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is the period
+
+    //     int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+    //     float transit_depth_min = *in_transit_depth_min;
+
+    //     int mean_size = in_mean_size[y];
+    //     int datapoints = *in_datapoints;
+    //     if(z_input < (*period_size_gpu)){
+    //         int durationMax = durationsMax[z_input];
+    //         int durationMin = durationsMin[z_input];
+    //         int duration = in_duration[y];
+
+    //         // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
+    //         if(duration >= durationMin && duration <= durationMax ){
+    //             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,z);
+    //             float overshoot = in_overshoot[y];
+    //             if(tid < *mean_x_size){
+    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = datapoints;
+    //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
+    //                 // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
+    //             }
+    //             if(tid < mean_size && calc_mean > transit_depth_min){
+    //                 float ootr = 0;
+    //                 if(tid == 0){
+    //                     ootr = in_fullsum[z*(*in_duration_size) + y];
+    //                 }
+    //                 else{
+    //                     ootr = *(in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+    //                 }
+
+    //                 float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
+    //                 // int signal_x_size = in_signal_x_size[y];
+    //                 int signal_x_size = duration;
+    //                 float *signal = in_signal+y*(*in_max_signal_x_size);
+    //                 float *signal_grazing = in_signal_grazing+y*(*in_max_signal_x_size);
+    //                 float *signal_box = in_signal_box+y*(*in_max_signal_x_size);
+                    
+    //                 float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
+    //                 float summed_edge_effect_correction = in_summed_edge_effect_correction[z_input];
+    //                 float SIGNAL_DEPTH = 0.5;
+
+    //                 float *dy = inverse_squared_patched_dy_arr + tid;
+    //                 float target_depth = calc_mean * overshoot;
+    //                 float reverse_scale = target_depth / SIGNAL_DEPTH;
+
+    //                 float sigi = 0;
+    //                 // float intransit_residual = 0;
+    //                 // float intransit_residuals[(signal_x_size)];
+    //                 float* intransit_residuals = (float*)malloc(signal_x_size * sizeof(float));
+    //                 // int signal_x_size,float* signal,float* data,float* dy,float reverse_scale,float* intransit_residuals){
+    //                 calcAllLowestResidualsAtomGPU<<<1,signal_x_size>>>(signal_x_size,signal,data,dy,reverse_scale,intransit_residuals);
+    //                 // cudaDeviceSynchronize();
+    //                 float intransit_residual = 0;
+    //                 for(int i = 0; i < signal_x_size; i++){
+    //                     intransit_residual = intransit_residual + intransit_residuals[i];
+    //                 }
+    //                 // free(intransit_residuals);
+    //                 // for (int i = 0; i < signal_x_size; i++) {
+    //                 //     sigi = (1 - signal[i]) * reverse_scale;
+    //                 //     intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
+    //                 // }
+
+    //                 float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+    //                 // float current_stat_grazing = intransit_residual_grazing + ootr - summed_edge_effect_correction;
+    //                 // float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
+
+    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
+    //                 // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat_box;
+    //                 // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
+    //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
+    //             }
+    //         }else{
+    //             if(tid < *mean_x_size){
+    //                 //0x7f800000 => infinity in float, according to IEEE-754
+    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
+    //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
+    //                 // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
+    //             }
+    //         }
+    //     }
+    // }
+
     __global__ void calcAllLowestResidualsGPU(
     float *out,//float *depths,
     int *in_mean_size,int *mean_x_size,
@@ -280,8 +395,8 @@ extern "C"{
                     }
 
                     float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-                    float current_stat_grazing = intransit_residual_grazing + ootr - summed_edge_effect_correction;
-                    float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
+                    // float current_stat_grazing = intransit_residual_grazing + ootr - summed_edge_effect_correction;
+                    // float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
 
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
                     // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat_box;

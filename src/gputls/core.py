@@ -30,7 +30,8 @@ def search_multi_periods(
     lc_cache_overview,
     T0_fit_margin,
     oversampling_factor,
-    verbose
+    verbose,
+    useLocalPTX = False
 ):
     # T0_fit_margin is not used for now, because T0_fit_margin is used to skip
     # some points in the search to reduce time in CPU TLS, but GPU is fast enough to search all points.
@@ -42,8 +43,11 @@ def search_multi_periods(
 
     # with open ('GPUFun.cu', 'r') as myfile:
     #     myCode=myfile.read()
-    GPUCode = GPUFun.getGPUCode()
-    module = cp.RawModule(code=GPUCode)
+    if not useLocalPTX:
+        GPUCode = GPUFun.getGPUCode()
+        module = cp.RawModule(code=GPUCode)
+    else :
+        module = cp.RawModule(path='./GTLS.ptx')
 
     periodsGPU = cp.array(periods, dtype=cp.float64)
     durationsMaxGPU = cp.array(periods, dtype=cp.int32)
@@ -364,7 +368,6 @@ def search_multi_periods(
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durations[durationIndex]:] - DataCumsum[:-durations[durationIndex]])/durations[durationIndex]
     redNoise = np.std(DataSlideAvg)
-
 
     bestSortIndex = sortIndexGPU[HighestPowerIndex]
     tIndex = bestSortIndex[bestRowT0]

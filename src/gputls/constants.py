@@ -15,6 +15,11 @@ TLS_VERSION = (
 # In the default, print status information during search
 VERBOSE = True
 
+# Use the local PTX file instead of the code in the package, usually can be faster.
+# But you need to compile the PTX file first.
+# The PTX file should be "./GTLS.ptx"
+USE_LOCAL_PTX = False
+
 # astrophysical constants
 G = 6.673e-11  # gravitational constant [m^3 / kg / s^2]
 R_sun = 695508000  # radius of the Sun [m]

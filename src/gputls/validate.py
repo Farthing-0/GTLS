@@ -50,6 +50,8 @@ def validate_args(self, kwargs):
 
     self.verbose = kwargs.get("verbose", constants.VERBOSE)
 
+    self.useLocalPTX = kwargs.get("useLocalPTX", constants.USE_LOCAL_PTX)
+
     # Warn user if unknown parameters
     for key, value in kwargs.items():
         if key not in constants.VALID_PARAMETERS:

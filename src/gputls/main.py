@@ -116,6 +116,7 @@ class gtls(object):
             T0_fit_margin=self.T0_fit_margin,
             oversampling_factor = self.oversampling_factor,
             verbose=self.verbose,
+            useLocalPTX=self.useLocalPTX
         )
         self.rawDurations = durations
         return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd)
