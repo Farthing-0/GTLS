@@ -50,7 +50,9 @@ def validate_args(self, kwargs):
 
     self.verbose = kwargs.get("verbose", constants.VERBOSE)
 
-    self.useLocalPTX = kwargs.get("useLocalPTX", constants.USE_LOCAL_PTX)
+    self.useLocalPTXCUBIN = kwargs.get("useLocalPTXCUBIN", constants.USE_LOCAL_PTXCUBIN)
+
+    self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
 
     # Warn user if unknown parameters
     for key, value in kwargs.items():

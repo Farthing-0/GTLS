@@ -6,6 +6,10 @@ from .helpers import transit_mask
 from . import GPUFun
 import pynvml
 
+def set_cuda_device(device_id):
+    """Set the CUDA device."""
+    cp.cuda.Device(device_id).use()
+
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
     blockSize = size
@@ -31,8 +35,13 @@ def search_multi_periods(
     T0_fit_margin,
     oversampling_factor,
     verbose,
-    useLocalPTX = False
+    useLocalPTXCUBIN = False,
+    GPUDeviceID = 0
 ):
+    
+    # Choose the GPU device
+    set_cuda_device(GPUDeviceID)
+
     # T0_fit_margin is not used for now, because T0_fit_margin is used to skip
     # some points in the search to reduce time in CPU TLS, but GPU is fast enough to search all points.
     # Use TESS data as an example, if we skip 99/100 points,(if the duration is longer than 100 points),
@@ -43,11 +52,19 @@ def search_multi_periods(
 
     # with open ('GPUFun.cu', 'r') as myfile:
     #     myCode=myfile.read()
-    if not useLocalPTX:
+    options = ('-rdc=true',)
+    if not useLocalPTXCUBIN:
         GPUCode = GPUFun.getGPUCode()
-        module = cp.RawModule(code=GPUCode)
+        module = cp.RawModule(code=GPUCode,options=options)
     else :
-        module = cp.RawModule(path='./GTLS.ptx')
+        import os.path
+        # options = {}
+        # options['rdc'] = 'True'
+
+        if os.path.isfile('./GTLS.ptx'):
+            module = cp.RawModule(path='./GTLS.ptx',options=options)
+        else:
+            module = cp.RawModule(path='./GTLS.cubin',options=options)
 
     periodsGPU = cp.array(periods, dtype=cp.float64)
     durationsMaxGPU = cp.array(periods, dtype=cp.int32)
@@ -449,4 +466,5 @@ def search_multi_periods(
     KLossStd = np.std(fluxK) / standardK**2
     KLossMean = np.sum(fluxK) / standardK**2 / len(para)
 
+    # print('durationsGPU',durationsGPU.get())
     return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd

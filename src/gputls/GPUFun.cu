@@ -210,8 +210,9 @@ extern "C"{
     //     int tid = blockIdx.x * blockDim.x + threadIdx.x; //tid is point index, tid < signal_x_size
 
     //     if(tid < signal_x_size){
-    //         float sigi = (1 - signal[tid]) * reverse_scale;
-    //         intransit_residuals[tid] = ((data[tid] - (1 - sigi)) * (data[tid] - (1 - sigi))) * dy[tid];
+    //         // float sigi = (1 - signal[tid]) * reverse_scale;
+    //         // intransit_residuals[tid] = ((data[tid] - (1 - sigi)) * (data[tid] - (1 - sigi))) * dy[tid];
+    //         intransit_residuals[tid] = 0;
     //     }
     // }
 
@@ -279,14 +280,17 @@ extern "C"{
     //                 float sigi = 0;
     //                 // float intransit_residual = 0;
     //                 // float intransit_residuals[(signal_x_size)];
-    //                 float* intransit_residuals = (float*)malloc(signal_x_size * sizeof(float));
+    //                 // float* intransit_residuals = (float*)cudaMalloc(signal_x_size * sizeof(float));
+    //                 float* intransit_residuals ;
+    //                 cudaMalloc((void**)&intransit_residuals,1 * sizeof(float));
     //                 // int signal_x_size,float* signal,float* data,float* dy,float reverse_scale,float* intransit_residuals){
-    //                 calcAllLowestResidualsAtomGPU<<<1,signal_x_size>>>(signal_x_size,signal,data,dy,reverse_scale,intransit_residuals);
+    //                 // calcAllLowestResidualsAtomGPU<<<1,signal_x_size>>>(signal_x_size,signal,data,dy,reverse_scale,intransit_residuals);
+    //                 // calcAllLowestResidualsAtomGPU<<<1,1>>>(signal_x_size,signal,data,dy,reverse_scale,intransit_residuals);
     //                 // cudaDeviceSynchronize();
     //                 float intransit_residual = 0;
-    //                 for(int i = 0; i < signal_x_size; i++){
-    //                     intransit_residual = intransit_residual + intransit_residuals[i];
-    //                 }
+    //                 // for(int i = 0; i < signal_x_size; i++){
+    //                 //     intransit_residual = intransit_residual + intransit_residuals[i];
+    //                 // }
     //                 // free(intransit_residuals);
     //                 // for (int i = 0; i < signal_x_size; i++) {
     //                 //     sigi = (1 - signal[i]) * reverse_scale;
@@ -296,8 +300,8 @@ extern "C"{
     //                 float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
     //                 // float current_stat_grazing = intransit_residual_grazing + ootr - summed_edge_effect_correction;
     //                 // float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
-
-    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
+    //                 cudaFree(intransit_residuals);
+    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0;
     //                 // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat_box;
     //                 // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
     //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
@@ -376,10 +380,10 @@ extern "C"{
 
                     float sigi = 0;
                     float intransit_residual = 0;
-                    float sigi_grazing = 0;
-                    float intransit_residual_grazing = 0;
-                    float sigi_box = 0;
-                    float intransit_residual_box = 0;
+                    // float sigi_grazing = 0;
+                    // float intransit_residual_grazing = 0;
+                    // float sigi_box = 0;
+                    // float intransit_residual_box = 0;
 
                     for (int i = 0; i < signal_x_size; i++) {
                         sigi = (1 - signal[i]) * reverse_scale;

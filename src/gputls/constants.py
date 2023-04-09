@@ -15,10 +15,13 @@ TLS_VERSION = (
 # In the default, print status information during search
 VERBOSE = True
 
-# Use the local PTX file instead of the code in the package, usually can be faster.
-# But you need to compile the PTX file first.
-# The PTX file should be "./GTLS.ptx"
-USE_LOCAL_PTX = False
+# Use the local PTX/CUBIN file instead of the code in the package, usually can be faster.
+# But you need to compile the PTX/CUBIN file first.
+# The PTX/CUBIN file should be "./GTLS.PTX" or "./GTLS.CUBIN"
+USE_LOCAL_PTXCUBIN = False
+
+# The GPU device ID to use
+GPU_DEVICE_ID = 0
 
 # astrophysical constants
 G = 6.673e-11  # gravitational constant [m^3 / kg / s^2]

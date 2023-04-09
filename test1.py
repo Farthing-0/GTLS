@@ -115,7 +115,9 @@ if __name__ == '__main__':
 
     time0 = time.time()
     model = gtls(t = times, y = flatten_lc, dy = dy)
+    # gtlsResult = model.power(useLocalPTXCUBIN=True)
     gtlsResult = model.power()
+
     # print('Time taken for GPU',time.time() - time0)
     # print('CPU results')
     # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
@@ -125,6 +127,7 @@ if __name__ == '__main__':
           'snr', gtlsResult.snr,'snrPink', gtlsResult.snrPink,'snrFit',gtlsResult.snrFit,'snrFitPink',gtlsResult.snrFitPink)
 
     print('periods searched',(gtlsResult.periods))
+    print('rawPoints',(gtlsResult.durationPoints))
     # print('DFToutlineValue',gtlsResult.DFToutlineValue)
 
     # plt.plot(periods,results.chi2,'o',label = 'CPU',color = 'red',markersize = 5,markerfacecolor='none')
