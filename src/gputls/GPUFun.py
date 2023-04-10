@@ -324,7 +324,7 @@ extern "C"{
     int *in_mean_size,int *mean_x_size,
     float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
-    float *in_signal,float *in_signal_grazing,float *in_signal_box,
+    float *in_signal,//float *in_signal_grazing,float *in_signal_box,
     int *in_max_signal_x_size,
     float *in_inverse_squared_patched_dys,
     float *in_overshoot, float *in_ootr,float *in_fullsum,
@@ -369,8 +369,8 @@ extern "C"{
                     // int signal_x_size = in_signal_x_size[y];
                     int signal_x_size = duration;
                     float *signal = in_signal+y*(*in_max_signal_x_size);
-                    float *signal_grazing = in_signal_grazing+y*(*in_max_signal_x_size);
-                    float *signal_box = in_signal_box+y*(*in_max_signal_x_size);
+                    // float *signal_grazing = in_signal_grazing+y*(*in_max_signal_x_size);
+                    // float *signal_box = in_signal_box+y*(*in_max_signal_x_size);
                     
                     float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
                     float summed_edge_effect_correction = in_summed_edge_effect_correction[z_input];
