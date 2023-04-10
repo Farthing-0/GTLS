@@ -139,10 +139,11 @@ def search_multi_periods(
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
     nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    # singleCalcPeriods_max = (nvmlinfo.free) / (10*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*3 + 2*len(durations)))
-    # singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
+    singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*3 + 2*len(durations)))
+    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
 
-    singleCalcPeriods = 100
+    # singleCalcPeriods = 100
+    # print('singleCalcPeriods: ', singleCalcPeriods)
 
     #GPU variables for the loop
     singleCalcPeriodsGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
