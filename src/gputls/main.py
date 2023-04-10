@@ -3,7 +3,7 @@ import numpy as np
 
 from . import constants as constants
 from .grid import duration_grid, period_grid
-from .transit import get_cache
+from .transit import get_cache, singleModel
 from .validate import validate_inputs, validate_args
 from . import core as core
 from .results import gtlsResult
@@ -55,6 +55,33 @@ class gtls(object):
             limb_dark=self.limb_dark,
             verbose=self.verbose
         )
+
+        idealTransit = singleModel(
+            maxwidth_in_samples=len(self.t),
+            per=self.per,
+            rp=self.rp,
+            a=self.a,
+            inc=self.inc,
+            ecc=self.ecc,
+            w=self.w,
+            u=self.u,
+            limb_dark=self.limb_dark
+        )
+
+        # print('durations',durations)
+        # print('maxwidth_in_samples',maxwidth_in_samples)
+        # print('lenResult',len(tempResult))
+        # import matplotlib.pyplot as plt
+        # plt.figure()
+        # for signal in self.lc_arr:
+        #     x = np.linspace(0, 1, len(signal))
+        #     signal = np.random.normal(signal, 0.01)
+        #     plt.plot(x,signal ,alpha=0.1)
+        # x = np.linspace(0,1,len(tempResult))
+        # plt.plot(x,tempResult)
+        # plt.savefig('test.png',dpi=300)
+        # plt.close()
+
 
         # _, lc_arr_grazing = get_cache(
         #     durations=durations,
@@ -110,6 +137,7 @@ class gtls(object):
             M_star_min=self.M_star_min,
             M_star_max=self.M_star_max,
             lc_arr=self.lc_arr,
+            idealTransit = idealTransit,
             # lc_arr_grazing=lc_arr_grazing,
             # lc_arr_box=lc_arr_box,
             lc_cache_overview=self.lc_cache_overview,

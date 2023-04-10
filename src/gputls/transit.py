@@ -158,3 +158,47 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
 
     lc_arr = numpy.array(lc_arr, dtype=object)
     return lc_cache_overview, lc_arr
+
+def single_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):
+    """Returns an Earth-like transit of width 1 and depth 1"""
+
+    f = numpy.ones(constants.SUPERSAMPLE_SIZE)
+    duration = 1  # transit duration in days. Increase for exotic cases
+    t = numpy.linspace(-duration * 0.5, duration * 0.5, constants.SUPERSAMPLE_SIZE)
+    ma = batman.TransitParams()
+    ma.t0 = 0  # time of inferior conjunction
+    ma.per = per  # orbital period, use Earth as a reference
+    ma.rp = rp  # planet radius (in units of stellar radii)
+    ma.a = a  # semi-major axis (in units of stellar radii)
+    ma.inc = inc  # orbital inclination (in degrees)
+    ma.ecc = ecc  # eccentricity
+    ma.w = w  # longitude of periastron (in degrees)
+    ma.u = u  # limb darkening coefficients
+    ma.limb_dark = limb_dark  # limb darkening model
+    m = batman.TransitModel(ma, t)  # initializes model
+    flux = m.light_curve(ma)  # calculates light curve
+
+    # Determine start of transit (first value < 1)
+    idx_first = numpy.argmax(flux < 1)
+    intransit_flux = flux[idx_first : -idx_first + 1]
+    intransit_time = t[idx_first : -idx_first + 1]
+
+    # Downsample (bin) to target sample size
+    x_new = numpy.linspace(t[idx_first], t[-idx_first - 1], samples)
+    f = interp1d(x_new, intransit_time)
+    downsampled_intransit_flux = f(intransit_flux)
+
+    # Rescale to height [0..1]
+    rescaled = (numpy.min(downsampled_intransit_flux) - downsampled_intransit_flux) / (
+        numpy.min(downsampled_intransit_flux) - 1
+    )
+
+    # Rescale to depth [0.5..1]
+    rescaled = rescaled * 0.5 + 0.5
+
+
+    return rescaled
+
+def singleModel(maxwidth_in_samples, per, rp, a, inc, ecc, w, u,limb_dark):
+    result = single_transit(maxwidth_in_samples, per, rp, a, inc, ecc, w, u, limb_dark)
+    return result

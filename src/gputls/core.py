@@ -29,6 +29,7 @@ def search_multi_periods(
     M_star_min,
     M_star_max,
     lc_arr,
+    idealTransit,
     # lc_arr_grazing,
     # lc_arr_box,
     lc_cache_overview,
@@ -104,17 +105,21 @@ def search_multi_periods(
     patchedDatasSize = int(len(t) + maxWidthInSamples)
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
+    idealTransitGPU = cp.asarray(idealTransit).astype(cp.float32)
+    idealTransitSizeGPU = cp.asarray(np.array([len(idealTransit)])).astype(cp.int32)
 
-
-    lc_arr_len = np.array([len(x) for x in lc_arr]).astype(np.int32)
-    lc_arr_max_len = np.array([np.max(lc_arr_len)]).astype(np.int32)
+    lc_arr_max_len = np.array([np.max(durations)]).astype(np.int32)
     lc_arr_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
+
+    # print('duration: ', durations)
+    # print('lc_arr_len: ', lc_arr_full_length)
+
 
     # lc_arr_grazing_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr_grazing])
     # lc_arr_box_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr_box])
 
-    lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
-    lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
+    # lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
+    # lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
     # lcArrGrazingFullLengthGPU = cp.asarray(lc_arr_grazing_full_length).astype(cp.float32)
     # lcArrBoxFullLengthGPU = cp.asarray(lc_arr_box_full_length).astype(cp.float32)
 
@@ -220,8 +225,12 @@ def search_multi_periods(
         (blockSize,1,1),(lowestResidualsGPU,#depthsGPU,
         meanSizeGPU,meanXSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,durationsGPU,
-        durationsSizeGPU,lcArrFullLengthGPU,#lcArrGrazingFullLengthGPU,lcArrBoxFullLengthGPU,
-        lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
+        durationsSizeGPU,
+        # lcArrFullLengthGPU,
+        idealTransitGPU,idealTransitSizeGPU,
+        #lcArrGrazingFullLengthGPU,lcArrBoxFullLengthGPU,
+        # lcArrMaxLenGPU,
+        inverseSquaredPatchedDysGPU,
         overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,#meanGPU,
         durationsMaxGPU,durationsMinGPU,transitDepthMinGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))

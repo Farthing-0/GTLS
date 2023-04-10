@@ -324,8 +324,10 @@ extern "C"{
     int *in_mean_size,int *mean_x_size,
     float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
-    float *in_signal,//float *in_signal_grazing,float *in_signal_box,
-    int *in_max_signal_x_size,
+    // float *in_signal,
+    float *ideal_transit,
+    int *ideal_transit_size_input,//float *in_signal_grazing,float *in_signal_box,
+    // int *in_max_signal_x_size,
     float *in_inverse_squared_patched_dys,
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
@@ -368,7 +370,7 @@ extern "C"{
                     float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
                     // int signal_x_size = in_signal_x_size[y];
                     int signal_x_size = duration;
-                    float *signal = in_signal+y*(*in_max_signal_x_size);
+                    // float *signal = in_signal+y*(*in_max_signal_x_size);
                     // float *signal_grazing = in_signal_grazing+y*(*in_max_signal_x_size);
                     // float *signal_box = in_signal_box+y*(*in_max_signal_x_size);
                     
@@ -387,8 +389,37 @@ extern "C"{
                     // float sigi_box = 0;
                     // float intransit_residual_box = 0;
 
-                    for (int i = 0; i < signal_x_size; i++) {
-                        sigi = (1 - signal[i]) * reverse_scale;
+                    // ideal_transit
+                    // idealTransitSizeGPU
+                    int ideal_transit_size = *ideal_transit_size_input;
+                    float correspondRate = (float)ideal_transit_size/((float)(duration - 1));
+                    int correspondIndex = 0;
+                    float correspondPoint = 0;
+                    float this_signal = 0;
+                    // for (int index = 0; index < duration; index++)
+                    // {   
+                    //     correspondIndex = (int)(index*correspondRate);
+                    //     correspondPoint = (float)(index*correspondRate) - (float)correspondIndex;
+                    //     if (correspondIndex < ideal_transit_size - 1){
+                    //         output[index] = ideal_transit[correspondIndex]*(1-correspondPoint) + ideal_transit[correspondIndex+1]*correspondPoint;
+                    //     }
+                    //     else{
+                    //         output[index] = ideal_transit[ideal_transit_size - 1];
+                    //     }
+                    // }
+
+                    for (int i = 0; i < duration; i++) {
+
+                        correspondIndex = (int)(i*correspondRate);
+                        correspondPoint = (float)(i*correspondRate) - (float)correspondIndex;
+                        // if (correspondIndex < ideal_transit_size - 1){
+                        this_signal = ideal_transit[correspondIndex]*(1-correspondPoint) + ideal_transit[correspondIndex+1]*correspondPoint;
+                        // }
+                        // else{
+                        //     this_signal = ideal_transit[ideal_transit_size - 1];
+                        // }
+
+                        sigi = (1 - this_signal) * reverse_scale;
                         intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
 
                         // sigi_grazing = (1 - signal_grazing[i]) * reverse_scale;
