@@ -135,6 +135,7 @@ VALID_PARAMETERS = [
     "period_min",
     "period_max",
     "n_transits_min",
+    "GPUDeviceID",
     "per",
     "rp",
     "a",

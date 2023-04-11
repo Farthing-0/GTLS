@@ -56,33 +56,33 @@ class gtls(object):
             verbose=self.verbose
         )
 
-        _, lc_arr_grazing = get_cache(
-            durations=durations,
-            maxwidth_in_samples=maxwidth_in_samples,
-            per=self.per,
-            rp=self.rp,
-            a=self.a,
-            inc=self.grazing_inc,
-            ecc=self.ecc,
-            w=self.w,
-            u=self.u,
-            limb_dark=self.limb_dark,
-            verbose=self.verbose
-        )
+        # _, lc_arr_grazing = get_cache(
+        #     durations=durations,
+        #     maxwidth_in_samples=maxwidth_in_samples,
+        #     per=self.per,
+        #     rp=self.rp,
+        #     a=self.a,
+        #     inc=self.grazing_inc,
+        #     ecc=self.ecc,
+        #     w=self.w,
+        #     u=self.u,
+        #     limb_dark=self.limb_dark,
+        #     verbose=self.verbose
+        # )
 
-        _, lc_arr_box = get_cache(
-            durations=durations,
-            maxwidth_in_samples=maxwidth_in_samples,
-            per=self.box_per,
-            rp=self.box_rp,
-            a=self.box_a,
-            inc=self.box_inc,
-            ecc=self.ecc,
-            w=self.w,
-            u=self.box_u,
-            limb_dark=self.box_limb_dark,
-            verbose=self.verbose
-        )
+        # _, lc_arr_box = get_cache(
+        #     durations=durations,
+        #     maxwidth_in_samples=maxwidth_in_samples,
+        #     per=self.box_per,
+        #     rp=self.box_rp,
+        #     a=self.box_a,
+        #     inc=self.box_inc,
+        #     ecc=self.ecc,
+        #     w=self.w,
+        #     u=self.box_u,
+        #     limb_dark=self.box_limb_dark,
+        #     verbose=self.verbose
+        # )
 
         if self.verbose:
             print(
@@ -110,8 +110,8 @@ class gtls(object):
             M_star_min=self.M_star_min,
             M_star_max=self.M_star_max,
             lc_arr=self.lc_arr,
-            lc_arr_grazing=lc_arr_grazing,
-            lc_arr_box=lc_arr_box,
+            # lc_arr_grazing=lc_arr_grazing,
+            # lc_arr_box=lc_arr_box,
             lc_cache_overview=self.lc_cache_overview,
             T0_fit_margin=self.T0_fit_margin,
             oversampling_factor = self.oversampling_factor,
