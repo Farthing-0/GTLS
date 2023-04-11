@@ -334,6 +334,10 @@ def search_multi_periods(
     generateTrapezoidFitGPU((gridSizeX,1,1),(blockSize,1,1),(bestTrapezoidFitGPU,
     bestFitTid,cp.int32(durations[durationIndex]),cp.int32(trapezoidFitSize),cp.float32(BestFitDepth)))
 
+    if bestRowT0 > len(t) - 1:
+        bestRowT0 = bestRowT0 - len(t) 
+
+
     # # Normalize Trapezoid Fit and patched data
     # patchDataMin = patchedDatasGPU[HighestPowerIndex].min()
     # bestFoldedDataGPU = (patchedDatasGPU[HighestPowerIndex] - patchDataMin)/(1 - patchDataMin)
@@ -345,8 +349,6 @@ def search_multi_periods(
     # blockSize,gridSizeX = calcGridBlockSize(len(t))
     # trapezoidSNRlossGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
     # inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
-    # if bestRowT0 > len(t) - 1:
-    #     bestRowT0 = bestRowT0 - len(t) 
     # T0loss = lossGPU[bestRowT0]
     # lossSDE = cp.abs(T0loss - cp.mean(lossGPU))/cp.std(lossGPU)
 

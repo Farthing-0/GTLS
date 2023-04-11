@@ -408,6 +408,7 @@ extern "C"{
                     //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
                 }
             }else{
+                // printf("Exist!");
                 if(tid < *mean_x_size){
                     //0x7f800000 => infinity in float, according to IEEE-754
                     out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
