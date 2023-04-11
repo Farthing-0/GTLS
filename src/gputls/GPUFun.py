@@ -334,87 +334,66 @@ extern "C"{
     )
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
-        int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is the period
+        int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the period
 
-        int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+        int z_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
         float transit_depth_min = *in_transit_depth_min;
 
-        int mean_size = in_mean_size[y];
         int datapoints = *in_datapoints;
         if(z_input < (*period_size_gpu)){
             int durationMax = durationsMax[z_input];
             int durationMin = durationsMin[z_input];
-            int duration = in_duration[y];
 
-            // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
-            if(duration >= durationMin && duration <= durationMax ){
-                float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,z);
-                float overshoot = in_overshoot[y];
-                if(tid < *mean_x_size){
-                    out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = datapoints;
-                    //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
-                    // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
-                }
-                if(tid < mean_size && calc_mean > transit_depth_min){
-                    float ootr = 0;
-                    if(tid == 0){
-                        ootr = in_fullsum[z*(*in_duration_size) + y];
+            for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++){
+                int mean_size = in_mean_size[durationIndex];
+                int duration = in_duration[durationIndex];
+                // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
+                if(duration >= durationMin && duration <= durationMax ){
+                    float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,y);
+                    float overshoot = in_overshoot[durationIndex];
+                    if(tid < *mean_x_size){
+                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = datapoints;
                     }
-                    else{
-                        ootr = *(in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+                    if(tid < mean_size && calc_mean > transit_depth_min){
+                        float ootr = 0;
+                        if(tid == 0){
+                            ootr = in_fullsum[y*(*in_duration_size) + durationIndex];
+                        }
+                        else{
+                            ootr = *(in_ootr+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+                        }
+
+                        float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
+                        float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
+                        // float *signal = in_signal;
+
+                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
+                        float summed_edge_effect_correction = in_summed_edge_effect_correction[z_input];
+                        // float SIGNAL_DEPTH = 0.5;
+
+                        float *dy = inverse_squared_patched_dy_arr + tid;
+                        // float target_depth = calc_mean * overshoot;
+                        float reverse_scale = calc_mean * overshoot * 2;  // "*2" means SIGNAL_DEPTH is 0.5,as "/SIGANL_DEPTH"
+
+                        float sigi = 0;
+                        float intransit_residual = 0;
+                        float loss = 0;
+                        for (int i = 0; i < duration; i++) {
+                            // sigi = (1 - signal[i]) * reverse_scale;
+                            // sigi = (signal[i]) * reverse_scale;
+                            sigi = 1;
+                            loss = (data[i] - (1 - sigi));
+                            intransit_residual = intransit_residual + loss * loss * dy[i];
+                        }
+
+                        float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = current_stat;
                     }
-
-                    float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
-                    // int signal_x_size = in_signal_x_size[y];
-                    int signal_x_size = duration;
-                    float *signal = in_signal+y*(*in_max_signal_x_size);
-                    // float *signal_grazing = in_signal_grazing+y*(*in_max_signal_x_size);
-                    // float *signal_box = in_signal_box+y*(*in_max_signal_x_size);
-                    
-                    float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
-                    float summed_edge_effect_correction = in_summed_edge_effect_correction[z_input];
-                    float SIGNAL_DEPTH = 0.5;
-
-                    float *dy = inverse_squared_patched_dy_arr + tid;
-                    float target_depth = calc_mean * overshoot;
-                    float reverse_scale = target_depth / SIGNAL_DEPTH;
-
-                    float sigi = 0;
-                    float intransit_residual = 0;
-                    // float sigi_grazing = 0;
-                    // float intransit_residual_grazing = 0;
-                    // float sigi_box = 0;
-                    // float intransit_residual_box = 0;
-
-                    for (int i = 0; i < signal_x_size; i++) {
-                    // for (int i = 0; i < 200; i++) {
-                        sigi = (1 - signal[i]) * reverse_scale;
-                        intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
-
-                        // sigi_grazing = (1 - signal_grazing[i]) * reverse_scale;
-                        // intransit_residual_grazing = intransit_residual_grazing + ((data[i] - (1 - sigi_grazing)) * (data[i] - (1 - sigi_grazing))) * dy[i];
-
-                        // sigi_box = (1 - signal_box[i]) * reverse_scale;
-                        // intransit_residual_box = intransit_residual_box + ((data[i] - (1 - sigi_box)) * (data[i] - (1 - sigi_box))) * dy[i];
+                }else{
+                    if(tid < *mean_x_size){
+                        //0x7f800000 => infinity in float, according to IEEE-754
+                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
                     }
-
-                    float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-                    // float current_stat_grazing = intransit_residual_grazing + ootr - summed_edge_effect_correction;
-                    // float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
-
-                    out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat;
-                    // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat_box;
-                    // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
-                    //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
-                }
-            }else{
-                // printf("Exist!");
-                if(tid < *mean_x_size){
-                    //0x7f800000 => infinity in float, according to IEEE-754
-                    out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
-                    //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
-                    // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
                 }
             }
         }

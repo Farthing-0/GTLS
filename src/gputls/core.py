@@ -106,7 +106,7 @@ def search_multi_periods(
     dyGPU = cp.asarray(dy).astype(cp.float32)
 
     lc_arr_max_len = np.array([np.max(durations)]).astype(np.int32)
-    lc_arr_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
+    lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
 
     # lc_arr_grazing_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr_grazing])
     # lc_arr_box_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr_box])
@@ -214,7 +214,8 @@ def search_multi_periods(
         #About LowestResidualsTypeGPU, 0 means standard transit, 1 means grazing transit, 2 means box transit,
         #3 means no transit(Or not detect at all)
         #TODO:export all transit types output, distinguish them in the next step? or just use the lowest one? 
-        calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
+        # calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
+        calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
         (blockSize,1,1),(lowestResidualsGPU,#depthsGPU,
         meanSizeGPU,meanXSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,durationsGPU,
