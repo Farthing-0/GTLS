@@ -340,15 +340,15 @@ def search_multi_periods(
     # bestTrapezoidFitGPU = (bestTrapezoidFitGPU - patchDataMin)/(1 - patchDataMin)
 
     # Find loss for each point
-    lossGPU = cp.empty(len(t),dtype=cp.float32)
-    trapezoidSNRlossGPU = module.get_function('trapezoidSNRloss')
-    blockSize,gridSizeX = calcGridBlockSize(len(t))
-    trapezoidSNRlossGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
-    inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
-    if bestRowT0 > len(t) - 1:
-        bestRowT0 = bestRowT0 - len(t) 
-    T0loss = lossGPU[bestRowT0]
-    lossSDE = cp.abs(T0loss - cp.mean(lossGPU))/cp.std(lossGPU)
+    # lossGPU = cp.empty(len(t),dtype=cp.float32)
+    # trapezoidSNRlossGPU = module.get_function('trapezoidSNRloss')
+    # blockSize,gridSizeX = calcGridBlockSize(len(t))
+    # trapezoidSNRlossGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
+    # inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
+    # if bestRowT0 > len(t) - 1:
+    #     bestRowT0 = bestRowT0 - len(t) 
+    # T0loss = lossGPU[bestRowT0]
+    # lossSDE = cp.abs(T0loss - cp.mean(lossGPU))/cp.std(lossGPU)
 
     # --debug ----
     # lossAtomGPU = cp.empty((len(t),durations[durationIndex]),dtype=cp.float32)
@@ -432,38 +432,42 @@ def search_multi_periods(
     # print('After main search, time used:',time.time() - start,'s')
     # outlineValue = None
 
-    # KLoss and KLossStd, can be optimized
-    def centerFold(time, period, T0):
-        """Normal phase folding"""
-        T0 = T0 + period/2
-        return (time - T0) / period - np.floor((time - T0) / period)
+    # # KLoss and KLossStd, can be optimized
+    # def centerFold(time, period, T0):
+    #     """Normal phase folding"""
+    #     T0 = T0 + period/2
+    #     return (time - T0) / period - np.floor((time - T0) / period)
 
-    phases = centerFold(t, period, T0)
-    phasesIndex = np.argsort(phases)
-    phasesSorted = phases[phasesIndex]
-    fluxesSorted = y[phasesIndex]
-    def chunks(lst, n):
-        """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i:i + n]
+    # phases = centerFold(t, period, T0)
+    # phasesIndex = np.argsort(phases)
+    # phasesSorted = phases[phasesIndex]
+    # fluxesSorted = y[phasesIndex]
+    # def chunks(lst, n):
+    #     """Yield successive n-sized chunks from lst."""
+    #     for i in range(0, len(lst), n):
+    #         yield lst[i:i + n]
 
-    # KLoss and KLossStd
-    polyFitSize = int(durations[durationIndex] / 2)
-    leftLimit = int(len(t)/2 - durations[durationIndex]/2)
-    rightLimit = int(len(t)/2 + durations[durationIndex]/2)
-    splitFluxes = list(chunks(fluxesSorted[0:leftLimit],polyFitSize))
-    splitFluxes = splitFluxes + (list(chunks(fluxesSorted[rightLimit:],polyFitSize)))
-    para = []
-    for flux in splitFluxes:
-        if len(flux) < 2:
-            continue
-        p = np.polyfit(range(len(flux)),flux,1)
-        para.append(p)
+    # # KLoss and KLossStd
+    # polyFitSize = int(durations[durationIndex] / 2)
+    # leftLimit = int(len(t)/2 - durations[durationIndex]/2)
+    # rightLimit = int(len(t)/2 + durations[durationIndex]/2)
+    # splitFluxes = list(chunks(fluxesSorted[0:leftLimit],polyFitSize))
+    # splitFluxes = splitFluxes + (list(chunks(fluxesSorted[rightLimit:],polyFitSize)))
+    # para = []
+    # for flux in splitFluxes:
+    #     if len(flux) < 2:
+    #         continue
+    #     p = np.polyfit(range(len(flux)),flux,1)
+    #     para.append(p)
 
-    standardK = (2*(1-BestFitDepth))/durations[durationIndex]
-    fluxK = (np.array(para)[:,0])**2
-    KLossStd = np.std(fluxK) / standardK**2
-    KLossMean = np.sum(fluxK) / standardK**2 / len(para)
+    # standardK = (2*(1-BestFitDepth))/durations[durationIndex]
+    # # fluxK = (np.array(para)[:,0])**2
+    # # KLossStd = np.std(fluxK) / standardK**2
+    # # KLossMean = np.sum(fluxK) / standardK**2 / len(para)
 
-    # print('durationsGPU',durationsGPU.get())
+    lossSDE = None
+    KLossStd = None
+    KLossMean = None
+
+    # # print('durationsGPU',durationsGPU.get())
     return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd
