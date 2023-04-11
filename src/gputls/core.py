@@ -105,9 +105,7 @@ def search_multi_periods(
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
 
-
-    lc_arr_len = np.array([len(x) for x in lc_arr]).astype(np.int32)
-    lc_arr_max_len = np.array([np.max(lc_arr_len)]).astype(np.int32)
+    lc_arr_max_len = np.array([np.max(durations)]).astype(np.int32)
     lc_arr_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
 
     # lc_arr_grazing_full_length = np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr_grazing])
