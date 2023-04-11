@@ -337,7 +337,6 @@ def search_multi_periods(
     if bestRowT0 > len(t) - 1:
         bestRowT0 = bestRowT0 - len(t) 
 
-
     # # Normalize Trapezoid Fit and patched data
     # patchDataMin = patchedDatasGPU[HighestPowerIndex].min()
     # bestFoldedDataGPU = (patchedDatasGPU[HighestPowerIndex] - patchDataMin)/(1 - patchDataMin)

@@ -386,6 +386,7 @@ extern "C"{
                     // float intransit_residual_box = 0;
 
                     for (int i = 0; i < signal_x_size; i++) {
+                    // for (int i = 0; i < 200; i++) {
                         sigi = (1 - signal[i]) * reverse_scale;
                         intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
 
