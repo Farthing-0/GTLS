@@ -412,12 +412,12 @@ extern "C"{
 
                         correspondIndex = (int)(i*correspondRate);
                         correspondPoint = (float)(i*correspondRate) - (float)correspondIndex;
-                        // if (correspondIndex < ideal_transit_size - 1){
+                        if (correspondIndex < ideal_transit_size - 1){
                         this_signal = ideal_transit[correspondIndex]*(1-correspondPoint) + ideal_transit[correspondIndex+1]*correspondPoint;
-                        // }
-                        // else{
-                        //     this_signal = ideal_transit[ideal_transit_size - 1];
-                        // }
+                        }
+                        else{
+                            this_signal = ideal_transit[ideal_transit_size - 1];
+                        }
 
                         sigi = (1 - this_signal) * reverse_scale;
                         intransit_residual = intransit_residual + ((data[i] - (1 - sigi)) * (data[i] - (1 - sigi))) * dy[i];
