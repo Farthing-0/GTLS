@@ -334,13 +334,13 @@ extern "C"{
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
         int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the period
 
-        int z_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+        int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
         float transit_depth_min = *in_transit_depth_min;
 
         int datapoints = *in_datapoints;
-        if(z_input < (*period_size_gpu)){
-            int durationMax = durationsMax[z_input];
-            int durationMin = durationsMin[z_input];
+        if(y_input < (*period_size_gpu)){
+            int durationMax = durationsMax[y_input];
+            int durationMin = durationsMin[y_input];
 
             for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++){
                 int mean_size = in_mean_size[durationIndex];
@@ -361,12 +361,12 @@ extern "C"{
                             ootr = *(in_ootr+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
                         }
 
-                        float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
+                        float *data = in_patched_datas + y_input*(*in_patched_datas_size) + tid;
                         float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
                         // float *signal = in_signal;
 
-                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + z_input*(*in_patched_datas_size);
-                        float summed_edge_effect_correction = in_summed_edge_effect_correction[z_input];
+                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + y_input*(*in_patched_datas_size);
+                        float summed_edge_effect_correction = in_summed_edge_effect_correction[y_input];
                         // float SIGNAL_DEPTH = 0.5;
 
                         float *dy = inverse_squared_patched_dy_arr + tid;
