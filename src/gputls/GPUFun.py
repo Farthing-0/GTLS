@@ -380,8 +380,8 @@ extern "C"{
                         float loss = 0;
                         for (int i = 0; i < duration; i++) {
                             // sigi = (1 - signal[i]) * reverse_scale;
-                            // sigi = (signal[i]) * reverse_scale;
-                            sigi = 1;
+                            sigi = (signal[i]) * reverse_scale;
+                            // sigi = 1;
                             loss = (data[i] - (1 - sigi));
                             intransit_residual = intransit_residual + loss * loss * dy[i];
                         }
