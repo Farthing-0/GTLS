@@ -539,6 +539,9 @@ extern "C"{
         }
     }
 
+    __global__ void postTransitFit(){
+        
+    }
 
     // // This function is used after the best period and duration are found, to calculate the SNR and some other metrics.
     // // 'ForAll' means that it will calculate the loss for all the periods and durations in the trapezoid fit.

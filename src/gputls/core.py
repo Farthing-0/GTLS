@@ -2,6 +2,7 @@ import numpy
 import numpy as np
 import cupy as cp
 from .stats import spectra,all_transit_times,calculate_transit_duration_in_days,intransit_stats,snr_stats,calcDurationDays
+from .transit import MutipleTransitFit
 from .helpers import transit_mask
 from . import GPUFun
 import pynvml
@@ -256,6 +257,7 @@ def search_multi_periods(
     transitMean = patchedDatasGPU[HighestPowerIndex][bestRowT0:bestRowT0+durations[durationIndex]].mean()
 
     # Transit Depth
+    # print("overshoot",overshootGPU)
     overshoot = lc_cache_overview["overshoot"][durationIndex]
     transitDepth =  (1-transitMean) * overshoot
 
@@ -273,7 +275,7 @@ def search_multi_periods(
     BestFitDepth = BestFitDepthGPU.item()
     dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
 
-    # Generate Trapezoid Fit
+    # Trapezoid Fit
     bestTrapezoidFitGPU = cp.empty(durations[durationIndex],dtype=cp.float32)
     generateTrapezoidFitGPU = module.get_function('generateTrapezoidFit')
     blockSize,gridSizeX = calcGridBlockSize(durations[durationIndex])
@@ -288,6 +290,13 @@ def search_multi_periods(
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durations[durationIndex]:] - DataCumsum[:-durations[durationIndex]])/durations[durationIndex]
     redNoise = np.std(DataSlideAvg)
+
+    # Transit Fit
+
+    postTransitArr, postOvershootArr = MutipleTransitFit(durations[durationIndex])
+    postTransitArrGPU = cp.asarray(postTransitArr, dtype=cp.float32)
+    postOvershootArrGPU = cp.asarray(postOvershootArr, dtype=cp.float32)
+    
 
     bestSortIndex = sortIndexGPU[HighestPowerIndex]
     tIndex = bestSortIndex[bestRowT0]
