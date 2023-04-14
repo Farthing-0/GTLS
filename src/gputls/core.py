@@ -241,65 +241,6 @@ def search_multi_periods(
     chi2 = LowestResidualsEachPeriodGPU.get()
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
 
-    # import time 
-    # cp.cuda.runtime.deviceSynchronize()
-    # start = time.time()
-
-    # # ---Mutliple Trapezoid Debug begin--- #
-
-    # # bestLocation = locationGPU[HighestPowerIndex].item()
-    # # durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
-
-    # durationIndexs = cp.floor(locationGPU / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
-    # targetDurationGPU = durationsGPU[durationIndexs]
-    # T0IndexsGPU = locationGPU % (int(patchedDatasSize) - (np.min(durations)) + 1)
-    # #TODO: use a self defined core function to calculate the transit depth to accelerate the process    
-    # transitMeansGPU = cp.empty(len(periods),dtype=cp.float32)
-    # for i in range(len(periods)):
-    #     transitMeansGPU[i] = patchedDatasGPU[i][T0IndexsGPU[i]:T0IndexsGPU[i]+targetDurationGPU[i]].mean()
-
-    # #Technically, the "real" trapezoidFitSize = 2 * trapezoidFitSize
-    # trapezoidFitSize = 100
-    # print('Calculating trapezoid fit for all periods and durations...')
-    # #Seems that will use about 2.1GB memory for trapezoidFitResultAllGPU ... Maybe I should create a new GPU array for each period?
-    # trapezoidFitResultAllGPU = cp.empty((len(periods),trapezoidFitSize,np.max(durations)),dtype=cp.float32)
-    # trapezoidFitResultAllGPU[:] = cp.nan
-    # print('shape',trapezoidFitResultAllGPU.shape)
-    # trapezoidFitGPU = module.get_function('trapezoidFitForAll')
-    # blockSize,gridSizeX = calcGridBlockSize(np.max(durations))
-    # trapezoidFitGPU((gridSizeX,trapezoidFitSize,len(periods)),(blockSize,1,1),(trapezoidFitResultAllGPU,
-    # patchedDatasGPU,patchedDatasSizeGPU,inverseSquaredPatchedDysGPU,
-    # targetDurationGPU,cp.int32(np.max(durations)),T0IndexsGPU,transitMeansGPU,trapezoidFitSize))
-    # trapezoidFitTidsGPU = cp.nanargmin(trapezoidFitResultAllGPU.sum(axis=-1),axis=-1)
-    # trapezoidFitTidsDepthGPU = (trapezoidFitSize * (transitMeansGPU) - 0.5*trapezoidFitTidsGPU)/(trapezoidFitSize - 0.5*trapezoidFitTidsGPU)
-    # # dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
-    # snrFitsGPU = cp.empty(len(periods),dtype=cp.float32)
-    # for i in range(len(periods)):
-    #     dataOutTransit = cp.concatenate((patchedDatasGPU[i][0:T0IndexsGPU[i]],patchedDatasGPU[i][T0IndexsGPU[i]+targetDurationGPU[i]:]))
-    #     snrFitsGPU[i] = (1 - trapezoidFitTidsDepthGPU[i])*(targetDurationGPU[i] ** 0.5)/cp.std(dataOutTransit)
-
-    # # snrTemp = (1 - trapezoidFitTidsDepthGPU)*(targetDurationGPU ** 0.5)
-    # # snrTempMax = cp.argmax(snrTemp)
-    # snrFitsGPUMax = cp.argmax(snrFitsGPU)
-    # print('debugSNRFit',snrFitsGPU[snrFitsGPUMax])
-    # # print('snrFitsGPUMax',snrFitsGPUMax)
-    # print('debugPeriod',periods[snrFitsGPUMax.get()])
-
-    # # dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
-    # # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
-    
-    # # print('trapezoidFitTids',list(trapezoidFitTidsGPU.get()))
-    # # print('trapezoidFitTidsDepth',list(trapezoidFitTidsDepthGPU.get()))
-    # # print('duration',targetDurationGPU)
-    # # print('trapezoidFitResultAllGPU shape',trapezoidFitResultAllGPU.shape)
-    # # # print('trapezoidFitResultAllGPU',trapezoidFitResultAllGPU)
-    # # print('sumMin',cp.nanargmin(trapezoidFitResultAllGPU.sum(axis=-1),axis=-1))#.nanargmin(axis=-1))
-    # # print('sum',trapezoidFitResultAllGPU.sum(axis=-1)[-1][:20])
-    # # cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
-
-    # # ---Mutliple Trapezoid Debug end--- #
-
-
     #Self Defined metrics
     HighestPowerIndex = numpy.argmax(power)
     # Depth = depthsEachPeriodGPU[HighestPowerIndex].item()    
@@ -341,49 +282,6 @@ def search_multi_periods(
 
     if bestRowT0 > len(t) - 1:
         bestRowT0 = bestRowT0 - len(t) 
-
-    # # Normalize Trapezoid Fit and patched data
-    # patchDataMin = patchedDatasGPU[HighestPowerIndex].min()
-    # bestFoldedDataGPU = (patchedDatasGPU[HighestPowerIndex] - patchDataMin)/(1 - patchDataMin)
-    # bestTrapezoidFitGPU = (bestTrapezoidFitGPU - patchDataMin)/(1 - patchDataMin)
-
-    # Find loss for each point
-    # lossGPU = cp.empty(len(t),dtype=cp.float32)
-    # trapezoidSNRlossGPU = module.get_function('trapezoidSNRloss')
-    # blockSize,gridSizeX = calcGridBlockSize(len(t))
-    # trapezoidSNRlossGPU((gridSizeX,1,1),(blockSize,1,1),(lossGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
-    # inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
-    # T0loss = lossGPU[bestRowT0]
-    # lossSDE = cp.abs(T0loss - cp.mean(lossGPU))/cp.std(lossGPU)
-
-    # --debug ----
-    # lossAtomGPU = cp.empty((len(t),durations[durationIndex]),dtype=cp.float32)
-    # trapezoidSNRlossAtomGPU = module.get_function('trapezoidSNRlossAtom')
-    # blockSize,gridSizeX = calcGridBlockSize(len(t))
-    # trapezoidSNRlossAtomGPU((durations[durationIndex],gridSizeX,1),(1,blockSize,1),(lossAtomGPU,cp.int32(len(t)),patchedDatasGPU[HighestPowerIndex],
-    # inverseSquaredPatchedDysGPU[HighestPowerIndex],cp.int32(durations[durationIndex]),bestTrapezoidFitGPU))
-
-    # lossStd = cp.std(lossAtomGPU,axis=-1)
-    # T0loss = lossStd[bestRowT0]
-    # lossSDE = cp.abs(T0loss - cp.mean(lossStd))/cp.std(lossStd)
-    # print('lossSDE',lossSDE.get())
-    
-    # import matplotlib.pyplot as plt
-    # print('bestTrapezoidFitGPU',bestTrapezoidFitGPU.shape)
-
-    # # plt.plot(bestTrapezoidFitGPU.get())
-    # plt.plot(lossGPU.get())
-    # # plt.plot(lossStd.get())
-    # # plt.ylim(0,10**-6)
-    # plt.axvline(bestRowT0)
-    # plt.savefig('lossGPU.png')
-    # plt.close()
-
-    # -- debug end ----
-
-    # dft = cp.abs(cp.fft.rfft(patchedDatasGPU[HighestPowerIndex]))[50:]
-    # line = dft[100:].mean() + 3 * dft[100:].std()
-    # outlineValue = len([x for x in dft[100:] if x > line])
 
     # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/cp.std(trapezoidFitResultGPU[bestFitTid])
     snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
@@ -433,47 +331,9 @@ def search_multi_periods(
     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
     snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
-    
-    # cp.cuda.runtime.deviceSynchronize()
-    # print('After main search, time used:',time.time() - start,'s')
-    # outlineValue = None
-
-    # # KLoss and KLossStd, can be optimized
-    # def centerFold(time, period, T0):
-    #     """Normal phase folding"""
-    #     T0 = T0 + period/2
-    #     return (time - T0) / period - np.floor((time - T0) / period)
-
-    # phases = centerFold(t, period, T0)
-    # phasesIndex = np.argsort(phases)
-    # phasesSorted = phases[phasesIndex]
-    # fluxesSorted = y[phasesIndex]
-    # def chunks(lst, n):
-    #     """Yield successive n-sized chunks from lst."""
-    #     for i in range(0, len(lst), n):
-    #         yield lst[i:i + n]
-
-    # # KLoss and KLossStd
-    # polyFitSize = int(durations[durationIndex] / 2)
-    # leftLimit = int(len(t)/2 - durations[durationIndex]/2)
-    # rightLimit = int(len(t)/2 + durations[durationIndex]/2)
-    # splitFluxes = list(chunks(fluxesSorted[0:leftLimit],polyFitSize))
-    # splitFluxes = splitFluxes + (list(chunks(fluxesSorted[rightLimit:],polyFitSize)))
-    # para = []
-    # for flux in splitFluxes:
-    #     if len(flux) < 2:
-    #         continue
-    #     p = np.polyfit(range(len(flux)),flux,1)
-    #     para.append(p)
-
-    # standardK = (2*(1-BestFitDepth))/durations[durationIndex]
-    # # fluxK = (np.array(para)[:,0])**2
-    # # KLossStd = np.std(fluxK) / standardK**2
-    # # KLossMean = np.sum(fluxK) / standardK**2 / len(para)
 
     lossSDE = None
     KLossStd = None
     KLossMean = None
 
-    # # print('durationsGPU',durationsGPU.get())
     return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd
