@@ -314,6 +314,10 @@ def search_multi_periods(
     bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
     transitMean = patchedDatasGPU[HighestPowerIndex][bestRowT0:bestRowT0+durations[durationIndex]].mean()
 
+    # Transit Depth
+    overshoot = lc_cache_overview["overshoot"][durationIndex]
+    transitDepth =  (1-transitMean) * overshoot
+
     #Technically, the "real" trapezoidFitSize = 2 * trapezoidFitSize
     trapezoidFitSize = 100
     trapezoidFitResultGPU = cp.empty((trapezoidFitSize,durations[durationIndex]),dtype=cp.float32)
@@ -472,4 +476,4 @@ def search_multi_periods(
     KLossMean = None
 
     # # print('durationsGPU',durationsGPU.get())
-    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,BestFitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd
+    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd

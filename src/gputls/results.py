@@ -8,7 +8,7 @@ class gtlsResult(object):
         self.durationPoints = durationPoints
         self.rawDurations = rawDurations
         self.duration = duration
-        self.depth = 1 - depth
+        self.depth = depth
         self.T0 = T0
         self.SDE = SDE
         self.chi2 = chi2

@@ -42,6 +42,8 @@ class gtls(object):
         if maxwidth_in_samples % 2 != 0:
             maxwidth_in_samples = maxwidth_in_samples + 1
         self.maxwidth_in_samples = maxwidth_in_samples
+        import time
+        getCacheStart = time.time()
         self.lc_cache_overview, self.lc_arr = get_cache(
             durations=durations,
             maxwidth_in_samples=maxwidth_in_samples,

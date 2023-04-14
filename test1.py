@@ -116,7 +116,7 @@ if __name__ == '__main__':
     time0 = time.time()
     model = gtls(t = times, y = flatten_lc, dy = dy)
     # gtlsResult = model.power(useLocalPTXCUBIN=True)
-    gtlsResult = model.power()
+    gtlsResult = model.power(GPUDeviceID = 0)
 
     # print('Time taken for GPU',time.time() - time0)
     # print('CPU results')
