@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 import batman  # https://www.cfa.harvard.edu/~lkreidberg/batman/
-import numpy
+import numpy as np
 from . import constants as constants
 from .interpolation import interp1d
 
@@ -8,9 +8,9 @@ from .interpolation import interp1d
 def reference_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):
     """Returns an Earth-like transit of width 1 and depth 1"""
 
-    f = numpy.ones(constants.SUPERSAMPLE_SIZE)
+    f = np.ones(constants.SUPERSAMPLE_SIZE)
     duration = 1  # transit duration in days. Increase for exotic cases
-    t = numpy.linspace(-duration * 0.5, duration * 0.5, constants.SUPERSAMPLE_SIZE)
+    t = np.linspace(-duration * 0.5, duration * 0.5, constants.SUPERSAMPLE_SIZE)
     ma = batman.TransitParams()
     ma.t0 = 0  # time of inferior conjunction
     ma.per = per  # orbital period, use Earth as a reference
@@ -25,18 +25,18 @@ def reference_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):
     flux = m.light_curve(ma)  # calculates light curve
 
     # Determine start of transit (first value < 1)
-    idx_first = numpy.argmax(flux < 1)
+    idx_first = np.argmax(flux < 1)
     intransit_flux = flux[idx_first : -idx_first + 1]
     intransit_time = t[idx_first : -idx_first + 1]
 
     # Downsample (bin) to target sample size
-    x_new = numpy.linspace(t[idx_first], t[-idx_first - 1], samples)
+    x_new = np.linspace(t[idx_first], t[-idx_first - 1], samples)
     f = interp1d(x_new, intransit_time)
     downsampled_intransit_flux = f(intransit_flux)
 
     # Rescale to height [0..1]
-    rescaled = (numpy.min(downsampled_intransit_flux) - downsampled_intransit_flux) / (
-        numpy.min(downsampled_intransit_flux) - 1
+    rescaled = (np.min(downsampled_intransit_flux) - downsampled_intransit_flux) / (
+        np.min(downsampled_intransit_flux) - 1
     )
 
     return rescaled
@@ -75,19 +75,19 @@ def fractional_transit(
         reference_flux = cached_reference_transit
 
     # Interpolate to shorter interval - new method without scipy
-    reference_time = numpy.linspace(-0.5, 0.5, samples)
+    reference_time = np.linspace(-0.5, 0.5, samples)
     occupied_samples = int((duration / maxwidth) * samples)
-    x_new = numpy.linspace(-0.5, 0.5, occupied_samples)
+    x_new = np.linspace(-0.5, 0.5, occupied_samples)
     f = interp1d(x_new, reference_time)
     y_new = f(reference_flux)
 
     # Patch ends with ones ("1")
     missing_samples = samples - occupied_samples
-    emtpy_segment = numpy.ones(int(missing_samples * 0.5))
-    result = numpy.append(emtpy_segment, y_new)
-    result = numpy.append(result, emtpy_segment)
-    if numpy.size(result) < samples:  # If odd number of samples
-        result = numpy.append(result, numpy.ones(1))
+    emtpy_segment = np.ones(int(missing_samples * 0.5))
+    result = np.append(emtpy_segment, y_new)
+    result = np.append(result, emtpy_segment)
+    if np.size(result) < samples:  # If odd number of samples
+        result = np.append(result, np.ones(1))
 
     # Depth rescaling
     result = 1 - ((1 - result) * depth)
@@ -104,8 +104,8 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
     # if verbose:
     #     print("Creating model cache for", str(len(durations)), "durations")
     lc_arr = []
-    rows = numpy.size(durations)
-    lc_cache_overview = numpy.zeros(
+    rows = np.size(durations)
+    lc_cache_overview = np.zeros(
         rows,
         dtype=[("duration", "f8"), ("width_in_samples", "i8"), ("overshoot", "f8")],
     )
@@ -125,7 +125,7 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
     for duration in durations:
         scaled_transit = fractional_transit(
             duration=duration,
-            maxwidth=numpy.max(durations),
+            maxwidth=np.max(durations),
             depth=constants.SIGNAL_DEPTH,
             samples=maxwidth_in_samples,
             per=per,
@@ -139,22 +139,65 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
             cached_reference_transit=cached_reference_transit,
         )
         lc_cache_overview["duration"][row] = duration
-        used_samples = int((duration / numpy.max(durations)) * maxwidth_in_samples)
+        used_samples = int((duration / np.max(durations)) * maxwidth_in_samples)
         lc_cache_overview["width_in_samples"][row] = used_samples
-        full_values = numpy.where(
+        full_values = np.where(
             scaled_transit < (1 - constants.NUMERICAL_STABILITY_CUTOFF)
         )
-        first_sample = numpy.min(full_values)
-        last_sample = numpy.max(full_values) + 1
+        first_sample = np.min(full_values)
+        last_sample = np.max(full_values) + 1
         signal = scaled_transit[first_sample:last_sample]
         lc_arr.append(signal)
 
         # Fraction of transit bottom and mean flux
-        overshoot = numpy.mean(signal) / numpy.min(signal)
+        overshoot = np.mean(signal) / np.min(signal)
 
         # Later, we multiply the inverse fraction ==> convert to inverse percentage
         lc_cache_overview["overshoot"][row] = 1 / (2 - overshoot)
         row += +1
 
-    lc_arr = numpy.array(lc_arr, dtype=object)
+    lc_arr = np.array(lc_arr, dtype=object)
     return lc_cache_overview, lc_arr
+
+def MutipleTransitFit(pointSize):
+
+    params = batman.TransitParams()       #object to store transit parameters
+    params.t0 = 0.                        #time of inferior conjunction
+    params.per = 1.                       #orbital period
+    params.rp = 0.1                       #planet radius (in units of stellar radii)
+    params.a = 15.                        #semi-major axis (in units of stellar radii)
+    params.inc = 87.                      #orbital inclination (in degrees)
+    params.ecc = 0.                       #eccentricity
+    params.w = 90.                        #longitude of periastron (in degrees)
+    params.limb_dark = "quadratic"        #limb darkening model
+    params.u = [0.4804, 0.1867]      #limb darkening coefficients [u1, u2, u3, u4]
+
+    t = np.linspace(-0.025, 0.025, 1000)  #times at which to calculate light curve
+    m = batman.TransitModel(params, t)    #initializes model
+
+    TargetIncMin = 86.2
+    TargetIncMax = 90
+    baseInc = 86
+    incsLog = np.linspace(np.log(TargetIncMin - baseInc),np.log(TargetIncMax - baseInc),100)
+    incs = np.exp(incsLog)+baseInc
+
+    transitArr = []
+    overshootArr = []
+    params.rp  = 0.025
+    for inc in incs:
+        params.inc = inc
+        m = batman.TransitModel(params,t)
+        flux = m.light_curve(params)                    #calculates light curveradii = np.linspace(0.09, 0.11, 20)
+
+        idx_first = np.argmax(flux < 1)
+        intransit_time = t[idx_first : -idx_first + 1]
+
+        tStart = intransit_time[0]
+        tEnd = intransit_time[-1]
+        tNew = np.linspace(tStart, tEnd, pointSize)
+        m = batman.TransitModel(params,tNew)
+        new_flux = m.light_curve(params)
+        rescaled = (np.min(new_flux) - new_flux) / (np.min(new_flux) - 1) * 0.5 + 0.5
+        transitArr.append(rescaled)
+        overshootArr.append(np.mean(rescaled)/0.5)
+    return np.array(transitArr), np.array(overshootArr)
