@@ -159,7 +159,7 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
     lc_arr = np.array(lc_arr, dtype=object)
     return lc_cache_overview, lc_arr
 
-def MutipleTransitFit(pointSize):
+def mutipleTransitFit(pointSize):
 
     params = batman.TransitParams()       #object to store transit parameters
     params.t0 = 0.                        #time of inferior conjunction

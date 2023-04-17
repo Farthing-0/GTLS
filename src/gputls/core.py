@@ -3,6 +3,7 @@ import numpy as np
 import cupy as cp
 from .stats import spectra,all_transit_times,calculate_transit_duration_in_days,intransit_stats,snr_stats,calcDurationDays
 from .helpers import transit_mask
+from .transit import mutipleTransitFit
 from . import GPUFun
 import pynvml
 
@@ -316,7 +317,7 @@ def search_multi_periods(
 
     # Transit Depth
     overshoot = lc_cache_overview["overshoot"][durationIndex]
-    transitDepth =  (1-transitMean) * overshoot
+    transitDepth =  ((1-transitMean) * overshoot).item()
 
     #Technically, the "real" trapezoidFitSize = 2 * trapezoidFitSize
     trapezoidFitSize = 100
@@ -341,6 +342,13 @@ def search_multi_periods(
 
     if bestRowT0 > len(t) - 1:
         bestRowT0 = bestRowT0 - len(t) 
+
+    # -- post Transit Fit
+    print('durations[durationIndex]',durations[durationIndex])
+    transitArr,overshootArr = mutipleTransitFit(durations[durationIndex])
+    # Find the best transit fit
+    
+
 
     # # Normalize Trapezoid Fit and patched data
     # patchDataMin = patchedDatasGPU[HighestPowerIndex].min()
