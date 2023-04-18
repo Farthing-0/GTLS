@@ -539,99 +539,41 @@ extern "C"{
         }
     }
 
-    // __global__ void postTransitFitAtom(float *results,
-    // float *inData, float *inInverseSquaredDys,
-    // int duration, int inT0Index,
-    // float *transitMean, int trapezoidFitSize, float *targetTransit){
-    //     int tid = blockIdx.x * blockDim.x + threadIdx.x; //tid is the index of the point in the trapezoid fit, tid < duration
-    //     int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is the index of different types of trapezoid fit, y < trapezoidFitSize
+    __global__ void postTransitFitAtom(float *results,
+    float *inData, float *idealTransit, float *inInverseSquaredDys,
+    int duration, int inDataSize, int idealTransitSize,float *pointResult){
+        int x = blockIdx.x * blockDim.x + threadIdx.x; //x is the index of the point in the folded curve, x < len(t)
+        int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is the index of different types of idealTransit fit, y < idealTransitSize
 
-    //     // For now, z is not used, but it is reserved for future use. 
-    //     // int z = blockIdx.z * blockDim.z + threadIdx.z;  //z is the index of different periods and durations (period and duration are one to one mapping)
+        float *result = results + y*inDataSize + x;
+        float tempResult = 0;
+        float tempTotalResult = 0;
+        // float pointResult[duration];
 
-    //     if (y < trapezoidFitSize and tid < duration) {
-    //         float *result = results + y*(duration);
 
-    //         //TrapezoidDepth can not change since I use other fixed values in the kernel
-    //         float TrapezoidDepth = ((float)trapezoidFitSize * (*transitMean) - 0.5*(float)y)/((float)trapezoidFitSize - 0.5*(float)y);
-    //         float meanSignal = (y*0.75 + (trapezoidFitSize - y)*TrapezoidDepth)/trapezoidFitSize;
-            
-    //         float trapezoidQ = ((float)y/(float)trapezoidFitSize)*(float(duration)/2);
-    //         float signal;
-    //         float sigi = 0;
-    //         float intransitResidual = 0;
+        float data;
+        float dy;
+        float idealTransitValue;
+        if (x < inDataSize){
+            for(int i = 0; i < duration; i++){
+                data = inData[x + i];
+                dy = inInverseSquaredDys[x + i];
+                idealTransitValue = idealTransit[y*duration + i];
 
-    //         float *data = inData + inT0Index;
-    //         float *dy = inInverseSquaredDys + inT0Index;
-
-    //         //Warining: Might be a bug especially when duration is small
-    //         // for (int i = 0; i < duration; i++) {
-    //         if (tid == 0 and y != 0) {
-    //             signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
-    //         }
-    //         else if(tid < trapezoidQ){
-    //             signal = (1 - ((1-TrapezoidDepth)/(trapezoidQ))*tid);
-    //         }
-    //         else if(tid >= trapezoidQ && tid < duration - trapezoidQ){
-    //             signal = TrapezoidDepth;
-    //         }
-    //         else{
-    //             signal = (1-((1-TrapezoidDepth)/(trapezoidQ))*(duration-tid));
-    //         }
-    //         result[tid] = (data[tid] - signal) * (data[tid] - signal) * dy[tid];
-    //     }
-    // }
-
-    // // This function is used after the best period and duration are found, to calculate the SNR and some other metrics.
-    // // 'ForAll' means that it will calculate the loss for all the periods and durations in the trapezoid fit.
-    // __global__ void trapezoidFitForAll(float *resultsArray,
-    // float *patchData,int* patchedDataSize, float *patchedDys,
-    // int *durations,int maxDuration, int* inT0Indexs,
-    // float *transitMeans, int trapezoidFitSize){
-    //     int tid = blockIdx.x * blockDim.x + threadIdx.x; //tid is the index of the point in the trapezoid fit, tid < duration
-    //     int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is the index of different types of trapezoid fit, y < trapezoidFitSize
-    //     int z = blockIdx.z * blockDim.z + threadIdx.z;  //z is the index of different periods and durations (period and duration are one to one mapping)
-
-    //     int duration = durations[z];
-    //     int inT0Index = inT0Indexs[z];
-    //     float transitMean = transitMeans[z];
-    //     float* results = resultsArray + z*(maxDuration*trapezoidFitSize);
-    //     float* inData = patchData + z*(*patchedDataSize);
-    //     float* inInverseSquaredDys = patchedDys + z*(*patchedDataSize);
-
-    //     // if (y < trapezoidFitSize and tid < duration) {
-    //     if (tid < duration) {
-    //         float *result = results + y*(duration);
-
-    //         //TrapezoidDepth can not change since I use other fixed values in the kernel
-    //         float TrapezoidDepth = ((float)trapezoidFitSize * (transitMean) - 0.5*(float)y)/((float)trapezoidFitSize - 0.5*(float)y);
-    //         float meanSignal = (y*0.75 + (trapezoidFitSize - y)*TrapezoidDepth)/trapezoidFitSize;
-            
-    //         float trapezoidQ = ((float)y/(float)trapezoidFitSize)*(float(duration)/2);
-    //         float signal;
-    //         float sigi = 0;
-    //         float intransitResidual = 0;
-
-    //         float *data = inData + inT0Index;
-    //         float *dy = inInverseSquaredDys + inT0Index;
-
-    //         //Warining: Might be a bug especially when duration is small
-    //         // for (int i = 0; i < duration; i++) {
-    //         if (tid == 0 and y != 0) {
-    //             signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
-    //         }
-    //         else if(tid < trapezoidQ){
-    //             signal = (1 - ((1-TrapezoidDepth)/(trapezoidQ))*tid);
-    //         }
-    //         else if(tid >= trapezoidQ && tid < duration - trapezoidQ){
-    //             signal = TrapezoidDepth;
-    //         }
-    //         else{
-    //             signal = (1-((1-TrapezoidDepth)/(trapezoidQ))*(duration-tid));
-    //         }
-    //         result[tid] = (data[tid] - signal) * (data[tid] - signal) * dy[tid];
-    //     }
-    // }
-
+                tempResult = (data - idealTransitValue) * (data - idealTransitValue) * dy;
+                pointResult[i] = tempResult;
+                tempTotalResult = tempTotalResult + tempResult;
+            }
+        }
+        // *result = tempTotalResult;
+        // result = std(pointResult)
+        float mean = tempTotalResult/duration;
+        float std = 0;
+        for(int i = 0; i < duration; i++){
+            std = std + (pointResult[i] - mean) * (pointResult[i] - mean);
+        }
+        std = sqrt(std/duration);
+        *result = std;
+    }
 
 }

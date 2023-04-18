@@ -344,11 +344,31 @@ def search_multi_periods(
         bestRowT0 = bestRowT0 - len(t) 
 
     # -- post Transit Fit
-    print('durations[durationIndex]',durations[durationIndex])
-    transitArr,overshootArr = mutipleTransitFit(durations[durationIndex])
-    # Find the best transit fit
-    
-
+    # print('durations[durationIndex]',durations[durationIndex])
+    # transitArr = mutipleTransitFit(durations[durationIndex],transitDepth)
+    # transitArrGPU = cp.array(transitArr,dtype=cp.float32)
+    # # Find the best transit fit
+    # # __global__ void postTransitFitAtom(float *results,
+    # # float *inData, float *idealTransit, float *inInverseSquaredDys,
+    # # int duration, int inDataSize, int idealTransitSize){    
+    # pointResultGPU = cp.empty((durations[durationIndex]),dtype=cp.float32)
+    # postTransitFitResultGPU = cp.empty((len(transitArr),len(y)),dtype=cp.float32)
+    # postTransitFitGPU = module.get_function('postTransitFitAtom')
+    # blockSize,gridSizeX = calcGridBlockSize(len(t))
+    # postTransitFitGPU((gridSizeX,len(transitArr),1),(blockSize,1,1),(postTransitFitResultGPU,
+    # patchedDatasGPU[HighestPowerIndex],transitArrGPU,inverseSquaredPatchedDysGPU[HighestPowerIndex],
+    # cp.int32(durations[durationIndex]),cp.int32(len(t)),cp.int32(len(transitArr)),pointResultGPU))
+    # # print('T0FitTest',postTransitFitResultGPU[:,bestRowT0])
+    # # print('T0FitTest',postTransitFitResultGPU)
+    # bestFitIndex = postTransitFitResultGPU[:,bestRowT0].argmin().item()
+    # # print('bestFitIndex',bestFitIndex)
+    # idealTransitFitLoss = postTransitFitResultGPU[bestFitIndex].get()
+    # # print('idealTransitFitLoss',idealTransitFitLoss)
+    # # print('idealTransitFitLoss-T0',idealTransitFitLoss[bestRowT0])
+    # lossSDE = abs(idealTransitFitLoss[bestRowT0] - np.mean(idealTransitFitLoss)) / np.std(idealTransitFitLoss)
+    # # print('lossSDE',lossSDE)
+    # # lossSDE = 
+    # # print('T0FitTest',postTransitFitResultGPU[0].shape)
 
     # # Normalize Trapezoid Fit and patched data
     # patchDataMin = patchedDatasGPU[HighestPowerIndex].min()

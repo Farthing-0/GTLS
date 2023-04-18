@@ -143,8 +143,6 @@ class gtls(object):
 
         lcArr = self.lc_arr
         assumeCurve = lcArr[np.where(self.rawDurations == self.rawDuration)[0][0]]
-        # print('assumeCurve',assumeCurve)
-        # print('self.Depth',self.Depth)
         assumeCurve = 1 - ((1- np.array(assumeCurve)) * 2 * (self.Depth))
         fitCurve = []
         IntransitCount = 0

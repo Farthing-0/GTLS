@@ -159,7 +159,7 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
     lc_arr = np.array(lc_arr, dtype=object)
     return lc_cache_overview, lc_arr
 
-def mutipleTransitFit(pointSize):
+def mutipleTransitFit(pointSize,depth):
 
     params = batman.TransitParams()       #object to store transit parameters
     params.t0 = 0.                        #time of inferior conjunction
@@ -197,7 +197,8 @@ def mutipleTransitFit(pointSize):
         tNew = np.linspace(tStart, tEnd, pointSize)
         m = batman.TransitModel(params,tNew)
         new_flux = m.light_curve(params)
-        rescaled = (np.min(new_flux) - new_flux) / (np.min(new_flux) - 1) * 0.5 + 0.5
+        # rescaled = (np.min(new_flux) - new_flux) / (np.min(new_flux) - 1) * 0.5 + 0.5
+        rescaled = (np.min(new_flux) - new_flux) / (np.min(new_flux) - 1) * depth + 1 - depth
         transitArr.append(rescaled)
-        overshootArr.append(np.mean(rescaled)/0.5)
-    return np.array(transitArr), np.array(overshootArr)
+        # overshootArr.append(np.mean(rescaled)/0.5)
+    return np.array(transitArr)#, np.array(overshootArr)
