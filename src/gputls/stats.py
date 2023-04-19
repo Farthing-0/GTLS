@@ -250,7 +250,8 @@ def all_transit_times(T0, t, period):
             break
     return transit_times
 
-def calcDurationDays(times, period, StartT0, rawDuration):
+# def calcDurationDays(times, period, StartT0, rawDuration):
+def calcDurationDays(times, period, StartT0, duration):
     """Return estimate for transit duration in days (Alternative method)"""
 
     def find_nearest(array, value):
@@ -267,7 +268,8 @@ def calcDurationDays(times, period, StartT0, rawDuration):
     phasesIndex = np.argsort(phases)
     phases_sorted = phases[phasesIndex]
     startIdx = find_nearest(phases_sorted,0.5)
-    endIdx = startIdx + (np.array(rawDuration) * len(times)).astype(int)
+    # endIdx = startIdx + (np.array(rawDuration) * len(times)).astype(int)
+    endIdx = startIdx + duration
     #Seems duration can not be longer than 0.5
     endPhases = phases_sorted[endIdx]
     DurationDays = (endPhases - 0.5) * period

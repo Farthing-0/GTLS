@@ -428,12 +428,13 @@ def search_multi_periods(
     snrFitPink = (1 - BestFitDepth)/((np.std(dataOutTransit)**2/(durations[durationIndex])) + (redNoise**2/(len(transit_times))))**0.5
 
     ## Alternative TLS Calculate transit duration(days) Method
-    transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
-
+    # transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
+    # transit_duration_in_days = calcDurationDays(t, period, T0, durations[durationIndex])
+    
     ##Raw TLS Calculate transit duration(days) Method
-    # transit_duration_in_days = calculate_transit_duration_in_days(
-    #     t, period, transit_times, rawDuration
-    # )
+    transit_duration_in_days = calculate_transit_duration_in_days(
+        t, period, transit_times, rawDuration
+    )
 
     T0 = T0 + transit_duration_in_days / 2
     transit_times = transit_times + transit_duration_in_days / 2
