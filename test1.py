@@ -74,7 +74,7 @@ def findRandomLc():
     # lc_file = lc_dir + files[10]
     for lc_file in files:
         # if '0000000021132157' in lc_file:
-        if '0000000363753435' in lc_file:
+        if '0000000411577033' in lc_file:
     #     # if '0000000028473414' in lc_file:
     # #     # if '0000000010596267' in lc_file:
     # #     if '0000000015422557' in lc_file:
@@ -134,8 +134,8 @@ if __name__ == '__main__':
     # # # # from main import transitleastsquares
 
     # # # # model = transitleastsquares(t = times, y = flatten_lc, GPU = False ,dy = dy)
-    model = transitleastsquares(t = times, y = flatten_lc,dy = dy)
-    results = model.power()
+    # model = transitleastsquares(t = times, y = flatten_lc,dy = dy)
+    # results = model.power()
 
     from gputls import gtls
 
@@ -145,8 +145,8 @@ if __name__ == '__main__':
     gtlsResult = model.power(GPUDeviceID = 0)
 
     # print('Time taken for GPU',time.time() - time0)
-    print('CPU results')
-    print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
+    # print('CPU results')
+    # print('period', results.period, 'duration', results.duration, 'depth', results.depth, 'T0', results.T0,'SDE', results.SDE,'snr', results.snr,'DepthMean',results.depth_mean)
 
     print('GPU results')
     print('period', gtlsResult.period, 'duration', gtlsResult.duration, 'depth', gtlsResult.depth, 'T0', gtlsResult.T0,'SDE', gtlsResult.SDE,
