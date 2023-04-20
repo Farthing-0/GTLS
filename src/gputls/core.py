@@ -9,8 +9,7 @@ import pynvml
 
 def set_cuda_device(device_id):
     """Set the CUDA device."""
-    if device_id != 0:
-        cp.cuda.Device(device_id).use()
+    cp.cuda.Device(device_id).use()
 
 def calcGridBlockSize(size):
     MAX_BLOCK_SIZE = 128
