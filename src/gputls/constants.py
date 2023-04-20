@@ -23,6 +23,9 @@ USE_LOCAL_PTXCUBIN = False
 # The GPU device ID to use
 GPU_DEVICE_ID = 0
 
+# skip points when search, which is the original feature of TLS
+LEGACY = False
+
 # astrophysical constants
 G = 6.673e-11  # gravitational constant [m^3 / kg / s^2]
 R_sun = 695508000  # radius of the Sun [m]
@@ -136,6 +139,7 @@ VALID_PARAMETERS = [
     "period_max",
     "n_transits_min",
     "GPUDeviceID",
+    "legacy",
     "per",
     "rp",
     "a",

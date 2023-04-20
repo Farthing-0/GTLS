@@ -54,6 +54,8 @@ def validate_args(self, kwargs):
 
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
 
+    self.legacy = kwargs.get("legacy", constants.LEGACY)
+
     # Warn user if unknown parameters
     for key, value in kwargs.items():
         if key not in constants.VALID_PARAMETERS:

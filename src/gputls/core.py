@@ -37,7 +37,10 @@ def search_multi_periods(
     oversampling_factor,
     verbose,
     useLocalPTXCUBIN = False,
-    GPUDeviceID = 0
+    GPUDeviceID = 0,
+
+    #legacy: Skip-points search, like the original TLS.
+    legacy = False
 ):
     
     # Choose the GPU device
@@ -209,7 +212,11 @@ def search_multi_periods(
         meanSizeGPU,meanXSizeGPU,fullSumGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
-        calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPU')
+        if legacy:
+            calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsCompatibleGPU')
+        else:
+            calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPU')
+
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         
         #About LowestResidualsTypeGPU, 0 means standard transit, 1 means grazing transit, 2 means box transit,

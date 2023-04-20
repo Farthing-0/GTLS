@@ -119,7 +119,8 @@ class gtls(object):
             oversampling_factor = self.oversampling_factor,
             verbose=self.verbose,
             useLocalPTXCUBIN=self.useLocalPTXCUBIN,
-            GPUDeviceID=self.GPUDeviceID
+            GPUDeviceID=self.GPUDeviceID,
+            legacy=self.legacy
         )
         self.rawDurations = durations
         return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd)

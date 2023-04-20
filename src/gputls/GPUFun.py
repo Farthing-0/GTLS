@@ -347,8 +347,94 @@ extern "C"{
             for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++){
                 int mean_size = in_mean_size[durationIndex];
                 int duration = in_duration[durationIndex];
-                // if(duration >= durationMin && duration <= durationMax &&( tid %100 == 0) ){
+
+                // int skipGap = int(duration/100);
+                // if(duration >= durationMin && duration <= durationMax && tid %skipGap == 0){
                 if(duration >= durationMin && duration <= durationMax ){
+
+                    float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,y);
+                    float overshoot = in_overshoot[durationIndex];
+                    if(tid < *mean_x_size){
+                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = datapoints;
+                    }
+                    if(tid < mean_size && calc_mean > transit_depth_min){
+                        float ootr = 0;
+                        if(tid == 0){
+                            ootr = in_fullsum[y*(*in_duration_size) + durationIndex];
+                        }
+                        else{
+                            ootr = *(in_ootr+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+                        }
+
+                        float *data = in_patched_datas + y_input*(*in_patched_datas_size) + tid;
+                        float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
+                        // float *signal = in_signal;
+
+                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + y_input*(*in_patched_datas_size);
+                        float summed_edge_effect_correction = in_summed_edge_effect_correction[y_input];
+                        // float SIGNAL_DEPTH = 0.5;
+
+                        float *dy = inverse_squared_patched_dy_arr + tid;
+                        // float target_depth = calc_mean * overshoot;
+                        float reverse_scale = calc_mean * overshoot * 2;  // "*2" means SIGNAL_DEPTH is 0.5,as "/SIGANL_DEPTH"
+
+                        float sigi = 0;
+                        float intransit_residual = 0;
+                        float loss = 0;
+                        for (int i = 0; i < duration; i++) {
+                            // sigi = (1 - signal[i]) * reverse_scale;
+                            sigi = (signal[i]) * reverse_scale;
+                            // sigi = 1;
+                            loss = (data[i] - (1 - sigi));
+                            intransit_residual = intransit_residual + loss * loss * dy[i];
+                        }
+
+                        float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = current_stat;
+                    }
+                }else{
+                    if(tid < *mean_x_size){
+                        //0x7f800000 => infinity in float, according to IEEE-754
+                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
+                    }
+                }
+            }
+        }
+    }
+
+    __global__ void calcAllLowestResidualsCompatibleGPU(
+    float *out,//float *depths,
+    int *in_mean_size,int *mean_x_size,
+    float *in_patched_datas,
+    int *in_patched_datas_size,int *in_duration,int *in_duration_size,
+    float *in_signal,//float *in_signal_grazing,float *in_signal_box,
+    int *in_max_signal_x_size,
+    float *in_inverse_squared_patched_dys,
+    float *in_overshoot, float *in_ootr,float *in_fullsum,
+    float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
+    int *durationsMax,int *durationsMin, float *in_transit_depth_min,
+    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu
+    )
+    {
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
+        int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the period
+
+        int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+        float transit_depth_min = *in_transit_depth_min;
+
+        int datapoints = *in_datapoints;
+        if(y_input < (*period_size_gpu)){
+            int durationMax = durationsMax[y_input];
+            int durationMin = durationsMin[y_input];
+
+            for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++){
+                int mean_size = in_mean_size[durationIndex];
+                int duration = in_duration[durationIndex];
+
+                int skipGap = int(duration/100);
+                if(duration >= durationMin && duration <= durationMax && tid %skipGap == 0){
+                // if(duration >= durationMin && duration <= durationMax ){
+
                     float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,y);
                     float overshoot = in_overshoot[durationIndex];
                     if(tid < *mean_x_size){
