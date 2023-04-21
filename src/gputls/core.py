@@ -70,6 +70,8 @@ def search_multi_periods(
         else:
             module = cp.RawModule(path='./GTLS.cubin',options=options)
 
+    print('len period',len(periods))
+
     periodsGPU = cp.array(periods, dtype=cp.float64)
     durationsMaxGPU = cp.array(periods, dtype=cp.int32)
     durationsMinGPU = cp.array(periods, dtype=cp.int32)
@@ -249,65 +251,6 @@ def search_multi_periods(
     chi2 = LowestResidualsEachPeriodGPU.get()
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
 
-    # import time 
-    # cp.cuda.runtime.deviceSynchronize()
-    # start = time.time()
-
-    # # ---Mutliple Trapezoid Debug begin--- #
-
-    # # bestLocation = locationGPU[HighestPowerIndex].item()
-    # # durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
-
-    # durationIndexs = cp.floor(locationGPU / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
-    # targetDurationGPU = durationsGPU[durationIndexs]
-    # T0IndexsGPU = locationGPU % (int(patchedDatasSize) - (np.min(durations)) + 1)
-    # #TODO: use a self defined core function to calculate the transit depth to accelerate the process    
-    # transitMeansGPU = cp.empty(len(periods),dtype=cp.float32)
-    # for i in range(len(periods)):
-    #     transitMeansGPU[i] = patchedDatasGPU[i][T0IndexsGPU[i]:T0IndexsGPU[i]+targetDurationGPU[i]].mean()
-
-    # #Technically, the "real" trapezoidFitSize = 2 * trapezoidFitSize
-    # trapezoidFitSize = 100
-    # print('Calculating trapezoid fit for all periods and durations...')
-    # #Seems that will use about 2.1GB memory for trapezoidFitResultAllGPU ... Maybe I should create a new GPU array for each period?
-    # trapezoidFitResultAllGPU = cp.empty((len(periods),trapezoidFitSize,np.max(durations)),dtype=cp.float32)
-    # trapezoidFitResultAllGPU[:] = cp.nan
-    # print('shape',trapezoidFitResultAllGPU.shape)
-    # trapezoidFitGPU = module.get_function('trapezoidFitForAll')
-    # blockSize,gridSizeX = calcGridBlockSize(np.max(durations))
-    # trapezoidFitGPU((gridSizeX,trapezoidFitSize,len(periods)),(blockSize,1,1),(trapezoidFitResultAllGPU,
-    # patchedDatasGPU,patchedDatasSizeGPU,inverseSquaredPatchedDysGPU,
-    # targetDurationGPU,cp.int32(np.max(durations)),T0IndexsGPU,transitMeansGPU,trapezoidFitSize))
-    # trapezoidFitTidsGPU = cp.nanargmin(trapezoidFitResultAllGPU.sum(axis=-1),axis=-1)
-    # trapezoidFitTidsDepthGPU = (trapezoidFitSize * (transitMeansGPU) - 0.5*trapezoidFitTidsGPU)/(trapezoidFitSize - 0.5*trapezoidFitTidsGPU)
-    # # dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
-    # snrFitsGPU = cp.empty(len(periods),dtype=cp.float32)
-    # for i in range(len(periods)):
-    #     dataOutTransit = cp.concatenate((patchedDatasGPU[i][0:T0IndexsGPU[i]],patchedDatasGPU[i][T0IndexsGPU[i]+targetDurationGPU[i]:]))
-    #     snrFitsGPU[i] = (1 - trapezoidFitTidsDepthGPU[i])*(targetDurationGPU[i] ** 0.5)/cp.std(dataOutTransit)
-
-    # # snrTemp = (1 - trapezoidFitTidsDepthGPU)*(targetDurationGPU ** 0.5)
-    # # snrTempMax = cp.argmax(snrTemp)
-    # snrFitsGPUMax = cp.argmax(snrFitsGPU)
-    # print('debugSNRFit',snrFitsGPU[snrFitsGPUMax])
-    # # print('snrFitsGPUMax',snrFitsGPUMax)
-    # print('debugPeriod',periods[snrFitsGPUMax.get()])
-
-    # # dataOutTransit = np.concatenate((patchedDatasGPU[HighestPowerIndex][0:bestRowT0].get(),patchedDatasGPU[HighestPowerIndex][bestRowT0+durations[durationIndex]:].get()))
-    # # snrFit = (1 - BestFitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
-    
-    # # print('trapezoidFitTids',list(trapezoidFitTidsGPU.get()))
-    # # print('trapezoidFitTidsDepth',list(trapezoidFitTidsDepthGPU.get()))
-    # # print('duration',targetDurationGPU)
-    # # print('trapezoidFitResultAllGPU shape',trapezoidFitResultAllGPU.shape)
-    # # # print('trapezoidFitResultAllGPU',trapezoidFitResultAllGPU)
-    # # print('sumMin',cp.nanargmin(trapezoidFitResultAllGPU.sum(axis=-1),axis=-1))#.nanargmin(axis=-1))
-    # # print('sum',trapezoidFitResultAllGPU.sum(axis=-1)[-1][:20])
-    # # cp.int32(durations[durationIndex]),cp.int32(bestRowT0),transitMean,cp.int32(trapezoidFitSize)))
-
-    # # ---Mutliple Trapezoid Debug end--- #
-
-
     #Self Defined metrics
     HighestPowerIndex = numpy.argmax(power)
     # Depth = depthsEachPeriodGPU[HighestPowerIndex].item()    
@@ -434,14 +377,16 @@ def search_multi_periods(
 
     snrFitPink = (1 - BestFitDepth)/((np.std(dataOutTransit)**2/(durations[durationIndex])) + (redNoise**2/(len(transit_times))))**0.5
 
+    # if legacy:
+    #     #Raw TLS Calculate transit duration(days) Method
+    #     transit_duration_in_days = calculate_transit_duration_in_days(
+    #         t, period, transit_times, rawDuration
+    #     )
+    # else:
     ## Alternative TLS Calculate transit duration(days) Method
     transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
     # transit_duration_in_days = calcDurationDays(t, period, T0, durations[durationIndex])
     
-    ##Raw TLS Calculate transit duration(days) Method
-    # transit_duration_in_days = calculate_transit_duration_in_days(
-    #     t, period, transit_times, rawDuration
-    # )
 
     T0 = T0 + transit_duration_in_days / 2
     transit_times = transit_times + transit_duration_in_days / 2
@@ -465,9 +410,28 @@ def search_multi_periods(
         per_transit_count=per_transit_count,
     )
 
-    #Fold N times, SNRFold = SNR * sqrt(N)
-    #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
-    snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
+
+    # if legacy:
+    depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
+    t, y, transit_times, transit_duration_in_days
+    )
+    # print('transit_times, transit_duration_in_days',transit_times, transit_duration_in_days)
+    all_flux_intransit = numpy.concatenate(
+        [all_flux_intransit_odd, all_flux_intransit_even]
+    )
+    intransit = transit_mask(t, period, 2 * rawDuration, T0)
+    flux_ootr = y[~intransit]
+    depth_mean = numpy.mean(all_flux_intransit)
+    # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
+    #     per_transit_count
+    # ) ** (0.5)
+    snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)
+    # else:
+    #     #Fold N times, SNRFold = SNR * sqrt(N)
+    #     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
+    #     snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
+
+
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
     
     # cp.cuda.runtime.deviceSynchronize()
