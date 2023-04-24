@@ -84,7 +84,7 @@ def search_multi_periods(
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
     nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*3 + 2*len(durations)))
+    singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
     singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
     print('singleCalcPeriods',singleCalcPeriods)
 
@@ -104,6 +104,8 @@ def search_multi_periods(
     periodsGPU = cp.empty((singleCalcPeriods,),dtype=cp.float64)
     durationsMaxGPU = cp.empty((singleCalcPeriods,),dtype=cp.int32)
     durationsMinGPU = cp.empty((singleCalcPeriods,),dtype=cp.int32)
+    locationGPU = cp.empty(len(periods),dtype=cp.int32)
+    LowestResidualsEachPeriodGPU = cp.empty(len(periods),dtype=cp.float32)
 
     # phasesGPU = cp.empty((len(periods),len(t)),dtype=cp.float64)
     # sortIndexGPU = cp.empty((len(periods),len(t)),dtype=cp.int32)
@@ -129,27 +131,27 @@ def search_multi_periods(
         durationsMinGPU = cp.asarray(SinglePeriods).astype(cp.int32)
 
         # Phase fold
-        phasesGPU = cp.empty((len(periods),len(t)),dtype=cp.float64)
-        sortIndexGPU = cp.empty((len(periods),len(t)),dtype=cp.int32)
+        phasesGPU = cp.empty((singleCalcPeriods,len(t)),dtype=cp.float64)
+        sortIndexGPU = cp.empty((singleCalcPeriods,len(t)),dtype=cp.int32)
         tGPU = cp.asarray(t).astype(cp.float64)
-        periodsSizeGPU = cp.asarray(np.array([len(periods)])).astype(cp.int32)
+        periodsSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         tSizeGPU = cp.asarray(np.array([len(t)])).astype(cp.int32)
         tLengthGPU = cp.asarray(np.array([max(t) - min(t)])).astype(cp.float32)
 
         durationsGridGPU = module.get_function('durationsGrid')
-        blockSize,gridSizeX = calcGridBlockSize(len(periods))
+        blockSize,gridSizeX = calcGridBlockSize(singleCalcPeriods)
         durationsGridGPU((gridSizeX,1,1),(blockSize,),
                         (periodsGPU,durationsMaxGPU, durationsMinGPU,tLengthGPU,tSizeGPU, periodsSizeGPU))
 
         fastFoldGPU = module.get_function('foldFast')
         blockSize,gridSizeX = calcGridBlockSize(len(t))
-        fastFoldGPU((gridSizeX,len(periods),),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
+        fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
         i_max = 10
         for i in range(1,i_max + 1):
-            sortIndexGPU[(i-1)*len(periods)/i_max:i*len(periods)/i_max] = phasesGPU[(i-1)*len(periods)/i_max:i*len(periods)/i_max].argsort()
+            sortIndexGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max] = phasesGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max].argsort()
 
-        patchedDatasGPU = cp.zeros((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
-        patchedDysGPU = cp.empty((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
+        patchedDatasGPU = cp.zeros((singleCalcPeriods,len(t) + maxWidthInSamples),dtype=cp.float32)
+        patchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxWidthInSamples),dtype=cp.float32)
         yGPU = cp.asarray(y).astype(cp.float32)
         dyGPU = cp.asarray(dy).astype(cp.float32)
 
@@ -160,26 +162,21 @@ def search_multi_periods(
         lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
 
         #Other GPU variables, declare here to save time.
-        inverseSquaredPatchedDysGPU = cp.empty((len(periods),len(t) + maxWidthInSamples),dtype=cp.float32)
-        edgeEffectCorrectionsGPU = cp.empty((len(periods)),dtype=cp.float32)
+        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxWidthInSamples),dtype=cp.float32)
+        edgeEffectCorrectionsGPU = cp.empty((singleCalcPeriods),dtype=cp.float32)
         maxwidthInSamplesGPU = cp.asarray(np.array([maxWidthInSamples])).astype(cp.int32)
-        periodSizeGPU = cp.asarray(np.array([len(periods)])).astype(cp.int32)
+        periodSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         durationsGPU = cp.asarray(durations).astype(cp.int32)
         durationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
         iterFlagGPU = cp.asarray(np.array([0])).astype(cp.int32)
-        locationGPU = cp.empty(len(periods),dtype=cp.int32)
 
         overshootGPU = cp.array(lc_cache_overview["overshoot"]).astype(cp.float32)
         datapointsGPU = cp.array([len(y)]).astype(cp.int32)
-        LowestResidualsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
+
         ## depth variable is not needed anymore because we trapezoid fit the transit to get the depth
         ## This method is much more faster and accurate than producing a depth from the transit model
-        # depthsEachPeriodGPU = cp.empty((len(periods)),dtype=cp.float32)
+        # depthsEachPeriodGPU = cp.empty((singleCalcPeriods),dtype=cp.float32)
         transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
-
-        nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-        singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*3 + 2*len(durations)))
-        singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
 
         #GPU variables for the loop
         singleCalcPeriodsGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
@@ -195,25 +192,25 @@ def search_multi_periods(
         #calculate patched data
         patchDataGPU = module.get_function('patchData')
         blockSize,gridSizeX = calcGridBlockSize(len(t) + maxWidthInSamples)
-        patchDataGPU((gridSizeX,len(periods),),(blockSize,),
+        patchDataGPU((gridSizeX,singleCalcPeriods,),(blockSize,),
         (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
         maxWidthInSamplesGPU,yGPU,dyGPU,tSizeGPU,periodsSizeGPU))
 
         calcInverseSquaredPatchedDyGPU = module.get_function('calcInverseSquaredPatchedDy')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize)
-        calcInverseSquaredPatchedDyGPU((gridSizeX,len(periods),1),(blockSize,1,1),
+        calcInverseSquaredPatchedDyGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
         (inverseSquaredPatchedDysGPU,patchedDysGPU,patchedDatasSizeGPU,))
 
         #calculate edge_effect_correction
         calcEdgeEffectCorrectionsGPU = module.get_function('calcEdgeEffectCorrections')
-        blockSize,gridSizeX = calcGridBlockSize(len(periods))
+        blockSize,gridSizeX = calcGridBlockSize(singleCalcPeriods)
         calcEdgeEffectCorrectionsGPU((gridSizeX,1,1),(blockSize,1,1),
         (edgeEffectCorrectionsGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
         patchedDatasSizeGPU,maxwidthInSamplesGPU,periodSizeGPU,))
 
         
         for i in range(singleCalcPeriods):
-            if((iterFlag * singleCalcPeriods + i) < len(periods)):
+            if((iterFlag * singleCalcPeriods + i) < singleCalcPeriods):
                 cumsumGPU[i] = cp.cumsum(patchedDatasGPU[i + iterFlag * singleCalcPeriods])
 
         calcAllFullSumGPU = module.get_function('calcAllFullSum')
@@ -260,10 +257,13 @@ def search_multi_periods(
         durationsMaxGPU,durationsMinGPU,transitDepthMinGPU,
         iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
         
+        print('iterFlag',iterFlag)
+        print('lowestResidualsGPU',edgeEffectCorrectionsGPU)
         #find best fit
         for i in range(singleCalcPeriods):
             if(iterFlag*singleCalcPeriods + i < len(periods)):
                 locationGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].argmin()
+                
                 LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
                 # depthsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = depthsGPU[i][int(locationGPU[iterFlag*singleCalcPeriods + i] / lowestResidualsGPU.shape[2])][locationGPU[iterFlag*singleCalcPeriods + i] % lowestResidualsGPU.shape[2]]
 
@@ -274,6 +274,13 @@ def search_multi_periods(
                 print((iterFlag + 1),'/',TotalIter,'bulk periods calculated')
 
     chi2 = LowestResidualsEachPeriodGPU.get()
+    print('chi2',chi2)
+    import matplotlib.pyplot as plt
+    # plt.plot(periods,chi2,'.')
+    plt.plot(chi2,'.')
+    plt.savefig('chi2.png')
+    plt.close()
+
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
 
     #Self Defined metrics
@@ -282,8 +289,12 @@ def search_multi_periods(
     period = periods[HighestPowerIndex]
 
     # BestChi2Index = numpy.argmin(chi2)
+    print('locationGPU',locationGPU)
     bestLocation = locationGPU[HighestPowerIndex].item()
+    print('bestLocation',bestLocation)
     durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
+    print('durationIndex',durationIndex)
+
     bestRow = np.where(lc_cache_overview["width_in_samples"] == durations[durationIndex])[0].item()
     rawDuration = lc_cache_overview['duration'][bestRow]
 
