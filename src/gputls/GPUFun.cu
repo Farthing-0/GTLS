@@ -109,76 +109,78 @@ extern "C"{
 
     __global__ void calcAllFullSum(float* fullsums,float *in_patched_data,
     float *in_inverse_squared_patched_dy,int *patched_data_size,int *in_duration,int *duration_size,
-    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    int *period_size_gpu)
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    // tid:durations
         int y = blockIdx.y * blockDim.y + threadIdx.y;    // y:periods
 
-        if(y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){// && tid < (*single_calc_periods_arr_gpu)){
-            int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+        // if(y < (*period_size_gpu)){// && tid < (*single_calc_periods_arr_gpu)){
+        //     int y_input = (y );
 
-            float *patched_data = in_patched_data + y_input*(*patched_data_size);
-            float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + y_input*(*patched_data_size);
+            // float *patched_data = in_patched_data + y_input*(*patched_data_size);
+            // float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + y_input*(*patched_data_size);
+        float *patched_data = in_patched_data + y*(*patched_data_size);
+        float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + y*(*patched_data_size);
 
-            float fullsum = 0;
-            for (int i = 0; i < *patched_data_size; i++) {
-                fullsum = fullsum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
-            }
-
-            if(tid < (*duration_size)){
-                int window = in_duration[tid];
-                float window_sum = 0;
-                for (int i = 0; i < window; i++) {
-                    window_sum = window_sum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
-                }
-                fullsums[tid + y*(*duration_size)] = fullsum - window_sum;
-            }
+        float fullsum = 0;
+        for (int i = 0; i < *patched_data_size; i++) {
+            fullsum = fullsum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
         }
+
+        if(tid < (*duration_size)){
+            int window = in_duration[tid];
+            float window_sum = 0;
+            for (int i = 0; i < window; i++) {
+                window_sum = window_sum + ((1 - patched_data[i]) * (1 - patched_data[i])) * inverse_squared_patched_dy[i];
+            }
+            fullsums[tid + y*(*duration_size)] = fullsum - window_sum;
+        }
+        // }
     }
     
     __global__ void calcAllOutOfTransitResiduals_step1_2GPU(float *temp_ootr,
     float *in_patched_data, int *in_duration,int *duration_size,
-    float *in_inverse_squared_patched_dy, int *patched_data_size,int *mean_x_size,
-    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    float *in_inverse_squared_patched_dy, int *patched_data_size,int *mean_x_size)//,
+    // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is point index
         int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;  //z is period index
 
-        if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
-            int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+        // if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
+        //     int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
 
-            float *patched_data = in_patched_data + z_input*(*patched_data_size);
-            float *inverse_squared_patched = in_inverse_squared_patched_dy + z_input*(*patched_data_size);
-            int window = in_duration[y];
-            
-            if(tid < *mean_x_size){
-                if(tid < *patched_data_size - window){
-                    int becomes_visible = tid;
-                    int becomes_invisible = tid + window;
-                    float add_visible_left = (1 - patched_data[becomes_visible]) * (1 - patched_data[becomes_visible]) * inverse_squared_patched[becomes_visible];
-                    float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
-                    float weight = add_visible_left - remove_invisible_right;
-                    temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = weight;
-                }
-                else{
-                    temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = 0;
-                }
+        float *patched_data = in_patched_data + z*(*patched_data_size);
+        float *inverse_squared_patched = in_inverse_squared_patched_dy + z*(*patched_data_size);
+        int window = in_duration[y];
+        
+        if(tid < *mean_x_size){
+            if(tid < *patched_data_size - window){
+                int becomes_visible = tid;
+                int becomes_invisible = tid + window;
+                float add_visible_left = (1 - patched_data[becomes_visible]) * (1 - patched_data[becomes_visible]) * inverse_squared_patched[becomes_visible];
+                float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
+                float weight = add_visible_left - remove_invisible_right;
+                temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = weight;
+            }
+            else{
+                temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = 0;
             }
         }
+        // }
     }
 
     __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr,
     int *duration_size,int *patched_data_size,int *in_mean_size,
-    int *mean_x_size,float *in_fullsum,
-    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    int *mean_x_size,float *in_fullsum)
+    // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
     {
         int i = blockIdx.x * blockDim.x + threadIdx.x;//i is point index
         int tid = blockIdx.y * blockDim.y + threadIdx.y;    //tid is duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is period index
 
         int mean_size = in_mean_size[tid];
-        if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
+        // if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
             float *fullsum = in_fullsum + z*(*duration_size);
             float *ootr = in_ootr + z*(*mean_x_size)*(*duration_size);
             float start = fullsum[tid];
@@ -189,7 +191,7 @@ extern "C"{
                 ootr[i+tid*(*mean_x_size)] = 0;
             }
 
-        }
+        // }
     }
 
     __device__ float calcAverageFromCumsum(float *inPatchedDataCumsum,
@@ -328,19 +330,25 @@ extern "C"{
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
     int *durationsMax,int *durationsMin, float *in_transit_depth_min,
-    int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu
+    int iter_flag_gpu
+    //,
+    // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu
     )
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
         int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the period
 
-        int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
+        // int y_input = (y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
         float transit_depth_min = *in_transit_depth_min;
 
         int datapoints = *in_datapoints;
-        if(y_input < (*period_size_gpu)){
-            int durationMax = durationsMax[y_input];
-            int durationMin = durationsMin[y_input];
+        // if(y_input < (*period_size_gpu)){
+        //     int durationMax = durationsMax[y_input];
+        //     int durationMin = durationsMin[y_input];
+        // if(y < (*period_size_gpu)){
+            int durationMax = durationsMax[y];
+            int durationMin = durationsMin[y];
+
 
             for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++){
                 int mean_size = in_mean_size[durationIndex];
@@ -364,12 +372,16 @@ extern "C"{
                             ootr = *(in_ootr+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
                         }
 
-                        float *data = in_patched_datas + y_input*(*in_patched_datas_size) + tid;
+                        // float *data = in_patched_datas + y_input*(*in_patched_datas_size) + tid;
+                        float *data = in_patched_datas + y*(*in_patched_datas_size) + tid;
                         float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
                         // float *signal = in_signal;
 
-                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + y_input*(*in_patched_datas_size);
-                        float summed_edge_effect_correction = in_summed_edge_effect_correction[y_input];
+                        // float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + y_input*(*in_patched_datas_size);
+                        // float summed_edge_effect_correction = in_summed_edge_effect_correction[y_input];
+                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + y*(*in_patched_datas_size);
+                        float summed_edge_effect_correction = in_summed_edge_effect_correction[y];
+
                         // float SIGNAL_DEPTH = 0.5;
 
                         float *dy = inverse_squared_patched_dy_arr + tid;
@@ -385,10 +397,22 @@ extern "C"{
                             // sigi = 1;
                             loss = (data[i] - (1 - sigi));
                             intransit_residual = intransit_residual + loss * loss * dy[i];
+                            // if (i==0 && iter_flag_gpu != 0 && tid == 0){
+                            // if (iter_flag_gpu != 0 && tid == 0 && y==0){
+                            // // if (iter_flag_gpu == 0 && tid == 0){
+                            //     printf("i: %d,intransit_residual: %f,loss: %f,data: %f, 1-sigi:%f,calc_mean:%f\\n",i,intransit_residual,loss,data[i],1-sigi,calc_mean);
+                            // }
+
                         }
 
                         float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
                         out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = current_stat;
+
+                        // if (iter_flag_gpu != 0 && tid == 0 && durationIndex == 0 && y == 0){
+                        // if (iter_flag_gpu != 0 && tid == 0){
+                        //     // printf("iter_flag_gpu%d ,out%f",iter_flag_gpu,current_stat);
+                        //     printf("iter_flag_gpu: %d ,out: %f,intransit_residual: %f,ootr: %f,summed_edge_effect_correction: %f\\n",iter_flag_gpu,current_stat,intransit_residual,ootr,summed_edge_effect_correction);
+                        // }
                     }
                 }else{
                     if(tid < *mean_x_size){
@@ -397,7 +421,7 @@ extern "C"{
                     }
                 }
             }
-        }
+        // }
     }
 
     __global__ void calcAllLowestResidualsCompatibleGPU(
@@ -505,7 +529,7 @@ extern "C"{
 
             //Warining: Might be a bug especially when duration is small
             for (int i = 0; i < duration; i++) {
-                if (i == 0 and tid != 0) {
+                if (i == 0 && tid != 0) {
                     signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
                 }
                 else if(i < trapezoidQ){
@@ -526,16 +550,16 @@ extern "C"{
     // "Atom" means that it is a single thread, and it is used to calculate the a single point loss of trapezoid fit.
     __global__ void trapezoidFitAtom(float *results,
     float *inData, float *inInverseSquaredDys,
-    int duration, int inT0Index,
-    float *transitMean, int trapezoidFitSize){
+    int duration, int inT0Index,float *transitMean, int trapezoidFitSize){
         int tid = blockIdx.x * blockDim.x + threadIdx.x; //tid is the index of the point in the trapezoid fit, tid < duration
         int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is the index of different types of trapezoid fit, y < trapezoidFitSize
 
         // For now, z is not used, but it is reserved for future use. 
         // int z = blockIdx.z * blockDim.z + threadIdx.z;  //z is the index of different periods and durations (period and duration are one to one mapping)
-
-        if (y < trapezoidFitSize and tid < duration) {
-            float *result = results + y*(duration);
+        printf("data[inT0Index]:%f\\n",inData[inT0Index]);
+        if (y < trapezoidFitSize && tid < duration) {
+            printf("tid:%d,duration:%d\\n",tid,duration);
+            float *result = results + y*(duration) +tid;
 
             //TrapezoidDepth can not change since I use other fixed values in the kernel
             float TrapezoidDepth = ((float)trapezoidFitSize * (*transitMean) - 0.5*(float)y)/((float)trapezoidFitSize - 0.5*(float)y);
@@ -546,12 +570,14 @@ extern "C"{
             float sigi = 0;
             float intransitResidual = 0;
 
-            float *data = inData + inT0Index;
-            float *dy = inInverseSquaredDys + inT0Index;
+            float *data = inData + inT0Index + tid;
+            float *dy = inInverseSquaredDys + inT0Index + tid;
+            // float *data = inData;
+            // float *dy = inInverseSquaredDys;
 
             //Warining: Might be a bug especially when duration is small
             // for (int i = 0; i < duration; i++) {
-            if (tid == 0 and y != 0) {
+            if (tid == 0 && y != 0) {
                 signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
             }
             else if(tid < trapezoidQ){
@@ -563,7 +589,9 @@ extern "C"{
             else{
                 signal = (1-((1-TrapezoidDepth)/(trapezoidQ))*(duration-tid));
             }
-            result[tid] = (data[tid] - signal) * (data[tid] - signal) * dy[tid];
+            // result[tid] = (data[tid] - signal) * (data[tid] - signal) * dy[tid];
+            *result = (*data - signal) * (*data - signal);
+            // result[tid] = 1;
         }
     }
 
@@ -576,7 +604,7 @@ extern "C"{
             float signal;
             // float TrapezoidDepth = *TrapezoidDepthArray;
 
-            if (tid == 0 and bestFitTid != 0) {
+            if (tid == 0 && bestFitTid != 0) {
                 signal = 1 - ((1-TrapezoidDepth)/(trapezoidQ));
             }
             else if(tid < trapezoidQ){
