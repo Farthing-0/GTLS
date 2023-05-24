@@ -26,6 +26,9 @@ GPU_DEVICE_ID = 0
 # skip points when search, which is the original feature of TLS
 LEGACY = False
 
+# fast: just return periods and power, ignore all other parameter.
+FAST = False
+
 # astrophysical constants
 G = 6.673e-11  # gravitational constant [m^3 / kg / s^2]
 R_sun = 695508000  # radius of the Sun [m]
@@ -137,9 +140,11 @@ VALID_PARAMETERS = [
     "M_star_max",
     "period_min",
     "period_max",
+    "periods",
     "n_transits_min",
     "GPUDeviceID",
     "legacy",
+    "fast",
     "per",
     "rp",
     "a",

@@ -68,18 +68,19 @@ def search_multi_periods(
     # with open ('GPUFun.cu', 'r') as myfile:
     #     myCode=myfile.read()
     options = ('-rdc=true',)
-    if not useLocalPTXCUBIN:
-        GPUCode = GPUFun.getGPUCode()
-        module = cp.RawModule(code=GPUCode,options=options)
-    else :
-        import os.path
-        # options = {}
-        # options['rdc'] = 'True'
+    # if not useLocalPTXCUBIN:
+    GPUCode = GPUFun.getGPUCode()
+    module = cp.RawModule(code=GPUCode,options=options)
+    module.compile()
+    # else :
+    #     import os.path
+    #     # options = {}
+    #     # options['rdc'] = 'True'
 
-        if os.path.isfile('./GTLS.ptx'):
-            module = cp.RawModule(path='./GTLS.ptx',options=options)
-        else:
-            module = cp.RawModule(path='./GTLS.cubin',options=options)
+    #     if os.path.isfile('./GTLS.ptx'):
+    #         module = cp.RawModule(path='./GTLS.ptx',options=options)
+    #     else:
+    #         module = cp.RawModule(path='./GTLS.cubin',options=options)
 
     durations = numpy.unique(lc_cache_overview["width_in_samples"])
     maxWidthInSamples = int(max(durations))
@@ -100,11 +101,7 @@ def search_multi_periods(
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
-    if TotalIter > 10:
-        pbar = tqdm.tqdm(total=TotalIter)
-
-    if verbose:
-        print('TotalIter',TotalIter)
+    pbar = tqdm.tqdm(total=TotalIter)
 
     #Initialize the variables
     periodsGPU = cp.empty((singleCalcPeriods,),dtype=cp.float64)
@@ -273,7 +270,7 @@ def search_multi_periods(
         iterFlagGPU = iterFlagGPU + 1
         # print('iterFlag',iterFlag)
 
-        if verbose and TotalIter > 10:
+        if verbose:
             pbar.update(1)
 
     chi2 = LowestResidualsEachPeriodGPU.get()

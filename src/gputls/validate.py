@@ -55,6 +55,7 @@ def validate_args(self, kwargs):
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
 
     self.legacy = kwargs.get("legacy", constants.LEGACY)
+    self.fast = kwargs.get("fast", constants.FAST)
 
     # Warn user if unknown parameters
     for key, value in kwargs.items():
@@ -74,6 +75,7 @@ def validate_args(self, kwargs):
     )
     self.period_max = kwargs.get("period_max", float("inf"))
     self.period_min = kwargs.get("period_min", 0)
+    self.periods = kwargs.get("periods", [])
     self.n_transits_min = kwargs.get("n_transits_min", constants.N_TRANSITS_MIN)
 
     self.R_star_min = kwargs.get("R_star_min", constants.R_STAR_MIN)

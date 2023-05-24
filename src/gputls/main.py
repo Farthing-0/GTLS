@@ -23,15 +23,18 @@ class gtls(object):
             print(constants.TLS_VERSION)
 
         # Generate possible periods
-        periods = period_grid(
-            R_star=self.R_star,
-            M_star=self.M_star,
-            time_span=np.max(self.t) - np.min(self.t),
-            period_min=self.period_min,
-            period_max=self.period_max,
-            oversampling_factor=self.oversampling_factor,
-            n_transits_min=self.n_transits_min,
-        )
+        if self.periods == []:
+            periods = period_grid(
+                R_star=self.R_star,
+                M_star=self.M_star,
+                time_span=np.max(self.t) - np.min(self.t),
+                period_min=self.period_min,
+                period_max=self.period_max,
+                oversampling_factor=self.oversampling_factor,
+                n_transits_min=self.n_transits_min,
+            )
+        else:
+            periods = self.periods
 
         # Generate possible durations
         durations = duration_grid(
@@ -101,27 +104,52 @@ class gtls(object):
 
         periods = np.sort(periods)
 
-        self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd = core.search_multi_periods(
-            periods=periods,
-            t=self.t,
-            y=self.y,
-            dy=self.dy,
-            transit_depth_min=self.transit_depth_min,
-            R_star_min=self.R_star_min,
-            R_star_max=self.R_star_max,
-            M_star_min=self.M_star_min,
-            M_star_max=self.M_star_max,
-            lc_arr=self.lc_arr,
-            # lc_arr_grazing=lc_arr_grazing,
-            # lc_arr_box=lc_arr_box,
-            lc_cache_overview=self.lc_cache_overview,
-            T0_fit_margin=self.T0_fit_margin,
-            oversampling_factor = self.oversampling_factor,
-            verbose=self.verbose,
-            useLocalPTXCUBIN=self.useLocalPTXCUBIN,
-            GPUDeviceID=self.GPUDeviceID,
-            legacy=self.legacy
-        )
+        if self.fast == False:
+            self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd = core.search_multi_periods(
+                periods=periods,
+                t=self.t,
+                y=self.y,
+                dy=self.dy,
+                transit_depth_min=self.transit_depth_min,
+                R_star_min=self.R_star_min,
+                R_star_max=self.R_star_max,
+                M_star_min=self.M_star_min,
+                M_star_max=self.M_star_max,
+                lc_arr=self.lc_arr,
+                # lc_arr_grazing=lc_arr_grazing,
+                # lc_arr_box=lc_arr_box,
+                lc_cache_overview=self.lc_cache_overview,
+                T0_fit_margin=self.T0_fit_margin,
+                oversampling_factor = self.oversampling_factor,
+                verbose=self.verbose,
+                useLocalPTXCUBIN=self.useLocalPTXCUBIN,
+                GPUDeviceID=self.GPUDeviceID,
+                legacy=self.legacy
+            )
+        else:
+            periods,power = core.search_multi_periods(
+                periods=periods,
+                t=self.t,
+                y=self.y,
+                dy=self.dy,
+                transit_depth_min=self.transit_depth_min,
+                R_star_min=self.R_star_min,
+                R_star_max=self.R_star_max,
+                M_star_min=self.M_star_min,
+                M_star_max=self.M_star_max,
+                lc_arr=self.lc_arr,
+                # lc_arr_grazing=lc_arr_grazing,
+                # lc_arr_box=lc_arr_box,
+                lc_cache_overview=self.lc_cache_overview,
+                T0_fit_margin=self.T0_fit_margin,
+                oversampling_factor = self.oversampling_factor,
+                verbose=self.verbose,
+                useLocalPTXCUBIN=self.useLocalPTXCUBIN,
+                GPUDeviceID=self.GPUDeviceID,
+                legacy=self.legacy,
+                fast=True
+            )
+            return periods,power
         self.rawDurations = durations
         return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd)
     
