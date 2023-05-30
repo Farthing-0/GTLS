@@ -45,8 +45,6 @@ class gtls(object):
         if maxwidth_in_samples % 2 != 0:
             maxwidth_in_samples = maxwidth_in_samples + 1
         self.maxwidth_in_samples = maxwidth_in_samples
-        import time
-        getCacheStart = time.time()
         self.lc_cache_overview, self.lc_arr = get_cache(
             durations=durations,
             maxwidth_in_samples=maxwidth_in_samples,
@@ -60,34 +58,6 @@ class gtls(object):
             limb_dark=self.limb_dark,
             verbose=self.verbose
         )
-
-        # _, lc_arr_grazing = get_cache(
-        #     durations=durations,
-        #     maxwidth_in_samples=maxwidth_in_samples,
-        #     per=self.per,
-        #     rp=self.rp,
-        #     a=self.a,
-        #     inc=self.grazing_inc,
-        #     ecc=self.ecc,
-        #     w=self.w,
-        #     u=self.u,
-        #     limb_dark=self.limb_dark,
-        #     verbose=self.verbose
-        # )
-
-        # _, lc_arr_box = get_cache(
-        #     durations=durations,
-        #     maxwidth_in_samples=maxwidth_in_samples,
-        #     per=self.box_per,
-        #     rp=self.box_rp,
-        #     a=self.box_a,
-        #     inc=self.box_inc,
-        #     ecc=self.ecc,
-        #     w=self.w,
-        #     u=self.box_u,
-        #     limb_dark=self.box_limb_dark,
-        #     verbose=self.verbose
-        # )
 
         if self.verbose:
             print(
@@ -116,8 +86,6 @@ class gtls(object):
                 M_star_min=self.M_star_min,
                 M_star_max=self.M_star_max,
                 lc_arr=self.lc_arr,
-                # lc_arr_grazing=lc_arr_grazing,
-                # lc_arr_box=lc_arr_box,
                 lc_cache_overview=self.lc_cache_overview,
                 T0_fit_margin=self.T0_fit_margin,
                 oversampling_factor = self.oversampling_factor,
@@ -138,8 +106,6 @@ class gtls(object):
                 M_star_min=self.M_star_min,
                 M_star_max=self.M_star_max,
                 lc_arr=self.lc_arr,
-                # lc_arr_grazing=lc_arr_grazing,
-                # lc_arr_box=lc_arr_box,
                 lc_cache_overview=self.lc_cache_overview,
                 T0_fit_margin=self.T0_fit_margin,
                 oversampling_factor = self.oversampling_factor,
@@ -153,6 +119,8 @@ class gtls(object):
         self.rawDurations = durations
         return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd)
     
+    # Useful tools
+
     def showFit(self):
         def centerFold(time, period, T0):
             """Normal phase folding"""
@@ -165,10 +133,7 @@ class gtls(object):
         fluxesSorted = self.y[phasesIndex]
 
         durationStart = (self.bestT0 - self.duration/2)
-
         durationStartPhase = centerFold(durationStart, self.period, self.bestT0)
-        # durationEndPhase = centerFold(durationEnd, self.period, self.bestT0)
-        # durationCenterPhase = centerFold(durationCenter, self.period, self.bestT0)
 
         lcArr = self.lc_arr
         assumeCurve = lcArr[np.where(self.rawDurations == self.rawDuration)[0][0]]
@@ -183,3 +148,25 @@ class gtls(object):
                 fitCurve.append(1)
 
         return fitCurve, phasesSorted, fluxesSorted 
+    
+    def periodogram(self, **kwargs):
+        """Compute the periodogram for a set of user-defined parameters"""
+        self, kwargs = validate_args(self, kwargs)
+
+        if self.verbose:
+            print(constants.TLS_VERSION)
+
+        # Generate possible periods
+        if self.periods == []:
+            periods = period_grid(
+                R_star=self.R_star,
+                M_star=self.M_star,
+                time_span=np.max(self.t) - np.min(self.t),
+                period_min=self.period_min,
+                period_max=self.period_max,
+                oversampling_factor=self.oversampling_factor,
+                n_transits_min=self.n_transits_min,
+            )
+        else:
+            periods = self.periods        
+        return periods

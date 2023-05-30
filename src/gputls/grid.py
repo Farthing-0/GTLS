@@ -154,10 +154,4 @@ def period_grid(
             R_star=1, M_star=1, time_span=time_span / constants.SECONDS_PER_DAY
         )
     else:
-
-        # For TESS data debug only, remove later
-        # periods = list(numpy.linspace(0.02,14,11000))
-        # print('periods', periods)
-        # return periods
-
         return periods[selected_index]  # periods in [days]
