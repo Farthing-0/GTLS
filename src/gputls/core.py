@@ -67,10 +67,11 @@ def search_multi_periods(
 
     # with open ('GPUFun.cu', 'r') as myfile:
     #     myCode=myfile.read()
-    options = ('-rdc=true',)
+    # options = ('-rdc=true',)
     # if not useLocalPTXCUBIN:
     GPUCode = GPUFun.getGPUCode()
-    module = cp.RawModule(code=GPUCode,options=options)
+    # module = cp.RawModule(code=GPUCode,options=options)
+    module = cp.RawModule(code=GPUCode)
     module.compile()
     # else :
     #     import os.path
