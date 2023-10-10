@@ -84,13 +84,15 @@ def search_multi_periods(
     #         module = cp.RawModule(path='./GTLS.cubin',options=options)
 
     durations = numpy.unique(lc_cache_overview["width_in_samples"])
-    maxWidthInSamples = int(max(durations))
-    if maxWidthInSamples % 2 != 0:
-        maxWidthInSamples = maxWidthInSamples + 1
+    maxDuration = int(max(durations))
+
+    # why?
+    if maxDuration % 2 != 0:
+        maxDuration = maxDuration + 1
+    
     durations = numpy.sort(durations)
     
-    maxWidthInSamplesGPU = cp.asarray(np.array([maxWidthInSamples])).astype(cp.int32)
-    patchedDatasSize = int(len(t) + maxWidthInSamples)
+    patchedDatasSize = int(len(t) + maxDuration)
     patchedDatasSizeGPU = cp.asarray(np.array([patchedDatasSize])).astype(cp.int32)
 
     pynvml.nvmlInit()
@@ -153,8 +155,8 @@ def search_multi_periods(
         for i in range(1,i_max + 1):
             sortIndexGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max] = phasesGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max].argsort()
 
-        patchedDatasGPU = cp.zeros((singleCalcPeriods,len(t) + maxWidthInSamples),dtype=cp.float32)
-        patchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxWidthInSamples),dtype=cp.float32)
+        patchedDatasGPU = cp.zeros((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
+        patchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
         yGPU = cp.asarray(y).astype(cp.float32)
         dyGPU = cp.asarray(dy).astype(cp.float32)
 
@@ -163,11 +165,12 @@ def search_multi_periods(
 
         lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
         lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
+        lcArrFullLengthSizeGPU = cp.asarray(np.array([len(lc_arr_full_length)])).astype(cp.int32)
 
         #Other GPU variables, declare here to save time.
-        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxWidthInSamples),dtype=cp.float32)
+        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
         edgeEffectCorrectionsGPU = cp.empty((singleCalcPeriods),dtype=cp.float32)
-        maxwidthInSamplesGPU = cp.asarray(np.array([maxWidthInSamples])).astype(cp.int32)
+        maxDurationGPU = cp.asarray(np.array([maxDuration])).astype(cp.int32)
         periodSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         durationsGPU = cp.asarray(durations).astype(cp.int32)
         durationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
@@ -183,19 +186,23 @@ def search_multi_periods(
         #GPU variables for the loop
         fullSumGPU = cp.empty((singleCalcPeriods,len(durations)),dtype=cp.float32)
         cumsumGPU = cp.empty((singleCalcPeriods,patchedDatasSize),dtype=cp.float32)
-        meanXSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
+        
+        # resultArrayXAxisSizeGPU is the maximum size of the result of a function possible use to restore the result of a patched light curve
+        resultArrayXAxisSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
+        
+
         ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
         lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
         # depthsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
         # lowestResidualsTypeGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.int32)
-        meanSizeGPU = cp.array([(patchedDatasSize - x + 1) for x in durations]).astype(np.int32)
+        # meanSizeGPU = cp.array([(patchedDatasSize - x + 1) for x in durations]).astype(np.int32)
         
         #calculate patched data
         patchDataGPU = module.get_function('patchData')
-        blockSize,gridSizeX = calcGridBlockSize(len(t) + maxWidthInSamples)
+        blockSize,gridSizeX = calcGridBlockSize(len(t) + maxDuration)
         patchDataGPU((gridSizeX,singleCalcPeriods,),(blockSize,),
         (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
-        maxWidthInSamplesGPU,yGPU,dyGPU,tSizeGPU,periodsSizeGPU))
+        maxDurationGPU,yGPU,dyGPU,tSizeGPU))
 
         calcInverseSquaredPatchedDyGPU = module.get_function('calcInverseSquaredPatchedDy')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize)
@@ -207,7 +214,7 @@ def search_multi_periods(
         blockSize,gridSizeX = calcGridBlockSize(singleCalcPeriods)
         calcEdgeEffectCorrectionsGPU((gridSizeX,1,1),(blockSize,1,1),
         (edgeEffectCorrectionsGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
-        patchedDatasSizeGPU,maxwidthInSamplesGPU,periodSizeGPU,))
+        patchedDatasSizeGPU,maxDurationGPU,periodSizeGPU,))
         
         for i in range(singleCalcPeriods):
             # if((iterFlag * singleCalcPeriods + i) < singleCalcPeriods):
@@ -225,7 +232,7 @@ def search_multi_periods(
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         calcAllOutOfTransitResiduals_step1_2GPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,patchedDatasGPU,durationsGPU,durationsSizeGPU,
-        inverseSquaredPatchedDysGPU,patchedDatasSizeGPU,meanXSizeGPU,))
+        inverseSquaredPatchedDysGPU,patchedDatasSizeGPU,resultArrayXAxisSizeGPU,))
         # iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
         # periodSizeGPU,))
 
@@ -235,7 +242,7 @@ def search_multi_periods(
         calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,
         durationsSizeGPU,patchedDatasSizeGPU,
-        meanSizeGPU,meanXSizeGPU,fullSumGPU,))
+        durationsGPU,resultArrayXAxisSizeGPU,fullSumGPU,))
         # iterFlagGPU,singleCalcPeriodsGPU,periodSizeGPU,))
 
         # if legacy:
@@ -245,15 +252,11 @@ def search_multi_periods(
 
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         
-        #About LowestResidualsTypeGPU, 0 means standard transit, 1 means grazing transit, 2 means box transit,
-        #3 means no transit(Or not detect at all)
-        #TODO:export all transit types output, distinguish them in the next step? or just use the lowest one? 
-        # calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
         calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
         (blockSize,1,1),(lowestResidualsGPU,#depthsGPU,
-        meanSizeGPU,meanXSizeGPU,
+        resultArrayXAxisSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,durationsGPU,
-        durationsSizeGPU,lcArrFullLengthGPU,#lcArrGrazingFullLengthGPU,lcArrBoxFullLengthGPU,
+        durationsSizeGPU,lcArrFullLengthGPU,lcArrFullLengthSizeGPU,#lcArrGrazingFullLengthGPU,lcArrBoxFullLengthGPU,
         lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
         overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,#meanGPU,
         durationsMaxGPU,durationsMinGPU,transitDepthMinGPU,iterFlagGPU
@@ -294,8 +297,8 @@ def search_multi_periods(
     rawDuration = lc_cache_overview['duration'][bestRow]
 
     bestTime,bestFlux,bestFluxDy = foldCPU(t,y,dy,period)
-    bestFlux = np.concatenate((bestFlux,bestFlux[:maxWidthInSamples]))
-    bestFluxDy = np.concatenate((bestFluxDy,bestFluxDy[:maxWidthInSamples]))
+    bestFlux = np.concatenate((bestFlux,bestFlux[:maxDuration]))
+    bestFluxDy = np.concatenate((bestFluxDy,bestFluxDy[:maxDuration]))
     bestFluxGPU = cp.asarray(bestFlux,dtype=cp.float32)
     bestFluxDyGPU = cp.asarray(bestFluxDy,dtype=cp.float32)
 

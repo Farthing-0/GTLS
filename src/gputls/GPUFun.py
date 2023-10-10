@@ -2,10 +2,6 @@ def getGPUCode():
     GPUCode = """
 extern "C"{
 
-    // #include <cuda.h>
-    // #include <cuda_device_runtime_api.h>
-    // cuda.h and cuda_device_runtime_api.h
-
     __global__ void foldFast(const double* time,const double* periods, double* phase,int* periodSize,int* timeSize) {
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
         int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -59,8 +55,8 @@ extern "C"{
     }
 
     __global__ void patchData(float *in_patchedData,float *in_patchedDys,
-    int *patchedDataSize,int *in_sortIndex,int *maxWidthInSamples,
-    float *flux,float *dy,int *tSize,int *periodSize){
+    int *patchedDataSize,int *in_sortIndex,int *maxDuration,
+    float *flux,float *dy,int *tSize){
         int tid = blockIdx.x * blockDim.x + threadIdx.x; //patchedData index
         int y = blockIdx.y * blockDim.y + threadIdx.y; //period index
 
@@ -72,7 +68,7 @@ extern "C"{
             patchedData[tid] = flux[sortIndex[tid]];
             patchedDys[tid] = dy[sortIndex[tid]];
         }
-        else if(tid < (*tSize + *maxWidthInSamples)){
+        else if(tid < (*tSize + *maxDuration)){
             patchedData[tid] = flux[sortIndex[tid - (*tSize)]];
             patchedDys[tid] = dy[sortIndex[tid - (*tSize)]];
         }
@@ -89,7 +85,7 @@ extern "C"{
     }
 
     __global__ void calcEdgeEffectCorrections(float *out,float *patch_data,
-    float* inverse_squared_patched_dys,int *patched_data_size,int* maxwidth_in_samples,int* period_size)
+    float* inverse_squared_patched_dys,int *patched_data_size,int* maxDuration,int* period_size)
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
         float* patched_data = patch_data + tid*(*patched_data_size);
@@ -98,7 +94,7 @@ extern "C"{
         double regular = 0;
         double patched = 0;
         if(tid < *period_size){
-            for (int j = 0; j < (*patched_data_size - *maxwidth_in_samples); j++) {
+            for (int j = 0; j < (*patched_data_size - *maxDuration); j++) {
                 regular = regular + (1+(double)(patched_data[j])*(double)(patched_data[j])-2*(double)(patched_data[j])) * (double)(inverse_squared_patched_dy[j]);
 
             }
@@ -142,7 +138,7 @@ extern "C"{
     
     __global__ void calcAllOutOfTransitResiduals_step1_2GPU(float *temp_ootr,
     float *in_patched_data, int *in_duration,int *duration_size,
-    float *in_inverse_squared_patched_dy, int *patched_data_size,int *mean_x_size)//,
+    float *in_inverse_squared_patched_dy, int *patched_data_size,int *resultArrayXAxisSize)//,
     // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is point index
@@ -156,44 +152,42 @@ extern "C"{
         float *inverse_squared_patched = in_inverse_squared_patched_dy + z*(*patched_data_size);
         int window = in_duration[y];
         
-        if(tid < *mean_x_size){
+        if(tid < *resultArrayXAxisSize){
             if(tid < *patched_data_size - window){
                 int becomes_visible = tid;
                 int becomes_invisible = tid + window;
                 float add_visible_left = (1 - patched_data[becomes_visible]) * (1 - patched_data[becomes_visible]) * inverse_squared_patched[becomes_visible];
                 float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
                 float weight = add_visible_left - remove_invisible_right;
-                temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = weight;
+                temp_ootr[tid + y*(*resultArrayXAxisSize)+z*(*resultArrayXAxisSize)*(*duration_size)] = weight;
             }
             else{
-                temp_ootr[tid + y*(*mean_x_size)+z*(*mean_x_size)*(*duration_size)] = 0;
+                temp_ootr[tid + y*(*resultArrayXAxisSize)+z*(*resultArrayXAxisSize)*(*duration_size)] = 0;
             }
         }
         // }
     }
 
     __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr,
-    int *duration_size,int *patched_data_size,int *in_mean_size,
-    int *mean_x_size,float *in_fullsum)
-    // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    int *duration_size,int *patched_data_size,int *in_duration,
+    int *resultArrayXAxisSize,float *in_fullsum)
     {
         int i = blockIdx.x * blockDim.x + threadIdx.x;//i is point index
         int tid = blockIdx.y * blockDim.y + threadIdx.y;    //tid is duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is period index
 
-        int mean_size = in_mean_size[tid];
-        // if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
-            float *fullsum = in_fullsum + z*(*duration_size);
-            float *ootr = in_ootr + z*(*mean_x_size)*(*duration_size);
-            float start = fullsum[tid];
-            if(i < mean_size){
-                ootr[i+tid*(*mean_x_size)] = start + ootr[i+tid*(*mean_x_size)];
-            }
-            else if (i<*mean_x_size){
-                ootr[i+tid*(*mean_x_size)] = 0;
-            }
+        // int mean_size = in_mean_size[tid];
+        int duration = in_duration[tid];
 
-        // }
+        float *fullsum = in_fullsum + z*(*duration_size);
+        float *ootr = in_ootr + z*(*resultArrayXAxisSize)*(*duration_size);
+        float start = fullsum[tid];
+        if(i < (*patched_data_size) - duration + 1){
+            ootr[i+tid*(*resultArrayXAxisSize)] = start + ootr[i+tid*(*resultArrayXAxisSize)];
+        }
+        else if (i<*resultArrayXAxisSize){
+            ootr[i+tid*(*resultArrayXAxisSize)] = 0;
+        }
     }
 
     __device__ float calcAverageFromCumsum(float *inPatchedDataCumsum,
@@ -222,7 +216,7 @@ extern "C"{
 
     // __global__ void calcAllLowestResidualsGPU(
     // float *out,//float *depths,
-    // int *in_mean_size,int *mean_x_size,
+    // int *in_mean_size,int *resultArrayXAxisSize,
     // float *in_patched_datas,
     // int *in_patched_datas_size,int *in_duration,int *in_duration_size,
     // float *in_signal,float *in_signal_grazing,float *in_signal_box,
@@ -252,10 +246,10 @@ extern "C"{
     //         if(duration >= durationMin && duration <= durationMax ){
     //             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,z);
     //             float overshoot = in_overshoot[y];
-    //             if(tid < *mean_x_size){
-    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = datapoints;
-    //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
-    //                 // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
+    //             if(tid < *resultArrayXAxisSize){
+    //                 out[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = datapoints;
+    //                 //depths[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = 0.0;
+    //                 // outType[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = 3;
     //             }
     //             if(tid < mean_size && calc_mean > transit_depth_min){
     //                 float ootr = 0;
@@ -263,7 +257,7 @@ extern "C"{
     //                     ootr = in_fullsum[z*(*in_duration_size) + y];
     //                 }
     //                 else{
-    //                     ootr = *(in_ootr+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+    //                     ootr = *(in_ootr+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size) + tid - 1);                    
     //                 }
 
     //                 float *data = in_patched_datas + z_input*(*in_patched_datas_size) + tid;
@@ -305,17 +299,17 @@ extern "C"{
     //                 // float current_stat_grazing = intransit_residual_grazing + ootr - summed_edge_effect_correction;
     //                 // float current_stat_box = intransit_residual_box + ootr - summed_edge_effect_correction;
     //                 cudaFree(intransit_residuals);
-    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0;
-    //                 // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = current_stat_box;
-    //                 // out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
-    //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = target_depth;
+    //                 out[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = 0;
+    //                 // out[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = current_stat_box;
+    //                 // out[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = min(current_stat, min(current_stat_grazing, current_stat_box));
+    //                 //depths[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = target_depth;
     //             }
     //         }else{
-    //             if(tid < *mean_x_size){
+    //             if(tid < *resultArrayXAxisSize){
     //                 //0x7f800000 => infinity in float, according to IEEE-754
-    //                 out[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
-    //                 //depths[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 0.0;
-    //                 // outType[tid+y*(*mean_x_size) + z*(*mean_x_size)*(*in_duration_size)] = 3;
+    //                 out[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
+    //                 //depths[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = 0.0;
+    //                 // outType[tid+y*(*resultArrayXAxisSize) + z*(*resultArrayXAxisSize)*(*in_duration_size)] = 3;
     //             }
     //         }
     //     }
@@ -323,10 +317,10 @@ extern "C"{
 
     __global__ void calcAllLowestResidualsGPU(
     float *out,//float *depths,
-    int *in_mean_size,int *mean_x_size,
+    int *resultArrayXAxisSize,
     float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
-    float *in_signal,//float *in_signal_grazing,float *in_signal_box,
+    float *in_signal,int *in_signal_size,//float *in_signal_grazing,float *in_signal_box,
     int *in_max_signal_x_size,
     float *in_inverse_squared_patched_dys,
     float *in_overshoot, float *in_ootr,float *in_fullsum,
@@ -345,15 +339,18 @@ extern "C"{
         int durationMin = durationsMin[y];
 
         for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++){
-            int mean_size = in_mean_size[durationIndex];
+
             int duration = in_duration[durationIndex];
+            int mean_size = *in_patched_datas_size - duration + 1;
+
+            // copy from in_signal to signal
+            // __shared__ float signal[duration] = in_signal + durationIndex*(*in_max_signal_x_size);
 
             if(duration >= durationMin && duration <= durationMax ){
-
                 float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,y);
                 float overshoot = in_overshoot[durationIndex];
-                if(tid < *mean_x_size){
-                    out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = datapoints;
+                if(tid < *resultArrayXAxisSize){
+                    out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = datapoints;
                 }
                 if(tid < mean_size && calc_mean > transit_depth_min){
                     float ootr = 0;
@@ -361,7 +358,7 @@ extern "C"{
                         ootr = in_fullsum[y*(*in_duration_size) + durationIndex];
                     }
                     else{
-                        ootr = *(in_ootr+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+                        ootr = *(in_ootr+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size) + tid - 1);                    
                     }
 
                     float *data = in_patched_datas + y*(*in_patched_datas_size) + tid;
@@ -378,22 +375,20 @@ extern "C"{
                     float intransit_residual = 0;
                     float loss = 0;
                     for (int i = 0; i < duration; i++) {
-                        // sigi = (1 - signal[i]) * reverse_scale;
                         sigi = (signal[i]) * reverse_scale;
                         // sigi = (signal) * reverse_scale;
-                        // sigi = 1;
                         loss = (data[i] - (1 - sigi));
                         intransit_residual = intransit_residual + loss * loss * dy[i];
+                        // intransit_residual = intransit_residual + loss * loss;
                     }
-
                     float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-                    out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = current_stat;
-
+                    out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = current_stat;
                 }
-            }else{
-                if(tid < *mean_x_size){
+            }
+            else{
+                if(tid < *resultArrayXAxisSize){
                     //0x7f800000 => infinity in float, according to IEEE-754
-                    out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
+                    out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
                 }
             }
         }
@@ -401,7 +396,7 @@ extern "C"{
 
     __global__ void calcAllLowestResidualsCompatibleGPU(
     float *out,//float *depths,
-    int *in_mean_size,int *mean_x_size,
+    int *in_mean_size,int *resultArrayXAxisSize,
     float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
     float *in_signal,//float *in_signal_grazing,float *in_signal_box,
@@ -434,8 +429,8 @@ extern "C"{
 
                     float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,y);
                     float overshoot = in_overshoot[durationIndex];
-                    if(tid < *mean_x_size){
-                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = datapoints;
+                    if(tid < *resultArrayXAxisSize){
+                        out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = datapoints;
                     }
                     if(tid < mean_size && calc_mean > transit_depth_min){
                         float ootr = 0;
@@ -443,7 +438,7 @@ extern "C"{
                             ootr = in_fullsum[y*(*in_duration_size) + durationIndex];
                         }
                         else{
-                            ootr = *(in_ootr+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size) + tid - 1);                    
+                            ootr = *(in_ootr+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size) + tid - 1);                    
                         }
 
                         float *data = in_patched_datas + y_input*(*in_patched_datas_size) + tid;
@@ -470,12 +465,12 @@ extern "C"{
                         }
 
                         float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = current_stat;
+                        out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = current_stat;
                     }
                 }else{
-                    if(tid < *mean_x_size){
+                    if(tid < *resultArrayXAxisSize){
                         //0x7f800000 => infinity in float, according to IEEE-754
-                        out[tid+durationIndex*(*mean_x_size) + y*(*mean_x_size)*(*in_duration_size)] = 0x7f800000;
+                        out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
                     }
                 }
             }
