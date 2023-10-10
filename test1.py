@@ -51,39 +51,41 @@ def cleaned_array(t, y, dy=None):
         return clean_t, clean_y, clean_dy
 
 def findRandomLc():
-    dir = '../../../HDD/'
-    lc_dir = None
-    for file in os.listdir(dir):
-        # print(file)
-        if file.endswith('lightcurve_58'):
-            lc_dir = dir + file + '/'
-            break
-    if lc_dir == None:
-        print('No lightcurve directory found')
-        return None
-        # exit()
+    # dir = '../../../HDD/'
+    # dir = './'
+    # lc_dir = None
+    # for file in os.listdir(dir):
+    #     # print(file)
+    #     if file.endswith('lightcurve_58'):
+    #         lc_dir = dir + file + '/'
+    #         break
+    # if lc_dir == None:
+    #     print('No lightcurve directory found')
+    #     return None
+    #     # exit()
 
-    files = []
-    for lc_file in os.listdir(lc_dir):
-        if(lc_file.endswith('.fits')):
-            files.append(lc_file)
+    # files = []
+    # for lc_file in os.listdir(lc_dir):
+    #     if(lc_file.endswith('.fits')):
+    #         files.append(lc_file)
     
-    # lc_file = lc_dir + random.choice(files)
+    # # lc_file = lc_dir + random.choice(files)
     
-    #35 can be a good example
-    # lc_file = lc_dir + files[10]
-    for lc_file in files:
-        if '0000000021132157' in lc_file:
-        # if '0000000373961316' in lc_file:
-    #     # if '0000000028473414' in lc_file:
-    # #     # if '0000000010596267' in lc_file:
-    # #     if '0000000015422557' in lc_file:
-            break
-    lc_file = lc_dir + lc_file
+    # #35 can be a good example
+    # # lc_file = lc_dir + files[10]
+    # for lc_file in files:
+    #     if '0000000021132157' in lc_file:
+    #     # if '0000000373961316' in lc_file:
+    # #     # if '0000000028473414' in lc_file:
+    # # #     # if '0000000010596267' in lc_file:
+    # # #     if '0000000015422557' in lc_file:
+    #         break
+    # lc_file = lc_dir + lc_file
     
-    print(lc_file)
-    fluxes = None
-    
+    # print(lc_file)
+    # fluxes = None
+    dir = './'
+    lc_file = dir + 'tess2022302161335-s0058-0000000021132157-0247-s_lc.fits'
     with fits.open(lc_file,mode = "readonly") as lc_file:
         fluxes = lc_file[1].data['PDCSAP_FLUX']
         times = lc_file[1].data['TIME']
