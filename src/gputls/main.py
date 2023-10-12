@@ -136,6 +136,7 @@ class gtls(object):
         durationStartPhase = centerFold(durationStart, self.period, self.bestT0)
 
         lcArr = self.lc_arr
+        
         assumeCurve = lcArr[np.where(self.rawDurations == self.rawDuration)[0][0]]
         assumeCurve = 1 - ((1- np.array(assumeCurve)) * 2 * (self.Depth))
         fitCurve = []
