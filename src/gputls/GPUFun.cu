@@ -272,12 +272,11 @@ extern "C"{
 // }
 
     __global__ void calcAllLowestResidualsGPUA(
-    float *out,//float *depths,
+    float *out,
     int *resultArrayXAxisSize,
     float *in_patched_datas,
     int *in_patched_datas_size,int *in_duration,int *in_duration_size,
-    float *in_signal,//float *in_signal_grazing,float *in_signal_box,
-    int *in_max_signal_x_size,
+    float *in_signal,int *in_max_signal_x_size,
     float *in_inverse_squared_patched_dys,
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
@@ -349,6 +348,92 @@ extern "C"{
                     out[tid+durationIndex*(*resultArrayXAxisSize) + y*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
                 }
             }
+        }
+    }
+
+    __global__ void calcAllLowestResidualsGPUB(
+    float *out,
+    int *resultArrayXAxisSize,
+    float *in_patched_datas,
+    int *in_patched_datas_size,int *in_duration,int *in_duration_size,
+    float *in_signal,int *in_max_signal_x_size,
+    float *in_inverse_squared_patched_dys,
+    float *in_overshoot, float *in_ootr,float *in_fullsum,
+    float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
+    int *durationsMax,int *durationsMin, float *in_transit_depth_min
+    )
+    {
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
+        int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
+        int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is the period
+
+        if(tid >= *resultArrayXAxisSize){
+            return;
+        }
+
+        int durationIndex = y;
+        int duration = in_duration[durationIndex];
+        int durationMax = durationsMax[y];
+        int durationMin = durationsMin[y];
+
+        int skipPoint = (duration > 100) ? 100 : 1;
+
+        int periodIndex = z;
+        float transit_depth_min = *in_transit_depth_min;
+        int datapoints = *in_datapoints;
+
+        int mean_size = *in_patched_datas_size - duration + 1;
+
+        if(duration >= durationMin && duration <= durationMax ){
+            float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
+            float overshoot = in_overshoot[durationIndex];
+
+            if(tid < mean_size && calc_mean > transit_depth_min && tid % skipPoint == 0){
+            // if(tid < mean_size && calc_mean > transit_depth_min){
+                float ootr = 0;
+                if(tid == 0){
+                    ootr = in_fullsum[periodIndex*(*in_duration_size) + durationIndex];
+                }
+                else{
+                    ootr = *(in_ootr+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size) + tid - 1);                    
+                }
+
+                float *data = in_patched_datas + periodIndex*(*in_patched_datas_size) + tid;
+                float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
+                // float signal = 0.1;
+
+                float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + periodIndex*(*in_patched_datas_size);
+                float summed_edge_effect_correction = in_summed_edge_effect_correction[periodIndex];
+
+                float *dy = inverse_squared_patched_dy_arr + tid;
+                float reverse_scale = calc_mean * overshoot * 2;  // "*2" means SIGNAL_DEPTH is 0.5,as "/SIGNAL_DEPTH"
+
+                // float reverse_duration = 1.0 / duration;
+
+                float sigi = 0;
+                float intransit_residual = 0;
+                float loss = 0;
+
+                for (int i = 0; i < duration; i++) {
+                    // sigi =  (-2.0 * i * reverse_duration + 1);
+                    // sigi = sigi * reverse_scale;
+                    sigi = (signal[i]) * reverse_scale;
+                    // sigi = (signal) * reverse_scale;
+                    loss = (data[i] - (1 - sigi));
+                    intransit_residual = intransit_residual + loss * loss * dy[i];
+                    // intransit_residual = intransit_residual + loss * loss;
+                }
+                float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+                out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = current_stat;
+            }
+            else
+            {
+                out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = datapoints;
+            }
+        }
+        else{
+            //0x7f800000 => infinity in float, according to IEEE-754
+            out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
         }
     }
 

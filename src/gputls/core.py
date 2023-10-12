@@ -124,6 +124,8 @@ def search_multi_periods(
     # For GPU memory limitaion, we can only calculate about
     for iterFlag in range(TotalIter):
 
+        lowestResidualsGPU = cp.ones((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+
         if iterFlag == TotalIter - 1:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:]
             # enlarge the SinglePeriods array to the same size as singleCalcPeriods
@@ -191,7 +193,6 @@ def search_multi_periods(
         resultArrayXAxisSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
         
         ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-        lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
         
         #calculate patched data
         patchDataGPU = module.get_function('patchData')
@@ -237,13 +238,25 @@ def search_multi_periods(
         durationsSizeGPU,patchedDatasSizeGPU,
         durationsGPU,resultArrayXAxisSizeGPU,fullSumGPU,))
 
-        calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUA')
+        # calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUA')
+        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
+        # (blockSize,1,1),(lowestResidualsGPU,resultArrayXAxisSizeGPU,
+        # patchedDatasGPU,patchedDatasSizeGPU,
+        # durationsGPU,durationsSizeGPU,
+        # lcArrFullLengthGPU,
+        # lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
+        # overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,
+        # durationsMaxGPU,durationsMinGPU,transitDepthMinGPU
+        # ))
+
+        calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
         blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
-        calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
+        # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,len(durations)),
+        calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(lowestResidualsGPU,resultArrayXAxisSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,
-        durationsGPU,
-        durationsSizeGPU,
+        durationsGPU,durationsSizeGPU,
         lcArrFullLengthGPU,
         lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
         overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,
