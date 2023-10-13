@@ -9,6 +9,7 @@ import time
 
 days = 100
 print('days',days)
+np.random.seed(0)
 period = np.random.uniform(1, 20)
 depth = np.random.uniform(2e-5,0.03)
 duration = np.random.uniform(0.01, 0.5)
@@ -57,7 +58,6 @@ gtlsResult = model.power()
 gtlsTime = time.time() - start
 
 print("TrueResult")
-print("period: ",period,"duration: ",duration,"depth: ",depth,"T0: ",T0)
+print("period: ",period,"duration: ",duration,"depth: ",depth,"T0: ",T0,"noisePPM: ",ppm)
 print("GTLSResult")
 print("period: ",gtlsResult.period,"duration: ",gtlsResult.duration,"depth: ",gtlsResult.depth,"T0: ",gtlsResult.T0,"SDE: ",gtlsResult.SDE,"snr: ",gtlsResult.snr,"snrPink: ",gtlsResult.snrPink,"snrFit: ",gtlsResult.snrFit,"snrFitPink: ",gtlsResult.snrFitPink,"lossSDE: ",gtlsResult.lossSDE,"KLossMean: ",gtlsResult.KLossMean,"KLossStd: ",gtlsResult.KLossStd)
-    

@@ -88,21 +88,32 @@ extern "C"{
     float* inverse_squared_patched_dys,int *patched_data_size,int* maxDuration,int* period_size)
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        if(tid >= *period_size){
+            return;
+        }
+
         float* patched_data = patch_data + tid*(*patched_data_size);
         float* inverse_squared_patched_dy = inverse_squared_patched_dys + tid*(*patched_data_size);
 
         double regular = 0;
         double patched = 0;
-        if(tid < *period_size){
-            for (int j = 0; j < (*patched_data_size - *maxDuration); j++) {
-                regular = regular + (1+(double)(patched_data[j])*(double)(patched_data[j])-2*(double)(patched_data[j])) * (double)(inverse_squared_patched_dy[j]);
 
+        // float regular = 0;
+        // float patched = 0;
+
+        for (int j = 0; j < (*patched_data_size); j++) {
+            double patchDataJ = (double)(patched_data[j]);
+            double patchDataDyJ = (double)(inverse_squared_patched_dy[j]);
+
+            // float patchDataJ = (patched_data[j]);
+            // float patchDataDyJ = (inverse_squared_patched_dy[j]);
+
+            if (j < (*patched_data_size - *maxDuration)){
+                regular = regular + (1+patchDataJ*patchDataJ-2*patchDataJ) * patchDataDyJ;
             }
-            for (int j = 0; j < (*patched_data_size); j++) {
-                patched = patched + (1-patched_data[j]) *(1-patched_data[j]) * (double)(inverse_squared_patched_dy[j]);
-            }
-        out[tid] = patched - regular;
+            patched = patched + (1-patchDataJ) *(1-patchDataJ) * patchDataDyJ;
         }
+        out[tid] = patched - regular;
     }
 
     __global__ void calcAllFullSum(float* fullsums,float *in_patched_data,

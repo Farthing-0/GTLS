@@ -99,8 +99,13 @@ def search_multi_periods(
     handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
     nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
     singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
-    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
 
+    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
+    # print(singleCalcPeriods)
+    if singleCalcPeriods < 15:
+        singleCalcPeriods = int(singleCalcPeriods / 1.1)
+        # singleCalcPeriods = singleCalcPeriods - 1
+    # # exit()
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
@@ -153,9 +158,13 @@ def search_multi_periods(
         fastFoldGPU = module.get_function('foldFast')
         blockSize,gridSizeX = calcGridBlockSize(len(t))
         fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
+        # if singleCalcPeriods > 100:
         i_max = 10
         for i in range(1,i_max + 1):
             sortIndexGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max] = phasesGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max].argsort()
+        # else:
+        #     for i in range(singleCalcPeriods):
+        #         sortIndexGPU[i] = phasesGPU[i].argsort()
 
         patchedDatasGPU = cp.zeros((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
         patchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
