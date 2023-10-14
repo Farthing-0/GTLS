@@ -387,9 +387,4 @@ def search_multi_periods(
 
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
 
-    lossSDE = None
-    KLossStd = None
-    KLossMean = None
-
-    # # print('durationsGPU',durationsGPU.get())
-    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,lossSDE,KLossMean,KLossStd
+    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink
