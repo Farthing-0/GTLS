@@ -50,7 +50,10 @@ def search_multi_periods(
     fast = False,
 
     #legacy: Skip-points search, like the original TLS,not implemented yet.
-    legacy = False
+    legacy = False,
+
+    # SimplifyEdgeEffect if dy is nearly uniform, we can simplify the edge effect correction
+    SimplifyEdgeEffect = True
 
 ):
     
@@ -179,8 +182,14 @@ def search_multi_periods(
         lcArrFullLengthSizeGPU = cp.asarray(np.array([len(lc_arr_full_length)])).astype(cp.int32)
 
         #Other GPU variables, declare here to save time.
-        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
+        
+        # if SimplifyEdgeEffect == False:
         edgeEffectCorrectionsGPU = cp.empty((singleCalcPeriods),dtype=cp.float32)
+        # else:
+        #     pass
+
+        
+        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
         maxDurationGPU = cp.asarray(np.array([maxDuration])).astype(cp.int32)
         periodSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         durationsGPU = cp.asarray(durations).astype(cp.int32)
@@ -215,6 +224,7 @@ def search_multi_periods(
         calcInverseSquaredPatchedDyGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
         (inverseSquaredPatchedDysGPU,patchedDysGPU,patchedDatasSizeGPU,))
 
+        # if SimplifyEdgeEffect == False:
         #calculate edge_effect_correction
         calcEdgeEffectCorrectionsGPU = module.get_function('calcEdgeEffectCorrections')
         blockSize,gridSizeX = calcGridBlockSize(singleCalcPeriods)
@@ -297,7 +307,14 @@ def search_multi_periods(
     bestLocation = locationGPU[HighestPowerIndex].item()
     durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
 
-    bestRow = np.where(lc_cache_overview["width_in_samples"] == durations[durationIndex])[0].item()
+    durationPointsNum = durations[durationIndex]
+
+    # need to do 
+    refindT0 = True
+    if refindT0:
+        pass
+
+    bestRow = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0].item()
     rawDuration = lc_cache_overview['duration'][bestRow]
 
     bestTime,bestFlux,bestFluxDy = foldCPU(t,y,dy,period)
@@ -305,20 +322,20 @@ def search_multi_periods(
     bestFluxDy = np.concatenate((bestFluxDy,bestFluxDy[:maxDuration]))
 
     bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
-    transitMean = bestFlux[bestRowT0:bestRowT0+durations[durationIndex]].mean()
+    transitMean = bestFlux[bestRowT0:bestRowT0+durationPointsNum].mean()
 
     # Transit Depth
     overshoot = lc_cache_overview["overshoot"][durationIndex]
     transitDepth =  ((1-transitMean) * overshoot).item()
 
-    dataOutTransit = np.concatenate((bestFlux[0:bestRowT0],bestFlux[bestRowT0+durations[durationIndex]:]))
+    dataOutTransit = np.concatenate((bestFlux[0:bestRowT0],bestFlux[bestRowT0+durationPointsNum:]))
 
     if bestRowT0 > len(t) - 1:
         bestRowT0 = bestRowT0 - len(t) 
 
-    snrFit = (1 - transitDepth)*(durations[durationIndex] ** 0.5)/np.std(dataOutTransit)
+    snrFit = (1 - transitDepth)*(durationPointsNum ** 0.5)/np.std(dataOutTransit)
     DataCumsum = np.cumsum(dataOutTransit)
-    DataSlideAvg = (DataCumsum[durations[durationIndex]:] - DataCumsum[:-durations[durationIndex]])/durations[durationIndex]
+    DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum])/durationPointsNum
     redNoise = np.std(DataSlideAvg)
 
     # bestSortIndex = sortIndexGPU[HighestPowerIndex]
@@ -328,7 +345,7 @@ def search_multi_periods(
     T0 = Tx - int((Tx-min(t)) / period) * period - period
     transit_times = all_transit_times(T0, t, period)
 
-    snrFitPink = (1 - transitDepth)/((np.std(dataOutTransit)**2/(durations[durationIndex])) + (redNoise**2/(len(transit_times))))**0.5
+    snrFitPink = (1 - transitDepth)/((np.std(dataOutTransit)**2/(durationPointsNum)) + (redNoise**2/(len(transit_times))))**0.5
 
     # if legacy:
     #     #Raw TLS Calculate transit duration(days) Method
@@ -338,7 +355,7 @@ def search_multi_periods(
     # else:
     ## Alternative TLS Calculate transit duration(days) Method
     transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
-    # transit_duration_in_days = calcDurationDays(t, period, T0, durations[durationIndex])
+    # transit_duration_in_days = calcDurationDays(t, period, T0, durationPointsNum)
     
 
     T0 = T0 + transit_duration_in_days / 2
@@ -387,4 +404,4 @@ def search_multi_periods(
 
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
 
-    return periods,period,rawDuration,durations[durationIndex],transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink
+    return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink

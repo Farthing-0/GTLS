@@ -98,22 +98,24 @@ extern "C"{
         double regular = 0;
         double patched = 0;
 
-        // float regular = 0;
-        // float patched = 0;
+        // for (int j = 0; j < (*patched_data_size); j++) {
+        //     double patchDataJ = (double)(patched_data[j]);
+        //     double patchDataDyJ = (double)(inverse_squared_patched_dy[j]);
 
-        for (int j = 0; j < (*patched_data_size); j++) {
+        //     if (j < (*patched_data_size - *maxDuration)){
+        //         regular = regular + (1+patchDataJ*patchDataJ-2*patchDataJ) * patchDataDyJ;
+        //     }
+        //     patched = patched + (1-patchDataJ) *(1-patchDataJ) * patchDataDyJ;
+        // }
+        // out[tid] = patched - regular;
+        double edgeEffect = 0;
+        for (int j = (*patched_data_size - *maxDuration); j < (*patched_data_size); j++) {
             double patchDataJ = (double)(patched_data[j]);
             double patchDataDyJ = (double)(inverse_squared_patched_dy[j]);
-
-            // float patchDataJ = (patched_data[j]);
-            // float patchDataDyJ = (inverse_squared_patched_dy[j]);
-
-            if (j < (*patched_data_size - *maxDuration)){
-                regular = regular + (1+patchDataJ*patchDataJ-2*patchDataJ) * patchDataDyJ;
-            }
-            patched = patched + (1-patchDataJ) *(1-patchDataJ) * patchDataDyJ;
+            edgeEffect = edgeEffect + (1+patchDataJ*patchDataJ-2*patchDataJ) * patchDataDyJ;
         }
-        out[tid] = patched - regular;
+        out[tid] = edgeEffect;
+
     }
 
     __global__ void calcAllFullSum(float* fullsums,float *in_patched_data,

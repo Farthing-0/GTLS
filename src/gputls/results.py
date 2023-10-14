@@ -18,7 +18,3 @@ class gtlsResult(object):
         self.snrPink = snrPink
         self.snrFit = snrFit
         self.snrFitPink = snrFitPink
-        # self.lossSDE = lossSDE
-        # # self.DFToutlineValue = outlineValue
-        # self.KLossMean = KLossMean
-        # self.KLossStd = KLossStd
