@@ -95,7 +95,8 @@ def search_multi_periods(
     
     durations = numpy.sort(durations)
     
-    patchedDatasSize = int(len(t) + maxDuration)
+    tSize = len(t)
+    patchedDatasSize = int(tSize + maxDuration)
     patchedDatasSizeGPU = cp.asarray(np.array([patchedDatasSize])).astype(cp.int32)
 
     pynvml.nvmlInit()
@@ -105,6 +106,9 @@ def search_multi_periods(
 
     singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
     # print(singleCalcPeriods)
+    # print('size: ',len(durations)*patchedDatasSize*singleCalcPeriods / 1024 /1024)
+    # exit()
+
     if singleCalcPeriods < 15:
         singleCalcPeriods = int(singleCalcPeriods / 1.1)
         # singleCalcPeriods = singleCalcPeriods - 1
@@ -124,15 +128,16 @@ def search_multi_periods(
     # iterFlagGPU = cp.asarray(np.array([0])).astype(cp.int32)
     iterFlagGPU = cp.int32(0)
 
-    # phasesGPU = cp.empty((len(periods),len(t)),dtype=cp.float64)
-    # sortIndexGPU = cp.empty((len(periods),len(t)),dtype=cp.int32)
+    # phasesGPU = cp.empty((len(periods),tSize),dtype=cp.float64)
+    # sortIndexGPU = cp.empty((len(periods),tSize),dtype=cp.int32)
     # tGPU = cp.asarray(t).astype(cp.float64)
 
 
     # For GPU memory limitaion, we can only calculate about
     for iterFlag in range(TotalIter):
 
-        lowestResidualsGPU = cp.ones((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+        # lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+        lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),tSize),dtype=cp.float32)
 
         if iterFlag == TotalIter - 1:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:]
@@ -146,11 +151,11 @@ def search_multi_periods(
         durationsMinGPU = cp.asarray(SinglePeriods).astype(cp.int32)
 
         # Phase fold
-        phasesGPU = cp.empty((singleCalcPeriods,len(t)),dtype=cp.float64)
-        sortIndexGPU = cp.empty((singleCalcPeriods,len(t)),dtype=cp.int32)
+        phasesGPU = cp.empty((singleCalcPeriods,tSize),dtype=cp.float64)
+        sortIndexGPU = cp.empty((singleCalcPeriods,tSize),dtype=cp.int32)
         tGPU = cp.asarray(t).astype(cp.float64)
         periodsSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
-        tSizeGPU = cp.asarray(np.array([len(t)])).astype(cp.int32)
+        tSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
         tLengthGPU = cp.asarray(np.array([max(t) - min(t)])).astype(cp.float32)
 
         durationsGridGPU = module.get_function('durationsGrid')
@@ -159,7 +164,7 @@ def search_multi_periods(
                         (periodsGPU,durationsMaxGPU, durationsMinGPU,tLengthGPU,tSizeGPU, periodsSizeGPU))
 
         fastFoldGPU = module.get_function('foldFast')
-        blockSize,gridSizeX = calcGridBlockSize(len(t))
+        blockSize,gridSizeX = calcGridBlockSize(tSize)
         fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
         # if singleCalcPeriods > 100:
         i_max = 10
@@ -169,8 +174,8 @@ def search_multi_periods(
         #     for i in range(singleCalcPeriods):
         #         sortIndexGPU[i] = phasesGPU[i].argsort()
 
-        patchedDatasGPU = cp.zeros((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
-        patchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
+        patchedDatasGPU = cp.zeros((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
+        patchedDysGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
         yGPU = cp.asarray(y).astype(cp.float32)
         dyGPU = cp.asarray(dy).astype(cp.float32)
 
@@ -189,7 +194,7 @@ def search_multi_periods(
         #     pass
 
         
-        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,len(t) + maxDuration),dtype=cp.float32)
+        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
         maxDurationGPU = cp.asarray(np.array([maxDuration])).astype(cp.int32)
         periodSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         durationsGPU = cp.asarray(durations).astype(cp.int32)
@@ -208,13 +213,16 @@ def search_multi_periods(
         cumsumGPU = cp.empty((singleCalcPeriods,patchedDatasSize),dtype=cp.float32)
         
         # resultArrayXAxisSizeGPU is the maximum size of the result of a function possible use to restore the result of a patched light curve
-        resultArrayXAxisSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
-        
-        ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-        
+        # resultArrayXAxisSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
+        resultArrayXAxisSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
+
+
+        # ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
+        ootrGPU = cp.empty((singleCalcPeriods,len(durations),(tSize)),dtype=cp.float32)
+
         #calculate patched data
         patchDataGPU = module.get_function('patchData')
-        blockSize,gridSizeX = calcGridBlockSize(len(t) + maxDuration)
+        blockSize,gridSizeX = calcGridBlockSize(tSize + maxDuration)
         patchDataGPU((gridSizeX,singleCalcPeriods,),(blockSize,),
         (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
         maxDurationGPU,yGPU,dyGPU,tSizeGPU))
@@ -286,6 +294,9 @@ def search_multi_periods(
         for i in range(singleCalcPeriods):
             if(iterFlag*singleCalcPeriods + i < len(periods)):
                 locationGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].argmin()
+                # print(lowestResidualsGPU[i].argmin())
+                # print(lowestResidualsGPU)
+                # exit()
                 LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
 
         iterFlagGPU = iterFlagGPU + 1
@@ -305,7 +316,8 @@ def search_multi_periods(
     period = periods[HighestPowerIndex]
 
     bestLocation = locationGPU[HighestPowerIndex].item()
-    durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
+    # durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
+    durationIndex = np.floor(bestLocation / (tSize)).astype(int)    
 
     durationPointsNum = durations[durationIndex]
 
@@ -321,7 +333,9 @@ def search_multi_periods(
     bestFlux = np.concatenate((bestFlux,bestFlux[:maxDuration]))
     bestFluxDy = np.concatenate((bestFluxDy,bestFluxDy[:maxDuration]))
 
-    bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
+    # bestRowT0 = bestLocation % (int(patchedDatasSize) - (np.min(durations)) + 1)
+    bestRowT0 = bestLocation % (tSize)
+
     transitMean = bestFlux[bestRowT0:bestRowT0+durationPointsNum].mean()
 
     # Transit Depth
@@ -330,8 +344,8 @@ def search_multi_periods(
 
     dataOutTransit = np.concatenate((bestFlux[0:bestRowT0],bestFlux[bestRowT0+durationPointsNum:]))
 
-    if bestRowT0 > len(t) - 1:
-        bestRowT0 = bestRowT0 - len(t) 
+    if bestRowT0 > tSize - 1:
+        bestRowT0 = bestRowT0 - tSize 
 
     snrFit = (1 - transitDepth)*(durationPointsNum ** 0.5)/np.std(dataOutTransit)
     DataCumsum = np.cumsum(dataOutTransit)

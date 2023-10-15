@@ -7,6 +7,7 @@ from gputls import gtls
 from tqdm import tqdm
 import time
 
+# days = 140
 days = 100
 print('days',days)
 np.random.seed(0)

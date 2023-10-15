@@ -151,15 +151,11 @@ extern "C"{
     
     __global__ void calcAllOutOfTransitResiduals_step1_2GPU(float *temp_ootr,
     float *in_patched_data, int *in_duration,int *duration_size,
-    float *in_inverse_squared_patched_dy, int *patched_data_size,int *resultArrayXAxisSize)//,
-    // int *iter_flag_gpu,int *single_calc_periods_arr_gpu,int *period_size_gpu)
+    float *in_inverse_squared_patched_dy, int *patched_data_size,int *resultArrayXAxisSize)
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is point index
         int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;  //z is period index
-
-        // if(z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu) < (*period_size_gpu)){
-        //     int z_input = (z + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu));
 
         float *patched_data = in_patched_data + z*(*patched_data_size);
         float *inverse_squared_patched = in_inverse_squared_patched_dy + z*(*patched_data_size);
@@ -189,7 +185,6 @@ extern "C"{
         int tid = blockIdx.y * blockDim.y + threadIdx.y;    //tid is duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is period index
 
-        // int mean_size = in_mean_size[tid];
         int duration = in_duration[tid];
 
         float *fullsum = in_fullsum + z*(*duration_size);
@@ -382,12 +377,20 @@ extern "C"{
         int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
         int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is the period
 
+
+        int durationIndex = y;
+        int duration = in_duration[durationIndex];
+        // int mean_size = *in_patched_datas_size - duration + 1;
+
         if(tid >= *resultArrayXAxisSize){
             return;
         }
 
-        int durationIndex = y;
-        int duration = in_duration[durationIndex];
+        // if(tid >= mean_size){
+        //     return;
+        // }
+
+
         int durationMax = durationsMax[y];
         int durationMin = durationsMin[y];
 
@@ -397,13 +400,12 @@ extern "C"{
         float transit_depth_min = *in_transit_depth_min;
         int datapoints = *in_datapoints;
 
-        int mean_size = *in_patched_datas_size - duration + 1;
-
         if(duration >= durationMin && duration <= durationMax ){
             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
             float overshoot = in_overshoot[durationIndex];
 
-            if(tid < mean_size && calc_mean > transit_depth_min && tid % skipPoint == 0){
+            // if(tid < mean_size && calc_mean > transit_depth_min && tid % skipPoint == 0){
+            if(calc_mean > transit_depth_min && tid % skipPoint == 0){
             // if(tid < mean_size && calc_mean > transit_depth_min){
                 float ootr = 0;
                 if(tid == 0){
