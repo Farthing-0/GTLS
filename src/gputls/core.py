@@ -174,7 +174,7 @@ def search_multi_periods(
         #     for i in range(singleCalcPeriods):
         #         sortIndexGPU[i] = phasesGPU[i].argsort()
 
-        patchedDatasGPU = cp.zeros((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
+        patchedDatasGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
         patchedDysGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
         yGPU = cp.asarray(y).astype(cp.float32)
         dyGPU = cp.asarray(dy).astype(cp.float32)
@@ -214,8 +214,7 @@ def search_multi_periods(
         
         # resultArrayXAxisSizeGPU is the maximum size of the result of a function possible use to restore the result of a patched light curve
         # resultArrayXAxisSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
-        resultArrayXAxisSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
-
+        # resultArrayXAxisSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
 
         # ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
         ootrGPU = cp.empty((singleCalcPeriods,len(durations),(tSize)),dtype=cp.float32)
@@ -252,18 +251,20 @@ def search_multi_periods(
         periodSizeGPU,))
 
         calcAllOutOfTransitResiduals_step1_2GPU = module.get_function('calcAllOutOfTransitResiduals_step1_2GPU')
-        blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllOutOfTransitResiduals_step1_2GPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,patchedDatasGPU,durationsGPU,durationsSizeGPU,
-        inverseSquaredPatchedDysGPU,patchedDatasSizeGPU,resultArrayXAxisSizeGPU,))
+        inverseSquaredPatchedDysGPU,patchedDatasSizeGPU,tSizeGPU,))
 
         ootrGPU = np.cumsum(ootrGPU,axis=-1)
         calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
-        blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(durations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,
         durationsSizeGPU,patchedDatasSizeGPU,
-        durationsGPU,resultArrayXAxisSizeGPU,fullSumGPU,))
+        durationsGPU,tSizeGPU,fullSumGPU,))
 
         # calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUA')
         # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
@@ -278,10 +279,11 @@ def search_multi_periods(
         # ))
 
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
-        blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
+        blockSize,gridSizeX = calcGridBlockSize(tSize)
         # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,len(durations)),
         calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
-        (blockSize,1,1),(lowestResidualsGPU,resultArrayXAxisSizeGPU,
+        (blockSize,1,1),(lowestResidualsGPU,tSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,
         durationsGPU,durationsSizeGPU,
         lcArrFullLengthGPU,
@@ -294,9 +296,6 @@ def search_multi_periods(
         for i in range(singleCalcPeriods):
             if(iterFlag*singleCalcPeriods + i < len(periods)):
                 locationGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].argmin()
-                # print(lowestResidualsGPU[i].argmin())
-                # print(lowestResidualsGPU)
-                # exit()
                 LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
 
         iterFlagGPU = iterFlagGPU + 1

@@ -187,15 +187,19 @@ extern "C"{
 
         int duration = in_duration[tid];
 
+        if (i >= (*resultArrayXAxisSize)){
+            return;
+        }
+
         float *fullsum = in_fullsum + z*(*duration_size);
         float *ootr = in_ootr + z*(*resultArrayXAxisSize)*(*duration_size);
         float start = fullsum[tid];
-        if(i < (*patched_data_size) - duration + 1){
-            ootr[i+tid*(*resultArrayXAxisSize)] = start + ootr[i+tid*(*resultArrayXAxisSize)];
-        }
-        else if (i<*resultArrayXAxisSize){
-            ootr[i+tid*(*resultArrayXAxisSize)] = 0;
-        }
+        // if(i < (*patched_data_size) - duration + 1){
+        ootr[i+tid*(*resultArrayXAxisSize)] = start + ootr[i+tid*(*resultArrayXAxisSize)];
+        // }
+        // else if (i<*resultArrayXAxisSize){
+        //     ootr[i+tid*(*resultArrayXAxisSize)] = 0;
+        // }
     }
 
     __device__ float calcAverageFromCumsum(float *inPatchedDataCumsum,
@@ -377,19 +381,12 @@ extern "C"{
         int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
         int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is the period
 
-
         int durationIndex = y;
         int duration = in_duration[durationIndex];
-        // int mean_size = *in_patched_datas_size - duration + 1;
 
         if(tid >= *resultArrayXAxisSize){
             return;
         }
-
-        // if(tid >= mean_size){
-        //     return;
-        // }
-
 
         int durationMax = durationsMax[y];
         int durationMin = durationsMin[y];
@@ -404,9 +401,7 @@ extern "C"{
             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
             float overshoot = in_overshoot[durationIndex];
 
-            // if(tid < mean_size && calc_mean > transit_depth_min && tid % skipPoint == 0){
             if(calc_mean > transit_depth_min && tid % skipPoint == 0){
-            // if(tid < mean_size && calc_mean > transit_depth_min){
                 float ootr = 0;
                 if(tid == 0){
                     ootr = in_fullsum[periodIndex*(*in_duration_size) + durationIndex];
