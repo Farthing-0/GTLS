@@ -155,24 +155,20 @@ extern "C"{
         int y = blockIdx.y * blockDim.y + threadIdx.y;  //y is duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;  //z is period index
 
+        if(tid >= *resultArrayXAxisSize){
+            return;
+        }
+
         float *patched_data = in_patched_data + z*(*patched_data_size);
         float *inverse_squared_patched = in_inverse_squared_patched_dy + z*(*patched_data_size);
         int window = in_duration[y];
         
-        if(tid < *resultArrayXAxisSize){
-            if(tid < *patched_data_size - window){
-                int becomes_visible = tid;
-                int becomes_invisible = tid + window;
-                float add_visible_left = (1 - patched_data[becomes_visible]) * (1 - patched_data[becomes_visible]) * inverse_squared_patched[becomes_visible];
-                float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
-                float weight = add_visible_left - remove_invisible_right;
-                temp_ootr[tid + y*(*resultArrayXAxisSize)+z*(*resultArrayXAxisSize)*(*duration_size)] = weight;
-            }
-            else{
-                temp_ootr[tid + y*(*resultArrayXAxisSize)+z*(*resultArrayXAxisSize)*(*duration_size)] = 0;
-            }
-        }
-        // }
+        int becomes_visible = tid;
+        int becomes_invisible = tid + window;
+        float add_visible_left = (1 - patched_data[becomes_visible]) * (1 - patched_data[becomes_visible]) * inverse_squared_patched[becomes_visible];
+        float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
+        float weight = add_visible_left - remove_invisible_right;
+        temp_ootr[tid + y*(*resultArrayXAxisSize)+z*(*resultArrayXAxisSize)*(*duration_size)] = weight;
     }
 
     __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr,
