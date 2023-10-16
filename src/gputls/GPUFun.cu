@@ -37,7 +37,8 @@ extern "C"{
         const double SECONDS_PER_DAY = 86400;
         const double R_sun = 695508000;// radius of the Sun [m]
         const double R_jup = 69911000;// radius of Jupiter [m]
-        const double FRACTIONAL_TRANSIT_DURATION_MAX = 0.12;
+        // const double FRACTIONAL_TRANSIT_DURATION_MAX = 0.12;
+        const double FRACTIONAL_TRANSIT_DURATION_MAX = 0.15;
 
         const double RsMin = R_sun * R_STAR_MIN;
         const double RsMax = R_sun * R_STAR_MAX;
