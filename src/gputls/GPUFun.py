@@ -12,8 +12,30 @@ extern "C"{
     }
 
     __global__ void durationsGrid(const double* periods,int* durationsMax,int* durationsMin,const float* tLength,const int* tSize,const int* periodSize){
-        const double R_STAR_MIN = 0.13;
-        const double R_STAR_MAX = 3.5;
+
+        //new boundary
+        // M_STAR_MIN = 0.05
+        // M_STAR_MAX = 1
+        // R_STAR_MIN = 0.05
+        // R_STAR_MAX = 4
+
+        // old boundary
+        // # M_STAR_MIN = 0.1
+        // # M_STAR_MAX = 1.0
+        // # R_STAR_MIN = 0.13
+        // # R_STAR_MAX = 3.5
+
+        // const double R_STAR_MIN = 0.13;
+        // const double R_STAR_MAX = 3.5;
+        const double R_STAR_MIN = 0.05;
+        const double R_STAR_MAX = 4;
+
+        // const double piGMMax = 416970932280661395000; //pi * 6.673e-11 * 1.989 * 10 ** 30 (pi*G*M)
+        // const double piGMMin = 41697093228066139500;  //pi * 6.673e-11 * 1.989 * 10 ** 30 * 0.1 (pi*G*M)
+        const double piGMMax = 416970;
+        // const double piGMMin = 41697;
+        const double piGMMin = 20848; //adpated from piGMMin = 41697 * 0.5, new boundary
+
         const double SECONDS_PER_DAY = 86400;
         const double R_sun = 695508000;// radius of the Sun [m]
         const double R_jup = 69911000;// radius of Jupiter [m]
@@ -21,10 +43,6 @@ extern "C"{
 
         const double RsMin = R_sun * R_STAR_MIN;
         const double RsMax = R_sun * R_STAR_MAX;
-        // const double piGMMax = 416970932280661395000; //pi * 6.673e-11 * 1.989 * 10 ** 30 (pi*G*M)
-        // const double piGMMin = 41697093228066139500;  //pi * 6.673e-11 * 1.989 * 10 ** 30 * 0.1 (pi*G*M)
-        const double piGMMax = 416970;
-        const double piGMMin = 41697;
 
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
         
@@ -167,6 +185,7 @@ extern "C"{
         
         int becomes_visible = tid;
         int becomes_invisible = tid + window;
+                
         float add_visible_left = (1 - patched_data[becomes_visible]) * (1 - patched_data[becomes_visible]) * inverse_squared_patched[becomes_visible];
         float remove_invisible_right = (1 - patched_data[becomes_invisible]) * (1 - patched_data[becomes_invisible]) * inverse_squared_patched[becomes_invisible];
         float weight = add_visible_left - remove_invisible_right;
@@ -398,6 +417,7 @@ extern "C"{
             float overshoot = in_overshoot[durationIndex];
 
             if(calc_mean > transit_depth_min && tid % skipPoint == 0){
+            // if(calc_mean > transit_depth_min){
                 float ootr = 0;
                 if(tid == 0){
                     ootr = in_fullsum[periodIndex*(*in_duration_size) + durationIndex];

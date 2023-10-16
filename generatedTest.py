@@ -7,10 +7,11 @@ from gputls import gtls
 from tqdm import tqdm
 import time
 
-days = 200
+days = 300
+# days = 200
 # days = 100
 print('days',days)
-np.random.seed(0)
+np.random.seed(2)
 period = np.random.uniform(1, 20)
 depth = np.random.uniform(2e-5,0.03)
 duration = np.random.uniform(0.01, 0.5)
