@@ -62,7 +62,7 @@ def search_multi_periods(
     # if not useLocalPTXCUBIN:
     GPUCode = GPUFun.getGPUCode()
     print(T0_fit_margin,int(1/T0_fit_margin))
-    GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + str(int(1/T0_fit_margin)))
+    GPUCode = GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + str(int(1/T0_fit_margin)))
     # module = cp.RawModule(code=GPUCode,options=options)
     module = cp.RawModule(code=GPUCode)
     module.compile()

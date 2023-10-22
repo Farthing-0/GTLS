@@ -56,7 +56,8 @@ flux = synthetic_signal + noise
 start = time.time()
 model = gtls(t = times, y = flux)
 # gtlsResult = model.power(GPUDeviceID = 1)
-gtlsResult = model.power()
+# gtlsResult = model.power()
+gtlsResult = model.power(T0_fit_margin = 0.01)
 gtlsTime = time.time() - start
 
 print("TrueResult")
