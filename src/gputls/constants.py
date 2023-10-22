@@ -118,7 +118,9 @@ SDE_MEDIAN_KERNEL_SIZE = 30
 # Useful in large datasets. 100k points: Extra runtime of order 2 minutes
 # While individual transits often are only a few cadences long, in the stacked
 # phase space it is (N transits * transit duration) [cadences] long
-T0_FIT_MARGIN = 0.01  # of transit duration e.g., 0.01 (=1%)
+# T0_FIT_MARGIN = 0.01  # of transit duration e.g., 0.01 (=1%)
+# T0_FIT_MARGIN = 8
+T0_FIT_MARGIN = 0.125
 
 # The secondary fit for T0 can take negligible or significant time, depending on the
 # number of data points and on T0_FIT_MARGIN. Set an empirical threshold to avoid

@@ -1,6 +1,7 @@
 def getGPUCode():
     GPUCode = """
 extern "C"{
+    #define SKIP_POINT 8
 
     __global__ void foldFast(const double* time,const double* periods, double* phase,int* periodSize,int* timeSize) {
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -39,7 +40,8 @@ extern "C"{
         const double SECONDS_PER_DAY = 86400;
         const double R_sun = 695508000;// radius of the Sun [m]
         const double R_jup = 69911000;// radius of Jupiter [m]
-        const double FRACTIONAL_TRANSIT_DURATION_MAX = 0.12;
+        // const double FRACTIONAL_TRANSIT_DURATION_MAX = 0.12;
+        const double FRACTIONAL_TRANSIT_DURATION_MAX = 0.15;
 
         const double RsMin = R_sun * R_STAR_MIN;
         const double RsMax = R_sun * R_STAR_MAX;
@@ -390,6 +392,7 @@ extern "C"{
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
     int *durationsMax,int *durationsMin, float *in_transit_depth_min
+    // ,int T0Margin
     )
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
@@ -406,7 +409,21 @@ extern "C"{
         int durationMax = durationsMax[y];
         int durationMin = durationsMin[y];
 
-        int skipPoint = (duration > 100) ? 100 : 1;
+        // int skipPoint = (duration > 100) ? 100 : 1;
+        int skipPoint;
+        // if (duration > 100) {
+        // if (duration > 8) {
+        //     skipPoint = duration / 8;
+        //     // skipPoint = duration / 100;
+        // }
+        if (duration > SKIP_POINT) {
+            skipPoint = duration / SKIP_POINT;
+            // skipPoint = duration / 100;
+        }
+
+        else{
+            skipPoint = 1;
+        }
 
         int periodIndex = z;
         float transit_depth_min = *in_transit_depth_min;
@@ -462,6 +479,77 @@ extern "C"{
         else{
             //0x7f800000 => infinity in float, according to IEEE-754
             out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
+        }
+    }
+
+
+    __global__ void calcAllLowestResidualsGPUBNoSkip(
+    float *out,
+    int *resultArrayXAxisSize,
+    float *in_patched_datas,
+    int *in_patched_datas_size,int *in_duration,int *in_duration_size,
+    float *in_signal,int *in_max_signal_x_size,
+    float *in_inverse_squared_patched_dys,
+    float *in_overshoot, float *in_ootr,float *in_fullsum,
+    float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
+    int *durationsMax,int *durationsMin, float *in_transit_depth_min
+    )
+    {
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
+        int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
+
+        int durationIndex = y;
+        int duration = in_duration[durationIndex];
+
+        if(tid >= *resultArrayXAxisSize){
+            return;
+        }
+
+        int durationMax = durationsMax[y];
+        int durationMin = durationsMin[y];
+
+        float transit_depth_min = *in_transit_depth_min;
+        int datapoints = *in_datapoints;
+
+        float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,0);
+        float overshoot = in_overshoot[durationIndex];
+
+        if(calc_mean > transit_depth_min){
+            float ootr = 0;
+            if(tid == 0){
+                ootr = in_fullsum[durationIndex];
+            }
+            else{
+                ootr = *(in_ootr+durationIndex*(*resultArrayXAxisSize) + tid - 1);                    
+            }
+
+            float *data = in_patched_datas + tid;
+            float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
+            // float signal = 0.1;
+
+            float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys;
+            float summed_edge_effect_correction = in_summed_edge_effect_correction[0];
+
+            float *dy = inverse_squared_patched_dy_arr + tid;
+            float reverse_scale = calc_mean * overshoot * 2;  // "*2" means SIGNAL_DEPTH is 0.5,as "/SIGNAL_DEPTH"
+
+            // float reverse_duration = 1.0 / duration;
+
+            float sigi = 0;
+            float intransit_residual = 0;
+            float loss = 0;
+
+            for (int i = 0; i < duration; i++) {
+                sigi = (signal[i]) * reverse_scale;
+                loss = (data[i] - (1 - sigi));
+                intransit_residual = intransit_residual + loss * loss * dy[i];
+            }
+            float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+            out[tid+durationIndex*(*resultArrayXAxisSize)] = current_stat;
+        }
+        else
+        {
+            out[tid+durationIndex*(*resultArrayXAxisSize)] = datapoints;
         }
     }
 

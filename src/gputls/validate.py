@@ -195,6 +195,6 @@ def validate_args(self, kwargs):
     # Assert 0 < T0_fit_margin < 0.1
     if self.T0_fit_margin < 0:
         self.T0_fit_margin = 0
-    elif self.T0_fit_margin > 0.1:  # Sensible limit 10% of transit duration
-        self.T0_fit_margin = 0.1
+    elif self.T0_fit_margin > 0.125:  # Sensible limit 10% of transit duration
+        self.T0_fit_margin = 0.125
     return self, kwargs
