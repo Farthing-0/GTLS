@@ -132,6 +132,8 @@ PROGRESSBAR_THRESHOLD = 5000
 # Then: Warn and return the default grid
 MINIMUM_PERIOD_GRID_SIZE = 100
 
+BAR_LOCATION = 0
+
 # Warn the user if unknown **kwargs are given as parameters
 VALID_PARAMETERS = [
     "R_star",
@@ -163,5 +165,6 @@ VALID_PARAMETERS = [
     "use_threads",
     "show_progress_bar",
     "transit_template",
-    "verbose"
+    "verbose",
+    "bar_location"
 ]

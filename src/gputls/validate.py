@@ -57,6 +57,8 @@ def validate_args(self, kwargs):
     self.legacy = kwargs.get("legacy", constants.LEGACY)
     self.fast = kwargs.get("fast", constants.FAST)
 
+    self.bar_location = kwargs.get("bar_location", constants.BAR_LOCATION)
+
     # Warn user if unknown parameters
     for key, value in kwargs.items():
         if key not in constants.VALID_PARAMETERS:

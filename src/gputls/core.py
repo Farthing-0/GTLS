@@ -49,6 +49,7 @@ def search_multi_periods(
     legacy = False,
     # SimplifyEdgeEffect if dy is nearly uniform, we can simplify the edge effect correction
     SimplifyEdgeEffect = True,
+    bar_location = 0
 ):
     
     # Choose the GPU device
@@ -61,7 +62,6 @@ def search_multi_periods(
     # options = ('-rdc=true',)
     # if not useLocalPTXCUBIN:
     GPUCode = GPUFun.getGPUCode()
-    print(T0_fit_margin,int(1/T0_fit_margin))
     GPUCode = GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + str(int(1/T0_fit_margin)))
     # module = cp.RawModule(code=GPUCode,options=options)
     module = cp.RawModule(code=GPUCode)
@@ -106,7 +106,7 @@ def search_multi_periods(
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
-    pbar = tqdm.tqdm(total=TotalIter)
+    pbar = tqdm.tqdm(total=TotalIter,position=bar_location)
 
     #Initialize the variables
     periodsGPU = cp.empty((singleCalcPeriods,),dtype=cp.float64)

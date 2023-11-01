@@ -92,7 +92,8 @@ class gtls(object):
                 verbose=self.verbose,
                 useLocalPTXCUBIN=self.useLocalPTXCUBIN,
                 GPUDeviceID=self.GPUDeviceID,
-                legacy=self.legacy
+                legacy=self.legacy,
+                bar_location=self.bar_location
             )
         else:
             periods,power = core.search_multi_periods(
@@ -112,7 +113,8 @@ class gtls(object):
                 useLocalPTXCUBIN=self.useLocalPTXCUBIN,
                 GPUDeviceID=self.GPUDeviceID,
                 legacy=self.legacy,
-                fast=True
+                fast=True,
+                bar_location=self.bar_location
             )
             return periods,power
         self.rawDurations = durations

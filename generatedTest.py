@@ -57,7 +57,7 @@ start = time.time()
 model = gtls(t = times, y = flux)
 # gtlsResult = model.power(GPUDeviceID = 1)
 # gtlsResult = model.power()
-gtlsResult = model.power(T0_fit_margin = 0.01)
+gtlsResult = model.power(T0_fit_margin = 0.01,bar_location = 0)
 gtlsTime = time.time() - start
 
 print("TrueResult")
