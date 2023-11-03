@@ -314,8 +314,11 @@ def search_multi_periods(
     refindT0 = True
     if refindT0:
         pass
-
-    bestRow = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0].item()
+    
+    find = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0]
+    if len(find) > 1:
+        find = find[0]
+    bestRow = find.item()
     rawDuration = lc_cache_overview['duration'][bestRow]
 
     bestTime,bestFlux,bestFluxDy = foldCPU(t,y,dy,period)
@@ -603,7 +606,10 @@ def search_single_periods(
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)    
     durationPointsNum = durations[durationIndex]
 
-    bestRow = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0].item()
+    find = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0]
+    if len(find) > 1:
+        find = find[0]
+    bestRow = find.item()
     rawDuration = lc_cache_overview['duration'][bestRow]
 
     bestTime,bestFlux,bestFluxDy = foldCPU(t,y,dy,period)
