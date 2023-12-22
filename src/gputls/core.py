@@ -56,25 +56,11 @@ def search_multi_periods(
     set_cuda_device(GPUDeviceID)
 
     # singleCalcPeriods = 130
-
-    # with open ('GPUFun.cu', 'r') as myfile:
-    #     myCode=myfile.read()
-    # options = ('-rdc=true',)
-    # if not useLocalPTXCUBIN:
     GPUCode = GPUFun.getGPUCode()
     GPUCode = GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + str(int(1/T0_fit_margin)))
     # module = cp.RawModule(code=GPUCode,options=options)
     module = cp.RawModule(code=GPUCode)
     module.compile()
-    # else :
-    #     import os.path
-    #     # options = {}
-    #     # options['rdc'] = 'True'
-
-    #     if os.path.isfile('./GTLS.ptx'):
-    #         module = cp.RawModule(path='./GTLS.ptx',options=options)
-    #     else:
-    #         module = cp.RawModule(path='./GTLS.cubin',options=options)
 
     durations = numpy.unique(lc_cache_overview["width_in_samples"])
     maxDuration = int(max(durations))
@@ -95,14 +81,12 @@ def search_multi_periods(
     singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
 
     singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
-    # print(singleCalcPeriods)
-    # print('size: ',len(durations)*patchedDatasSize*singleCalcPeriods / 1024 /1024)
-    # exit()
 
     if singleCalcPeriods < 15:
         singleCalcPeriods = int(singleCalcPeriods / 1.1)
         # singleCalcPeriods = singleCalcPeriods - 1
     # # exit()
+
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
@@ -174,7 +158,7 @@ def search_multi_periods(
 
         lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
         lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
-        lcArrFullLengthSizeGPU = cp.asarray(np.array([len(lc_arr_full_length)])).astype(cp.int32)
+        # lcArrFullLengthSizeGPU = cp.asarray(np.array([len(lc_arr_full_length)])).astype(cp.int32)
 
         #Other GPU variables, declare here to save time.
         
@@ -192,10 +176,6 @@ def search_multi_periods(
 
         overshootGPU = cp.array(lc_cache_overview["overshoot"]).astype(cp.float32)
         datapointsGPU = cp.array([len(y)]).astype(cp.int32)
-
-        ## depth variable is not needed anymore because we trapezoid fit the transit to get the depth
-        ## This method is much more faster and accurate than producing a depth from the transit model
-        # depthsEachPeriodGPU = cp.empty((singleCalcPeriods),dtype=cp.float32)
         transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
 
         #GPU variables for the loop
@@ -498,7 +478,7 @@ def search_single_periods(
 
     lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
     lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
-    lcArrFullLengthSizeGPU = cp.asarray(np.array([len(lc_arr_full_length)])).astype(cp.int32)
+    # lcArrFullLengthSizeGPU = cp.asarray(np.array([len(lc_arr_full_length)])).astype(cp.int32)
 
     #Other GPU variables, declare here to save time.
     

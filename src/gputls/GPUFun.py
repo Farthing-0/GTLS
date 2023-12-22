@@ -392,7 +392,6 @@ extern "C"{
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
     int *durationsMax,int *durationsMin, float *in_transit_depth_min
-    // ,int T0Margin
     )
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
@@ -409,18 +408,10 @@ extern "C"{
         int durationMax = durationsMax[y];
         int durationMin = durationsMin[y];
 
-        // int skipPoint = (duration > 100) ? 100 : 1;
         int skipPoint;
-        // if (duration > 100) {
-        // if (duration > 8) {
-        //     skipPoint = duration / 8;
-        //     // skipPoint = duration / 100;
-        // }
         if (duration > SKIP_POINT) {
             skipPoint = duration / SKIP_POINT;
-            // skipPoint = duration / 100;
         }
-
         else{
             skipPoint = 1;
         }
@@ -432,6 +423,9 @@ extern "C"{
         if(duration >= durationMin && duration <= durationMax ){
             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
             float overshoot = in_overshoot[durationIndex];
+
+            // // binning the data
+            // float data_bin = inPatchedDataCumsum[periodIndex*(*in_patched_datas_size) + duration - 1]
 
             if(calc_mean > transit_depth_min && tid % skipPoint == 0){
             // if(calc_mean > transit_depth_min){
