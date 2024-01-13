@@ -55,10 +55,11 @@ def search_multi_periods(
     # Choose the GPU device
     set_cuda_device(GPUDeviceID)
 
-    # singleCalcPeriods = 130
     GPUCode = GPUFun.getGPUCode()
-    GPUCode = GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + str(int(1/T0_fit_margin)))
-    # module = cp.RawModule(code=GPUCode,options=options)
+    if T0_fit_margin == 0:
+        GPUCode = GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + '0x7f800000')
+    else:
+        GPUCode = GPUCode.replace('#define SKIP_POINT 8','#define SKIP_POINT ' + str(int(1/T0_fit_margin)))
     module = cp.RawModule(code=GPUCode)
     module.compile()
 

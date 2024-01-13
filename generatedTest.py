@@ -13,15 +13,16 @@ GTLSTestFlag = False
 # TLSTestFlag = True
 GTLSTestFlag = True
 
+# T0_fit_margin = 0.01
 T0_fit_margin = 0.01
 
-days = 1000
-period = np.random.uniform(1, 300)
+days = 28
+period = np.random.uniform(1, days/2)
 depth = np.random.uniform(2e-4,0.03)
 duration = np.random.uniform(0.01, 0.5)
 time_start = 1
 T0 = np.random.uniform(time_start, period+time_start)
-ppm = 300
+ppm = 500
 
 semiMajorAxis = period / (np.pi * duration)
 
