@@ -14,7 +14,7 @@ GTLSTestFlag = False
 GTLSTestFlag = True
 
 # T0_fit_margin = 0.01
-T0_fit_margin = 0.01
+T0_fit_margin = 0
 
 days = 28
 period = np.random.uniform(1, days/2)
