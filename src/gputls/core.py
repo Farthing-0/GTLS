@@ -91,7 +91,8 @@ def search_multi_periods(
     #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
-    pbar = tqdm.tqdm(total=TotalIter,position=bar_location)
+    if verbose:
+        pbar = tqdm.tqdm(total=TotalIter,position=bar_location)
 
     #Initialize the variables
     periodsGPU = cp.empty((singleCalcPeriods,),dtype=cp.float64)

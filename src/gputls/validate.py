@@ -48,8 +48,6 @@ def validate_inputs(t, y, dy):
 
 def validate_args(self, kwargs):
 
-    self.verbose = kwargs.get("verbose", constants.VERBOSE)
-
     self.useLocalPTXCUBIN = kwargs.get("useLocalPTXCUBIN", constants.USE_LOCAL_PTXCUBIN)
 
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
