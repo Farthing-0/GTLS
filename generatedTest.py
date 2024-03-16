@@ -16,7 +16,7 @@ GTLSTestFlag = True
 # T0_fit_margin = 0.01
 T0_fit_margin = 0
 
-days = 28
+days = 2900
 period = np.random.uniform(1, days/2)
 depth = np.random.uniform(2e-4,0.03)
 duration = np.random.uniform(0.01, 0.5)
