@@ -85,10 +85,8 @@ def search_multi_periods(
 
     if singleCalcPeriods < 15:
         singleCalcPeriods = int(singleCalcPeriods / 1.1)
-        # singleCalcPeriods = singleCalcPeriods - 1
-    # # exit()
 
-    #From now on, due to GPU memory size limitation, GPU can only do several periods(about 100-1000) at a time.
+    #Due to GPU memory size limitation, GPU can only do several periods at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
     if verbose:
@@ -101,15 +99,8 @@ def search_multi_periods(
     locationGPU = cp.empty(len(periods),dtype=cp.int32)
     LowestResidualsEachPeriodGPU = cp.empty(len(periods),dtype=cp.float32)
 
-    # iterFlagGPU = cp.asarray(np.array([0])).astype(cp.int32)
     iterFlagGPU = cp.int32(0)
 
-    # phasesGPU = cp.empty((len(periods),tSize),dtype=cp.float64)
-    # sortIndexGPU = cp.empty((len(periods),tSize),dtype=cp.int32)
-    # tGPU = cp.asarray(t).astype(cp.float64)
-
-
-    # For GPU memory limitaion, we can only calculate about
     for iterFlag in range(TotalIter):
 
         # lowestResidualsGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
@@ -203,8 +194,6 @@ def search_multi_periods(
         calcInverseSquaredPatchedDyGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
         (inverseSquaredPatchedDysGPU,patchedDysGPU,patchedDatasSizeGPU,))
 
-        # if SimplifyEdgeEffect == False:
-        #calculate edge_effect_correction
         calcEdgeEffectCorrectionsGPU = module.get_function('calcEdgeEffectCorrections')
         blockSize,gridSizeX = calcGridBlockSize(singleCalcPeriods)
         calcEdgeEffectCorrectionsGPU((gridSizeX,1,1),(blockSize,1,1),
@@ -238,18 +227,6 @@ def search_multi_periods(
         (blockSize,1,1),(ootrGPU,
         durationsSizeGPU,patchedDatasSizeGPU,
         durationsGPU,tSizeGPU,fullSumGPU,))
-
-        # calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUA')
-        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
-        # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
-        # (blockSize,1,1),(lowestResidualsGPU,resultArrayXAxisSizeGPU,
-        # patchedDatasGPU,patchedDatasSizeGPU,
-        # durationsGPU,durationsSizeGPU,
-        # lcArrFullLengthGPU,
-        # lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
-        # overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,
-        # durationsMaxGPU,durationsMinGPU,transitDepthMinGPU
-        # ))
 
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
         # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)

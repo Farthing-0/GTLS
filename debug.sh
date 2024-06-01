@@ -8,7 +8,8 @@ python3 -m build
 # python3 -m pip install dist/gputls-0.3.1-py3-none-any.whl --break-system-packages
 python3 -m pip install dist/gputls-0.3.1-py3-none-any.whl
 # python3 test1.py
-python3 generatedTest.py
+# python3 generatedTest.py
+python3 KeplerLongCurveSingleTest.py
 
 # bakup commands
 # rm GTLS.ptx GTLS.cubin
