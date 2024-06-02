@@ -436,7 +436,7 @@ extern "C"{
         float transit_depth_min = *in_transit_depth_min;
         int datapoints = *in_datapoints;
 
-        if(duration >= durationMin && duration <= durationMax ){
+        // if(duration >= durationMin && duration <= durationMax ){
             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
             float overshoot = in_overshoot[durationIndex];
 
@@ -476,11 +476,11 @@ extern "C"{
             {
                 out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = datapoints;
             }
-        }
-        else{
-            //0x7f800000 => infinity in float, according to IEEE-754
-            out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
-        }
+        // }
+        // else{
+        //     //0x7f800000 => infinity in float, according to IEEE-754
+        //     out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
+        // }
     }
 
 

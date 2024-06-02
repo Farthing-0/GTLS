@@ -16,28 +16,24 @@ data = pd.read_csv('allKoi2lcResult_update.csv')
 # rank by pointsLength
 data = data.sort_values(by='pointsLength', ascending=False)
 
-# # load light curve 10666592.0
-# line = data.head(1)
-# print(line)
-
 from tqdm import tqdm
-# for index,line in tqdm(data.iterrows(), total=data.shape[0]):
 for index,line in data.iterrows():
     # iter over all columns
     dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
+
+    if 11446443 != int(line["kepid"]):
+        continue
+
     for name in line.index:
         if "public" in name and "long" in name:
             if type(line[name]) == str:
                 files.append(dir + '/' + name + '/' + line[name])
-
     AllTimes = []
     AllFluxes = []
     AllDys = []
     for file in (files):
         with fits.open(file) as hdul:
-            # print(hdul.info())
-            # print(hdul[1].columns)
             times = hdul[1].data['TIME']
             fluxes = hdul[1].data['PDCSAP_FLUX']
             dys = hdul[1].data['PDCSAP_FLUX_ERR']
@@ -55,27 +51,18 @@ for index,line in data.iterrows():
     AllFluxes = np.array(AllFluxes)[AllIndex]
     AllDys = np.array(AllDys)[AllIndex]
 
-    # lkFlux = lk.LightCurve(time=AllTimes, flux=AllFluxes, flux_err=AllDys)
-    # lkFluxBin = lkFlux.bin(binsize=3)
-    # AllTimes = lkFluxBin.time.value
-    # AllFluxes = lkFluxBin.flux.value
-    # AllDys = lkFluxBin.flux_err.value
-
-    T0_fit_margin = 0.1
+    # T0_fit_margin = 0.1
     TLSTestFlag = False
     # TLSTestFlag = True
     GTLSTestFlag = True
     if TLSTestFlag:
-        model = transitleastsquares(AllTimes, AllFluxes)
+        model = transitleastsquares(AllTimes, AllFluxes, AllDys)
         results = model.power(T0_fit_margin = T0_fit_margin)
 
     if GTLSTestFlag:
-        GTLSmodel = gtls(t = AllTimes, y = AllFluxes)
-        # gtlsResult = GTLSmodel.power(T0_fit_margin = T0_fit_margin,bar_location = 0,GPUDeviceID = 0,bin_size = 10)
-        # gtlsResult = GTLSmodel.power(T0_fit_margin = T0_fit_margin,bar_location = 0,GPUDeviceID = 1)
+        GTLSmodel = gtls(t = AllTimes, y = AllFluxes, dy = AllDys)
         gtlsResult = GTLSmodel.power(bar_location = 0,GPUDeviceID = 1)
         print(gtlsResult.period,gtlsResult.T0,gtlsResult.duration,gtlsResult.depth,gtlsResult.snr,gtlsResult.SDE)
-
     break
 
     # saveFileData.loc[len(saveFileData)] = [line['kepid'],gtlsResult.period,gtlsResult.T0,gtlsResult.duration,gtlsResult.depth,gtlsResult.snr,gtlsResult.SDE]
