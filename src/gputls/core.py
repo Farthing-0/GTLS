@@ -135,9 +135,9 @@ def search_multi_periods(
             # durationsGridGPU = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
             durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
 
-        # print('durationGridGPU',durationsGridCollectionGPU[iterFlag])
-        singleDurations = durations[durationsGridCollectionGPU[iterFlag].get()]
-        print('singleDurations',len(singleDurations))
+        durationsGrid = durations[durationsGridCollectionGPU[iterFlag].get()
+        singleDurations = durations[durationsGrid]
+        lc_arr = lc_arr[durationsGrid]
 
         periodsGPU = cp.asarray(SinglePeriods).astype(cp.float64)
         durationsMaxGPU = cp.asarray(SinglePeriods).astype(cp.int32)
@@ -197,7 +197,8 @@ def search_multi_periods(
         # resultArrayXAxisSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
 
         # ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-        ootrGPU = cp.empty((singleCalcPeriods,len(durations),(tSize)),dtype=cp.float32)
+
+        ootrGPU = cp.empty((singleCalcPeriods,len(singleDurations),(tSize)),dtype=cp.float32)
 
         #calculate patched data
         patchDataGPU = module.get_function('patchData')
@@ -222,34 +223,30 @@ def search_multi_periods(
             cumsumGPU[i] = cp.cumsum(patchedDatasGPU[i])
 
         calcAllFullSumGPU = module.get_function('calcAllFullSum')
-        blockSize,gridSizeX = calcGridBlockSize(len(durations))
+        blockSize,gridSizeX = calcGridBlockSize(len(singleDurations))
         calcAllFullSumGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
         (fullSumGPU,patchedDatasGPU,inverseSquaredPatchedDysGPU,
         patchedDatasSizeGPU,durationsGPU,durationsSizeGPU,
         periodSizeGPU,))
 
         calcAllOutOfTransitResiduals_step1_2GPU = module.get_function('calcAllOutOfTransitResiduals_step1_2GPU')
-        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         blockSize,gridSizeX = calcGridBlockSize(tSize)
-        calcAllOutOfTransitResiduals_step1_2GPU((gridSizeX,len(durations),singleCalcPeriods),
+        calcAllOutOfTransitResiduals_step1_2GPU((gridSizeX,len(singleDurations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,patchedDatasGPU,durationsGPU,durationsSizeGPU,
         inverseSquaredPatchedDysGPU,patchedDatasSizeGPU,tSizeGPU,))
 
         # ootrGPU = np.cumsum(ootrGPU,axis=-1)
         ootrGPU = cp.cumsum(ootrGPU,axis=-1)
         calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
-        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         blockSize,gridSizeX = calcGridBlockSize(tSize)
-        calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(durations),singleCalcPeriods),
+        calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(singleDurations),singleCalcPeriods),
         (blockSize,1,1),(ootrGPU,
         durationsSizeGPU,patchedDatasSizeGPU,
         durationsGPU,tSizeGPU,fullSumGPU,))
 
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
-        # blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize - (np.min(durations)) + 1)
         blockSize,gridSizeX = calcGridBlockSize(tSize)
-        # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,len(durations)),
-        calcAllLowestResidualsGPU((gridSizeX,len(durations),singleCalcPeriods),
+        calcAllLowestResidualsGPU((gridSizeX,len(singleDurations),singleCalcPeriods),
         (blockSize,1,1),(lowestResidualsGPU,tSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,
         durationsGPU,durationsSizeGPU,
@@ -281,10 +278,11 @@ def search_multi_periods(
     period = periods[HighestPowerIndex]
 
     bestLocation = locationGPU[HighestPowerIndex].item()
-    # durationIndex = np.floor(bestLocation / (int(patchedDatasSize) - (np.min(durations)) + 1)).astype(int)
-    durationIndex = np.floor(bestLocation / (tSize)).astype(int)    
+    durationIndex = np.floor(bestLocation / (tSize)).astype(int)
 
-    durationPointsNum = durations[durationIndex]
+    bestIterFlag = np.floor(period / singleCalcPeriods).astype(int)
+    bestSingleDurations = durationsGridCollectionGPU[bestIterFlag].get()
+    durationPointsNum = bestSingleDurations[durationIndex]
 
     # need to do 
     refindT0 = True
