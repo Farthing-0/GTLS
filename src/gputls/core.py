@@ -135,9 +135,9 @@ def search_multi_periods(
             # durationsGridGPU = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
             durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
 
-        durationsGrid = durations[durationsGridCollectionGPU[iterFlag].get()
-        singleDurations = durations[durationsGrid]
-        lc_arr = lc_arr[durationsGrid]
+        durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
+        singleDurations = durations[durationsBoolGrid]
+        single_lc_arr = lc_arr[durationsBoolGrid]
 
         periodsGPU = cp.asarray(SinglePeriods).astype(cp.float64)
         durationsMaxGPU = cp.asarray(SinglePeriods).astype(cp.int32)
@@ -171,7 +171,7 @@ def search_multi_periods(
         dyGPU = cp.asarray(dy).astype(cp.float32)
 
         lc_arr_max_len = np.array([np.max(singleDurations)]).astype(np.int32)
-        lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
+        lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in single_lc_arr])
 
         lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
         lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
@@ -280,8 +280,10 @@ def search_multi_periods(
     bestLocation = locationGPU[HighestPowerIndex].item()
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)
 
-    bestIterFlag = np.floor(period / singleCalcPeriods).astype(int)
-    bestSingleDurations = durationsGridCollectionGPU[bestIterFlag].get()
+    bestIterFlag = np.floor(HighestPowerIndex / singleCalcPeriods).astype(int)
+    print('bestIterFlag',bestIterFlag)
+    bestSingleDurations = durations[durationsGridCollectionGPU[bestIterFlag].get()]
+    print('bestSingleDurations',bestSingleDurations)
     durationPointsNum = bestSingleDurations[durationIndex]
 
     # need to do 
@@ -289,6 +291,8 @@ def search_multi_periods(
     if refindT0:
         pass
     
+    print('durationIndex',durationIndex)
+    print('durationPointsNum',durationPointsNum)
     find = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0]
     if len(find) > 1:
         find = find[0]
