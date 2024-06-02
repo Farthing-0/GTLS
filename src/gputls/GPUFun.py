@@ -74,6 +74,22 @@ extern "C"{
         }
     }
 
+    __global__ void durationBool(int* durationsMax,int* durationsMin,const int* durationSize,const int* periodSize,const int* durations ,bool* durationBoolArray){
+        int tid = blockDim.x * blockIdx.x + threadIdx.x; //period index
+        int y = blockDim.y * blockIdx.y + threadIdx.y;  //duration indexs
+
+        if (tid < (*periodSize) && y < (*durationSize)){
+            int duration_min_in_samples = durationsMin[tid];
+            int duration_max_in_samples = durationsMax[tid];
+            if(durations[y] >= duration_min_in_samples && durations[y] <= duration_max_in_samples){
+                durationBoolArray[y + tid*(*durationSize)] = 1;
+            }
+            else{
+                durationBoolArray[y + tid*(*durationSize)] = 0;
+            }
+        }
+    }
+
     __global__ void patchData(float *in_patchedData,float *in_patchedDys,
     int *patchedDataSize,int *in_sortIndex,int *maxDuration,
     float *flux,float *dy,int *tSize){
@@ -424,11 +440,7 @@ extern "C"{
             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
             float overshoot = in_overshoot[durationIndex];
 
-            // // binning the data
-            // float data_bin = inPatchedDataCumsum[periodIndex*(*in_patched_datas_size) + duration - 1]
-
             if(calc_mean > transit_depth_min && tid % skipPoint == 0){
-            // if(calc_mean > transit_depth_min){
                 float ootr = 0;
                 if(tid == 0){
                     ootr = in_fullsum[periodIndex*(*in_duration_size) + durationIndex];
@@ -439,7 +451,6 @@ extern "C"{
 
                 float *data = in_patched_datas + periodIndex*(*in_patched_datas_size) + tid;
                 float *signal = in_signal+durationIndex*(*in_max_signal_x_size);
-                // float signal = 0.1;
 
                 float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + periodIndex*(*in_patched_datas_size);
                 float summed_edge_effect_correction = in_summed_edge_effect_correction[periodIndex];
@@ -454,13 +465,9 @@ extern "C"{
                 float loss = 0;
 
                 for (int i = 0; i < duration; i++) {
-                    // sigi =  (-2.0 * i * reverse_duration + 1);
-                    // sigi = sigi * reverse_scale;
                     sigi = (signal[i]) * reverse_scale;
-                    // sigi = (signal) * reverse_scale;
                     loss = (data[i] - (1 - sigi));
                     intransit_residual = intransit_residual + loss * loss * dy[i];
-                    // intransit_residual = intransit_residual + loss * loss;
                 }
                 float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
                 out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = current_stat;

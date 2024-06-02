@@ -72,6 +72,22 @@ extern "C"{
         }
     }
 
+    __global__ void durationBool(int* durationsMax,int* durationsMin,const int* durationSize,const int* periodSize,const int* durations ,bool* durationBoolArray){
+        int tid = blockDim.x * blockIdx.x + threadIdx.x; //period index
+        int y = blockDim.y * blockIdx.y + threadIdx.y;  //duration indexs
+
+        if (tid < (*periodSize) && y < (*durationSize)){
+            int duration_min_in_samples = durationsMin[tid];
+            int duration_max_in_samples = durationsMax[tid];
+            if(durations[y] >= duration_min_in_samples && durations[y] <= duration_max_in_samples){
+                durationBoolArray[y + tid*(*durationSize)] = 1;
+            }
+            else{
+                durationBoolArray[y + tid*(*durationSize)] = 0;
+            }
+        }
+    }
+
     __global__ void patchData(float *in_patchedData,float *in_patchedDys,
     int *patchedDataSize,int *in_sortIndex,int *maxDuration,
     float *flux,float *dy,int *tSize){
