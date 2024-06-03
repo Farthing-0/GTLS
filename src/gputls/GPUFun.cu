@@ -405,36 +405,37 @@ extern "C"{
     float *in_inverse_squared_patched_dys,
     float *in_overshoot, float *in_ootr,float *in_fullsum,
     float *in_summed_edge_effect_correction,int *in_datapoints,float *cumsumGPU,
-    int *durationsMax,int *durationsMin, float *in_transit_depth_min
+    float *in_transit_depth_min
     )
     {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    //tid is each point
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      //y is the duration
-        int z = blockIdx.z * blockDim.z + threadIdx.z;      //z is the period
+        int y = blockIdx.y * blockDim.y + threadIdx.y;
+        int z = blockIdx.z * blockDim.z + threadIdx.z;
+
+        int durationSize = *in_duration_size;
 
         int durationIndex = y;
-        int duration = in_duration[durationIndex];
-
-        if(tid >= *resultArrayXAxisSize){
-            return;
-        }
-
-        int durationMax = durationsMax[y];
-        int durationMin = durationsMin[y];
-
-        int skipPoint;
-        if (duration > SKIP_POINT) {
-            skipPoint = duration / SKIP_POINT;
-        }
-        else{
-            skipPoint = 1;
-        }
-
         int periodIndex = z;
-        float transit_depth_min = *in_transit_depth_min;
-        int datapoints = *in_datapoints;
+        // #pragma unroll 1
+        // for (int durationIndex = 0; durationIndex < durationSize; durationIndex++){
 
-        // if(duration >= durationMin && duration <= durationMax ){
+            int duration = in_duration[durationIndex];
+
+            if(tid >= *resultArrayXAxisSize){
+                return;
+            }
+
+            int skipPoint;
+            if (duration > SKIP_POINT) {
+                skipPoint = duration / SKIP_POINT;
+            }
+            else{
+                skipPoint = 1;
+            }
+
+            float transit_depth_min = *in_transit_depth_min;
+            int datapoints = *in_datapoints;
+
             float calc_mean = calcAverageFromCumsum(cumsumGPU,duration,in_patched_datas_size,tid,periodIndex);
             float overshoot = in_overshoot[durationIndex];
 
@@ -456,28 +457,43 @@ extern "C"{
                 float *dy = inverse_squared_patched_dy_arr + tid;
                 float reverse_scale = calc_mean * overshoot * 2;  // "*2" means SIGNAL_DEPTH is 0.5,as "/SIGNAL_DEPTH"
 
-                // float reverse_duration = 1.0 / duration;
-
                 float sigi = 0;
                 float intransit_residual = 0;
                 float loss = 0;
 
-                for (int i = 0; i < duration; i++) {
+                int skipSearchPoint = 1;
+                skipSearchPoint = 3;
+                
+                // skipSearchPoint = duration / 2;
+                // if(skipSearchPoint < 1){
+                //     skipSearchPoint = 1;
+                // }
+
+                if (duration < 50){
+                    skipSearchPoint = 1;
+                }
+                else if (duration < 500){
+                    skipSearchPoint = 3;
+                }
+                else{
+                    skipSearchPoint = 3;
+                }
+
+                float actualLossFraction = float(duration) / (((duration-1) / skipSearchPoint) + 1);
+
+                // for (int i = 0; i < duration; i++) {
+                for (int i = 0; i < duration; i = i + skipSearchPoint) {
                     sigi = (signal[i]) * reverse_scale;
                     loss = (data[i] - (1 - sigi));
                     intransit_residual = intransit_residual + loss * loss * dy[i];
                 }
-                float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+                float current_stat = intransit_residual * actualLossFraction + ootr - summed_edge_effect_correction;
                 out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = current_stat;
             }
             else
             {
                 out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = datapoints;
             }
-        // }
-        // else{
-        //     //0x7f800000 => infinity in float, according to IEEE-754
-        //     out[tid+durationIndex*(*resultArrayXAxisSize) + periodIndex*(*resultArrayXAxisSize)*(*in_duration_size)] = 0x7f800000;
         // }
     }
 

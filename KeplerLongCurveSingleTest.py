@@ -8,6 +8,7 @@ from lcFuns import gpubls, cleaned_array,normalize
 from transitleastsquares import transitleastsquares
 from gputls import gtls
 import lightkurve as lk
+import wotan
 
 saveFile = 'KeplerGTLSFastTest.csv'
 saveFileData = pd.DataFrame(columns=['KIC','period','T0','duration','depth','SNR','SDE'])
@@ -41,6 +42,10 @@ for index,line in data.iterrows():
             times, fluxes, dys = cleaned_array(times, fluxes, dys)
             # normalize
             times,fluxes,dy = normalize(times,fluxes,dys)
+
+            # window = 0.5
+            # fluxes, trend_lc = wotan.flatten(times, fluxes, window_length=window, method='biweight', return_trend=True)
+
             AllTimes.extend(times.tolist())
             AllFluxes.extend(fluxes.tolist())
             AllDys.extend(dy.tolist())

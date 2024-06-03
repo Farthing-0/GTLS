@@ -246,13 +246,14 @@ def search_multi_periods(
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
         blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllLowestResidualsGPU((gridSizeX,len(singleDurations),singleCalcPeriods),
+        # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
         (blockSize,1,1),(lowestResidualsGPU,tSizeGPU,
         patchedDatasGPU,patchedDatasSizeGPU,
         durationsGPU,durationsSizeGPU,
         lcArrFullLengthGPU,
         lcArrMaxLenGPU,inverseSquaredPatchedDysGPU,
         overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,
-        durationsMaxGPU,durationsMinGPU,transitDepthMinGPU
+        transitDepthMinGPU
         ))
 
         #find best fit
@@ -273,113 +274,12 @@ def search_multi_periods(
     if fast:
         return periods,power
 
+    powerargsort = np.argsort(-power) # sort in descending order
+    periodsSorted = periods[powerargsort]
+    print('periodsSorted',periodsSorted[:100])
+
     HighestPowerIndex = numpy.argmax(power)
     period = periods[HighestPowerIndex]
-
-    bestLocation = locationGPU[HighestPowerIndex].item()
-    durationIndex = np.floor(bestLocation / (tSize)).astype(int)
-
-    bestIterFlag = np.floor(HighestPowerIndex / singleCalcPeriods).astype(int)
-    print('bestIterFlag',bestIterFlag)
-    bestSingleDurations = durations[durationsGridCollectionGPU[bestIterFlag].get()]
-    print('bestSingleDurations',bestSingleDurations)
-    durationPointsNum = bestSingleDurations[durationIndex]
-
-    # need to do 
-    refindT0 = True
-    if refindT0:
-        pass
-    
-    print('durationIndex',durationIndex)
-    print('durationPointsNum',durationPointsNum)
-    find = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0]
-    if len(find) > 1:
-        find = find[0]
-    bestRow = find.item()
-    rawDuration = lc_cache_overview['duration'][bestRow]
-
-    bestTime,bestFlux,bestFluxDy = foldCPU(t,y,dy,period)
-    bestFlux = np.concatenate((bestFlux,bestFlux[:maxDuration]))
-    bestFluxDy = np.concatenate((bestFluxDy,bestFluxDy[:maxDuration]))
-
-    bestRowT0 = bestLocation % (tSize)
-
-    transitMean = bestFlux[bestRowT0:bestRowT0+durationPointsNum].mean()
-
-    # Transit Depth
-    overshoot = lc_cache_overview["overshoot"][durationIndex]
-    transitDepth =  ((1-transitMean) * overshoot).item()
-
-    dataOutTransit = np.concatenate((bestFlux[0:bestRowT0],bestFlux[bestRowT0+durationPointsNum:]))
-
-    if bestRowT0 > tSize - 1:
-        bestRowT0 = bestRowT0 - tSize 
-
-    snrFit = (1 - transitDepth)*(durationPointsNum ** 0.5)/np.std(dataOutTransit)
-    DataCumsum = np.cumsum(dataOutTransit)
-    DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum])/durationPointsNum
-    redNoise = np.std(DataSlideAvg)
-
-    Tx = bestTime[bestRowT0]
-    T0 = Tx - int((Tx-min(t)) / period) * period - period
-    transit_times = all_transit_times(T0, t, period)
-
-    snrFitPink = (1 - transitDepth)/((np.std(dataOutTransit)**2/(durationPointsNum)) + (redNoise**2/(len(transit_times))))**0.5
-
-    # if legacy:
-    #     #Raw TLS Calculate transit duration(days) Method
-    #     transit_duration_in_days = calculate_transit_duration_in_days(
-    #         t, period, transit_times, rawDuration
-    #     )
-    # else:
-    ## Alternative TLS Calculate transit duration(days) Method
-    transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
-    
-    T0 = T0 + transit_duration_in_days / 2
-    transit_times = transit_times + transit_duration_in_days / 2
-    if(T0 < min(t)):
-        T0 = T0 + period
-    else:
-        T0 = T0
-
-    #SNR
-    depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
-    t, y, transit_times, transit_duration_in_days
-    )
-    snr_per_transit, snr_pink_per_transit = snr_stats(
-        t=t,
-        y=y,
-        period=period,
-        duration=rawDuration,
-        T0=T0,
-        transit_times=transit_times,
-        transit_duration_in_days=transit_duration_in_days,
-        per_transit_count=per_transit_count,
-    )
-
-
-    # if legacy:
-    depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
-    t, y, transit_times, transit_duration_in_days
-    )
-    # print('transit_times, transit_duration_in_days',transit_times, transit_duration_in_days)
-    all_flux_intransit = numpy.concatenate(
-        [all_flux_intransit_odd, all_flux_intransit_even]
-    )
-    intransit = transit_mask(t, period, 2 * rawDuration, T0)
-    flux_ootr = y[~intransit]
-    depth_mean = numpy.mean(all_flux_intransit)
-    # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
-    #     per_transit_count
-    # ) ** (0.5)
-    snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)
-    # else:
-    #     #Fold N times, SNRFold = SNR * sqrt(N)
-    #     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
-    #     snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
-
-
-    snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
         period,
