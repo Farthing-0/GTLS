@@ -56,7 +56,7 @@ for index,line in data.iterrows():
     AllFluxes = np.array(AllFluxes)[AllIndex]
     AllDys = np.array(AllDys)[AllIndex]
 
-    # T0_fit_margin = 0.1
+    T0_fit_margin = 0.125
     TLSTestFlag = False
     # TLSTestFlag = True
     GTLSTestFlag = True
@@ -66,7 +66,7 @@ for index,line in data.iterrows():
 
     if GTLSTestFlag:
         GTLSmodel = gtls(t = AllTimes, y = AllFluxes, dy = AllDys)
-        gtlsResult = GTLSmodel.power(bar_location = 0,GPUDeviceID = 1)
+        gtlsResult = GTLSmodel.power(bar_location = 0,GPUDeviceID = 1,T0_fit_margin = T0_fit_margin)
         print(gtlsResult.period,gtlsResult.T0,gtlsResult.duration,gtlsResult.depth,gtlsResult.snr,gtlsResult.SDE)
     break
 
