@@ -63,7 +63,8 @@ def search_multi_periods(
     module = cp.RawModule(code=GPUCode)
     module.compile()
 
-    durations = numpy.unique(lc_cache_overview["width_in_samples"])
+    durations,indices = numpy.unique(lc_cache_overview["width_in_samples"],return_index=True)
+    lc_arr = lc_arr[indices]
     maxDuration = int(max(durations))
 
     # why?
@@ -123,6 +124,10 @@ def search_multi_periods(
                     (fulldurationsMaxGPU,fulldurationsMinGPU,fulldurationsSizeGPU,fullperiodsSizeGPU,fulldurationsGPU,durationBoolArrayGPU))
 
     durationsGridCollectionGPU = cp.empty((TotalIter,len(durations)),dtype=cp.bool_)
+
+    yGPU = cp.asarray(y).astype(cp.float32)
+    dyGPU = cp.asarray(dy).astype(cp.float32)
+
     for iterFlag in range(TotalIter):
 
         if iterFlag == TotalIter - 1:
@@ -160,17 +165,8 @@ def search_multi_periods(
         durationsGridGPU((gridSizeX,1,1),(blockSize,),
                         (periodsGPU,durationsMaxGPU, durationsMinGPU,tLengthGPU,tSizeGPU, periodsSizeGPU))
 
-        fastFoldGPU = module.get_function('foldFast')
-        blockSize,gridSizeX = calcGridBlockSize(tSize)
-        fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
-        i_max = 10
-        for i in range(1,i_max + 1):
-            sortIndexGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max] = phasesGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max].argsort()
-
         patchedDatasGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
         patchedDysGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
-        yGPU = cp.asarray(y).astype(cp.float32)
-        dyGPU = cp.asarray(dy).astype(cp.float32)
 
         lc_arr_max_len = np.array([np.max(singleDurations)]).astype(np.int32)
         lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in single_lc_arr])
@@ -193,14 +189,18 @@ def search_multi_periods(
         #GPU variables for the loop
         fullSumGPU = cp.empty((singleCalcPeriods,len(singleDurations)),dtype=cp.float32)
         cumsumGPU = cp.empty((singleCalcPeriods,patchedDatasSize),dtype=cp.float32)
-        
-        # resultArrayXAxisSizeGPU is the maximum size of the result of a function possible use to restore the result of a patched light curve
-        # resultArrayXAxisSizeGPU = cp.asarray(np.array([int(patchedDatasSize) - (np.min(durations)) + 1])).astype(cp.int32)
-        # resultArrayXAxisSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
-
-        # ootrGPU = cp.empty((singleCalcPeriods,len(durations),(int(patchedDatasSize) - (np.min(durations)) + 1)),dtype=cp.float32)
-
         ootrGPU = cp.empty((singleCalcPeriods,len(singleDurations),(tSize)),dtype=cp.float32)
+
+        fastFoldGPU = module.get_function('foldFast')
+        blockSize,gridSizeX = calcGridBlockSize(tSize)
+        fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
+
+        # # incase gpu memory is not enough, split the phasesGPU into several parts
+        i_max = 10
+        for i in range(1,i_max + 1):
+            sortIndexGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max] = phasesGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max].argsort()
+        # todo: change to below way, seems a bug here
+        # sortIndexGPU = phasesGPU.argsort()
 
         #calculate patched data
         patchDataGPU = module.get_function('patchData')

@@ -23,7 +23,8 @@ for index,line in data.iterrows():
     dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
 
-    if 11446443 != int(line["kepid"]):
+    if 9171801 != int(line["kepid"]):
+    # if 11446443 != int(line["kepid"]):
         continue
 
     for name in line.index:
