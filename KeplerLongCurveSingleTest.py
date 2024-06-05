@@ -4,7 +4,7 @@ import pandas as pd
 import sys
 from astropy.io import fits
 sys.path.insert(1, '../../GTLSTest/precision')
-from lcFuns import gpubls, cleaned_array,normalize
+from lcFuns import gpubls, cleaned_array,normalize,checkParams
 from transitleastsquares import transitleastsquares
 from gputls import gtls
 import lightkurve as lk
@@ -23,8 +23,9 @@ for index,line in data.iterrows():
     dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
 
-    if 9171801 != int(line["kepid"]):
-    # if 11446443 != int(line["kepid"]):
+    # if 9171801 != int(line["kepid"]):
+    if 10227501 != int(line["kepid"]):
+    # if 11013201 != int(line["kepid"]):
         continue
 
     for name in line.index:
@@ -36,20 +37,38 @@ for index,line in data.iterrows():
     AllDys = []
     for file in (files):
         with fits.open(file) as hdul:
-            times = hdul[1].data['TIME']
-            fluxes = hdul[1].data['PDCSAP_FLUX']
-            dys = hdul[1].data['PDCSAP_FLUX_ERR']
-            # remove nan
-            times, fluxes, dys = cleaned_array(times, fluxes, dys)
-            # normalize
-            times,fluxes,dy = normalize(times,fluxes,dys)
+            # times = hdul[1].data['TIME']
+            # fluxes = hdul[1].data['PDCSAP_FLUX']
+            # dys = hdul[1].data['PDCSAP_FLUX_ERR']
+            # # remove nan
+            # times, fluxes, dys = cleaned_array(times, fluxes, dys)
+            # # normalize
+            # times,fluxes,dy = normalize(times,fluxes,dys)
 
             # window = 0.5
-            # fluxes, trend_lc = wotan.flatten(times, fluxes, window_length=window, method='biweight', return_trend=True)
+            times,fluxes,dys,radius,logg = checkParams(file)
+            times,fluxes,dys = cleaned_array(times,fluxes,dys)
+            times,fluxes,dys = normalize(times,fluxes,dys)
+
+            # detrend
+            M_s = 1.98892e30 # mass of sun in kg
+            R_s = 6.957e8 # radius of sun in m
+            Gc = 6.67408e-11 # gravitational constant in m^3 kg^-1 s^-2
+
+            if len(times) < 10:
+                continue
+
+            if (radius != None and logg != None):
+                mass = np.power(10,logg) / 100 * np.power(radius*R_s,2) / Gc / M_s # mass in solar mass
+                window = 3 * wotan.t14(R_s=radius, M_s=mass, P=14, small_planet=True)
+            else:
+                window = 0.5
+
+            fluxes, trend_lc = wotan.flatten(times, fluxes, window_length=window, method='biweight', return_trend=True)
 
             AllTimes.extend(times.tolist())
             AllFluxes.extend(fluxes.tolist())
-            AllDys.extend(dy.tolist())
+            AllDys.extend(dys.tolist())
 
     #sort by time
     AllIndex = np.argsort(AllTimes)

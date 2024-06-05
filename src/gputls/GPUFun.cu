@@ -462,22 +462,22 @@ extern "C"{
                 float loss = 0;
 
                 int skipSearchPoint = 1;
-                skipSearchPoint = 3;
+                // skipSearchPoint = 3;
                 
-                // skipSearchPoint = duration / 2;
-                // if(skipSearchPoint < 1){
+                // // skipSearchPoint = duration / 2;
+                // // if(skipSearchPoint < 1){
+                // //     skipSearchPoint = 1;
+                // // }
+
+                // if (duration < 50){
                 //     skipSearchPoint = 1;
                 // }
-
-                if (duration < 50){
-                    skipSearchPoint = 1;
-                }
-                else if (duration < 500){
-                    skipSearchPoint = 3;
-                }
-                else{
-                    skipSearchPoint = 3;
-                }
+                // else if (duration < 500){
+                //     skipSearchPoint = 2;
+                // }
+                // else{
+                //     skipSearchPoint = 2;
+                // }
 
                 float actualLossFraction = float(duration) / (((duration-1) / skipSearchPoint) + 1);
 

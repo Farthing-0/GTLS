@@ -92,7 +92,6 @@ def period_uncertainty(periods, power):
         period_uncertainty = float("inf")
     return period_uncertainty
 
-
 def spectra(chi2, oversampling_factor):
     SR = np.min(chi2) / chi2
     SDE_raw = (1 - np.mean(SR)) / np.std(SR)

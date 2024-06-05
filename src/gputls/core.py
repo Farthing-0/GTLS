@@ -302,8 +302,30 @@ def search_multi_periods(
         GPUDeviceID
     )
 
-    HighestPowerIndex = numpy.argmin(chi2_again)
-    period = possiblePeriods[HighestPowerIndex]
+    powerargsort = np.argsort(-power) # sort in descending order
+    periodsSorted = periods[powerargsort]
+    chi2Sorted = chi2[powerargsort]
+    possiblePeriods = periodsSorted[:100]
+    print('possiblePeriods',periodsSorted[:100])
+
+    chi2_again = search_multi_periods_again(
+        possiblePeriods,
+        t,
+        y,
+        dy,
+        transit_depth_min,
+        lc_arr,
+        lc_cache_overview,
+        GPUDeviceID
+    )
+
+    chi2Sorted[:100] = chi2_again
+    periodsIndex = np.argsort(periodsSorted)
+    chi2Sorted = chi2Sorted[periodsIndex]
+    SR, power_raw, power, SDE_raw, SDE = spectra(chi2Sorted, oversampling_factor)
+
+    periodIndex = np.argmax(power)    
+    period = periods[periodIndex]
     print('period',period)
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
