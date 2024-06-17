@@ -24,7 +24,7 @@ for index,line in data.iterrows():
     files = []
 
     # if 9171801 != int(line["kepid"]):
-    if 10227501 != int(line["kepid"]):
+    if 11502218 != int(line["kepid"]):
     # if 11013201 != int(line["kepid"]):
         continue
 
