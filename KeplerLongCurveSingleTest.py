@@ -23,8 +23,8 @@ for index,line in data.iterrows():
     dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
 
-    # if 9171801 != int(line["kepid"]):
-    if 11502218 != int(line["kepid"]):
+    if 9171801 != int(line["kepid"]):
+    # if 3003992 != int(line["kepid"]):
     # if 11013201 != int(line["kepid"]):
         continue
 
@@ -88,6 +88,7 @@ for index,line in data.iterrows():
         GTLSmodel = gtls(t = AllTimes, y = AllFluxes, dy = AllDys)
         gtlsResult = GTLSmodel.power(bar_location = 0,GPUDeviceID = 1,T0_fit_margin = T0_fit_margin)
         print(gtlsResult.period,gtlsResult.T0,gtlsResult.duration,gtlsResult.depth,gtlsResult.snr,gtlsResult.SDE)
+        print('depth',gtlsResult.depth)
     break
 
     # saveFileData.loc[len(saveFileData)] = [line['kepid'],gtlsResult.period,gtlsResult.T0,gtlsResult.duration,gtlsResult.depth,gtlsResult.snr,gtlsResult.SDE]

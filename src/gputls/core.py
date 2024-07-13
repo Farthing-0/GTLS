@@ -65,6 +65,7 @@ def search_multi_periods(
 
     durations,indices = numpy.unique(lc_cache_overview["width_in_samples"],return_index=True)
     lc_arr = lc_arr[indices]
+    lc_cache_overview = lc_cache_overview[indices]
     maxDuration = int(max(durations))
 
     # why?
@@ -143,6 +144,8 @@ def search_multi_periods(
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
         single_lc_arr = lc_arr[durationsBoolGrid]
+        single_lc_cache_overview = lc_cache_overview[durationsBoolGrid]
+        overshootGPU = cp.array(single_lc_cache_overview["overshoot"]).astype(cp.float32)
 
         periodsGPU = cp.asarray(SinglePeriods).astype(cp.float64)
         durationsMaxGPU = cp.asarray(SinglePeriods).astype(cp.int32)
@@ -150,7 +153,6 @@ def search_multi_periods(
 
         lowestResidualsGPU = cp.empty((singleCalcPeriods,len(singleDurations),tSize),dtype=cp.float32)
         # lowestResidualsGPU = cp.empty((singleCalcPeriods,len(singleDurations)*tSize),dtype=cp.float32)
-
 
         # Phase fold
         phasesGPU = cp.empty((singleCalcPeriods,tSize),dtype=cp.float64)
@@ -181,8 +183,6 @@ def search_multi_periods(
         periodSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         durationsGPU = cp.asarray(singleDurations).astype(cp.int32)
         durationsSizeGPU = cp.asarray(np.array([len(singleDurations)])).astype(cp.int32)
-
-        overshootGPU = cp.array(lc_cache_overview["overshoot"]).astype(cp.float32)
         datapointsGPU = cp.array([len(y)]).astype(cp.int32)
         transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
 
@@ -288,25 +288,9 @@ def search_multi_periods(
 
     powerargsort = np.argsort(-power) # sort in descending order
     periodsSorted = periods[powerargsort]
-    possiblePeriods = periodsSorted[:100]
-    print('possiblePeriods',periodsSorted[:100])
-
-    chi2_again = search_multi_periods_again(
-        possiblePeriods,
-        t,
-        y,
-        dy,
-        transit_depth_min,
-        lc_arr,
-        lc_cache_overview,
-        GPUDeviceID
-    )
-
-    powerargsort = np.argsort(-power) # sort in descending order
-    periodsSorted = periods[powerargsort]
     chi2Sorted = chi2[powerargsort]
     possiblePeriods = periodsSorted[:100]
-    print('possiblePeriods',periodsSorted[:100])
+    # print('possiblePeriods',periodsSorted[:100])
 
     chi2_again = search_multi_periods_again(
         possiblePeriods,
@@ -326,7 +310,7 @@ def search_multi_periods(
 
     periodIndex = np.argmax(power)    
     period = periods[periodIndex]
-    print('period',period)
+    # print('period',period)
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
         period,
@@ -358,7 +342,9 @@ def search_multi_periods_again(
     GPUCode = GPUFun.getGPUCode()
     module = cp.RawModule(code=GPUCode)
 
-    durations = numpy.unique(lc_cache_overview["width_in_samples"])
+    durations,indices = numpy.unique(lc_cache_overview["width_in_samples"],return_index=True)
+    lc_arr = lc_arr[indices]
+    lc_cache_overview = lc_cache_overview[indices]
     maxDuration = int(max(durations))
 
     # why?
@@ -587,8 +573,14 @@ def search_single_periods(
 
     durationMax = durationsMaxGPU.get().item()
     durationMin = durationsMinGPU.get().item()
-    durations  = np.array([x for x in durations if x <= durationMax and x >= durationMin])
-    lc_arr = [x for x in lc_arr if len(x) <= durationMax and len(x) >= durationMin]
+    durationsBoolList = np.logical_and(durations <= durationMax, durations >= durationMin)
+    durations = durations[durationsBoolList]
+    single_lc_arr = lc_arr[durationsBoolList]
+    single_lc_cache_overview = lc_cache_overview[durationsBoolList]
+
+    # print('durations',len(durations))
+    # print('single_lc_arr',len(single_lc_arr))
+    # print('single_lc_cache_overview',len(single_lc_cache_overview))
 
     lowestResidualsGPU = cp.empty((len(durations),tSize),dtype=cp.float32)
 
@@ -606,7 +598,7 @@ def search_single_periods(
     dyGPU = cp.asarray(dy).astype(cp.float32)
 
     lc_arr_max_len = np.array([np.max(durations)]).astype(np.int32)
-    lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in lc_arr])
+    lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in single_lc_arr])
 
     lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
     lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
@@ -619,7 +611,7 @@ def search_single_periods(
     durationsGPU = cp.asarray(durations).astype(cp.int32)
     durationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
 
-    overshootGPU = cp.array(lc_cache_overview["overshoot"]).astype(cp.float32)
+    overshootGPU = cp.array(single_lc_cache_overview["overshoot"]).astype(cp.float32)
     datapointsGPU = cp.array([len(y)]).astype(cp.int32)
 
     ## depth variable is not needed anymore because we trapezoid fit the transit to get the depth
@@ -707,11 +699,11 @@ def search_single_periods(
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)    
     durationPointsNum = durations[durationIndex]
 
-    find = np.where(lc_cache_overview["width_in_samples"] == durationPointsNum)[0]
+    find = np.where(single_lc_cache_overview["width_in_samples"] == durationPointsNum)[0]
     if len(find) > 1:
         find = find[0]
     bestRow = find.item()
-    rawDuration = lc_cache_overview['duration'][bestRow]
+    rawDuration = single_lc_cache_overview['duration'][bestRow]
 
     bestTime,bestFlux,bestFluxDy = foldCPU(t,y,dy,period)
     bestFlux = np.concatenate((bestFlux,bestFlux[:maxDuration]))
@@ -722,7 +714,7 @@ def search_single_periods(
     transitMean = bestFlux[bestRowT0:bestRowT0+durationPointsNum].mean()
 
     # Transit Depth
-    overshoot = lc_cache_overview["overshoot"][durationIndex]
+    overshoot = single_lc_cache_overview["overshoot"][durationIndex]
     transitDepth =  ((1-transitMean) * overshoot).item()
 
     dataOutTransit = np.concatenate((bestFlux[0:bestRowT0],bestFlux[bestRowT0+durationPointsNum:]))
