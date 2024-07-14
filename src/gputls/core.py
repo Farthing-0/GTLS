@@ -578,10 +578,6 @@ def search_single_periods(
     single_lc_arr = lc_arr[durationsBoolList]
     single_lc_cache_overview = lc_cache_overview[durationsBoolList]
 
-    # print('durations',len(durations))
-    # print('single_lc_arr',len(single_lc_arr))
-    # print('single_lc_cache_overview',len(single_lc_cache_overview))
-
     lowestResidualsGPU = cp.empty((len(durations),tSize),dtype=cp.float32)
 
     fastFoldGPU = module.get_function('foldFast')
@@ -688,10 +684,6 @@ def search_single_periods(
     durationsMaxGPU,durationsMinGPU,transitDepthMinGPU
     ))
 
-    # #find best fit
-    # for i in range(singleCalcPeriods):
-    # print(lowestResidualsGPU)
-    # exit()
     bestLocation = lowestResidualsGPU.argmin().get()
     # print('bestLocation',bestLocation)
         # LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
@@ -764,11 +756,6 @@ def search_single_periods(
         per_transit_count=per_transit_count,
     )
 
-    # if legacy:
-    depth_mean_odd, depth_mean_even, depth_mean_odd_std, depth_mean_even_std, all_flux_intransit_odd, all_flux_intransit_even, per_transit_count, transit_depths, transit_depths_uncertainties = intransit_stats(
-    t, y, transit_times, transit_duration_in_days
-    )
-    # print('transit_times, transit_duration_in_days',transit_times, transit_duration_in_days)
     all_flux_intransit = numpy.concatenate(
         [all_flux_intransit_odd, all_flux_intransit_even]
     )
@@ -779,10 +766,6 @@ def search_single_periods(
     #     per_transit_count
     # ) ** (0.5)
     snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)
-    # else:
-    #     #Fold N times, SNRFold = SNR * sqrt(N)
-    #     #Reference: https://dsp.stackexchange.com/questions/26366/how-to-derive-the-results-that-averaging-n-signals-yields-a-sqrtn-fold-in
-    #     snr = np.mean(snr_per_transit) * (len(transit_times)**(0.5))
 
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
     
