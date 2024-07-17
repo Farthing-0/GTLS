@@ -258,12 +258,6 @@ def search_multi_periods(
         transitDepthMinGPU
         ))
 
-        #find best fit
-        # for i in range(singleCalcPeriods):
-        #     if(iterFlag*singleCalcPeriods + i < len(periods)):
-        #         locationGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].argmin()
-        #         LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
-
         start_idx = iterFlag * singleCalcPeriods
         end_idx = start_idx + singleCalcPeriods
         valid_range = min(end_idx, len(periods)) - start_idx
@@ -286,11 +280,25 @@ def search_multi_periods(
     if fast:
         return periods,power
 
-    powerargsort = np.argsort(-power) # sort in descending order
-    periodsSorted = periods[powerargsort]
-    chi2Sorted = chi2[powerargsort]
-    possiblePeriods = periodsSorted[:100]
-    # print('possiblePeriods',periodsSorted[:100])
+    # powerargsort = np.argsort(-power) # sort in descending order
+    # periodsSorted = periods[powerargsort]
+    # chi2Sorted = chi2[powerargsort]
+    # searchAgainNumber = 100 # 100 minchi2 and 100 maxchi2 which period > 1
+    # possiblePeriods = periodsSorted[:searchAgainNumber]
+
+    combined = list(enumerate(zip(periods, -power)))
+    sorted_combined = sorted(combined, key=lambda x: x[1][1])
+    top_100_indices = [item[0] for item in sorted_combined[:100]]
+    top_100_periods = [item[1][0] for item in sorted_combined[:100]]
+    remaining_combined = [item for item in sorted_combined if item[0] not in top_100_indices]
+    remaining_combined_greater_than_1 = [item for item in remaining_combined if item[1][0] > 1]
+    sorted_remaining_combined_greater_than_1 = sorted(remaining_combined_greater_than_1, key=lambda x: x[1][1])
+    next_100_indices = [item[0] for item in sorted_remaining_combined_greater_than_1[:100]]
+    next_100_periods = [item[1][0] for item in sorted_remaining_combined_greater_than_1[:100]]
+
+    possiblePeriodsIndices = top_100_indices + next_100_indices
+    possiblePeriods = top_100_periods + next_100_periods
+    # print('possiblePeriods',possiblePeriods)
 
     chi2_again = search_multi_periods_again(
         possiblePeriods,
@@ -302,15 +310,34 @@ def search_multi_periods(
         lc_cache_overview,
         GPUDeviceID
     )
+    # exit()
+    # todo:将正确的周期输入后仍然无法准确筛选，可能需要进一步研究search_multi_periods_again 这个函数的问题。典型：KIC 7295235
+    # update: 似乎是spectra的问题
+    # update: 看起来的确是spectra的问题
+    # chi2Sorted[:searchAgainNumber] = chi2_again
+    # periodsIndex = np.argsort(periodsSorted)
+    # chi2Sorted = chi2Sorted[periodsIndex]
+    # SR, power_raw, power, SDE_raw, SDE = spectra(chi2Sorted, oversampling_factor)
+    # 下面的函数不应该再用全chi2搜索了，应该用chi2_again搜索
+    chi2[possiblePeriodsIndices] = chi2_again
+    chi2_median = np.median(chi2)
+    # replace the extreme outliers
+    chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
 
-    chi2Sorted[:100] = chi2_again
-    periodsIndex = np.argsort(periodsSorted)
-    chi2Sorted = chi2Sorted[periodsIndex]
-    SR, power_raw, power, SDE_raw, SDE = spectra(chi2Sorted, oversampling_factor)
-
-    periodIndex = np.argmax(power)    
+    SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
+    power_again = power[possiblePeriodsIndices]
+    periodIndex = possiblePeriodsIndices[np.argmax(power_again)]
+    # periodIndex = possiblePeriodsIndices[np.argmin(chi2_again)]
     period = periods[periodIndex]
-    # print('period',period)
+
+    # debug
+    import matplotlib.pyplot as plt
+    # plt.plot(periods[possiblePeriodsIndices][:40],power_again[:40],'.')
+    # plt.plot(possiblePeriods,power_again,'.')
+    # plt.plot(possiblePeriods,chi2_again,'.')
+    plt.plot(periods,chi2,'.')
+    plt.savefig('debugTest.png')
+    # print('best index:',np.argmax(power_again))
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
         period,

@@ -416,8 +416,6 @@ extern "C"{
 
         int durationIndex = y;
         int periodIndex = z;
-        // #pragma unroll 1
-        // for (int durationIndex = 0; durationIndex < durationSize; durationIndex++){
 
             int duration = in_duration[durationIndex];
 

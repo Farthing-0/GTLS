@@ -23,7 +23,8 @@ for index,line in data.iterrows():
     dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
 
-    if 9171801 != int(line["kepid"]):
+    # if 7295235 != int(line["kepid"]):
+    if 11336883 != int(line["kepid"]):
     # if 3003992 != int(line["kepid"]):
     # if 11013201 != int(line["kepid"]):
         continue
@@ -78,11 +79,14 @@ for index,line in data.iterrows():
 
     T0_fit_margin = 0.125
     TLSTestFlag = False
+    GTLSTestFlag = False
+
     # TLSTestFlag = True
     GTLSTestFlag = True
     if TLSTestFlag:
         model = transitleastsquares(AllTimes, AllFluxes, AllDys)
         results = model.power(T0_fit_margin = T0_fit_margin)
+        print(results.period,results.T0,results.duration,results.depth,results.snr,results.SDE)
 
     if GTLSTestFlag:
         GTLSmodel = gtls(t = AllTimes, y = AllFluxes, dy = AllDys)
