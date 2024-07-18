@@ -23,8 +23,9 @@ for index,line in data.iterrows():
     dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
 
+    if 3120431 != int(line["kepid"]):
     # if 7295235 != int(line["kepid"]):
-    if 11336883 != int(line["kepid"]):
+    # if 11336883 != int(line["kepid"]):
     # if 3003992 != int(line["kepid"]):
     # if 11013201 != int(line["kepid"]):
         continue
