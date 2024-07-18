@@ -310,15 +310,7 @@ def search_multi_periods(
         lc_cache_overview,
         GPUDeviceID
     )
-    # exit()
-    # todo:将正确的周期输入后仍然无法准确筛选，可能需要进一步研究search_multi_periods_again 这个函数的问题。典型：KIC 7295235
-    # update: 似乎是spectra的问题
-    # update: 看起来的确是spectra的问题
-    # chi2Sorted[:searchAgainNumber] = chi2_again
-    # periodsIndex = np.argsort(periodsSorted)
-    # chi2Sorted = chi2Sorted[periodsIndex]
-    # SR, power_raw, power, SDE_raw, SDE = spectra(chi2Sorted, oversampling_factor)
-    # 下面的函数不应该再用全chi2搜索了，应该用chi2_again搜索
+
     chi2[possiblePeriodsIndices] = chi2_again
     chi2_median = np.median(chi2)
     # replace the extreme outliers
@@ -329,15 +321,6 @@ def search_multi_periods(
     periodIndex = possiblePeriodsIndices[np.argmax(power_again)]
     # periodIndex = possiblePeriodsIndices[np.argmin(chi2_again)]
     period = periods[periodIndex]
-
-    # debug
-    import matplotlib.pyplot as plt
-    # plt.plot(periods[possiblePeriodsIndices][:40],power_again[:40],'.')
-    # plt.plot(possiblePeriods,power_again,'.')
-    # plt.plot(possiblePeriods,chi2_again,'.')
-    plt.plot(periods,chi2,'.')
-    plt.savefig('debugTest.png')
-    # print('best index:',np.argmax(power_again))
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
         period,
