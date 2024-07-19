@@ -26,6 +26,20 @@ def calcGridBlockSize(size):
     gridSizeX = int((size / blockSize) + 1)
     return blockSize,gridSizeX
 
+def find_nearest_indices(a, b):
+    a = np.array(a)
+    b = np.array(b)
+
+    nearest_indices = np.zeros(a.shape, dtype=int)
+    nearest_elements = np.zeros(a.shape)
+
+    for i, val in enumerate(a):
+        nearest_index = np.argmin(np.abs(b - val))
+        nearest_indices[i] = nearest_index
+        nearest_elements[i] = b[nearest_index]
+    
+    return nearest_indices, nearest_elements
+
 def search_multi_periods(
     periods,
     t,
@@ -312,7 +326,32 @@ def search_multi_periods(
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
     power_again = power[possiblePeriodsIndices]
     periodIndex = possiblePeriodsIndices[np.argmax(power_again)]
-    # periodIndex = possiblePeriodsIndices[np.argmin(chi2_again)]
+    period = periods[periodIndex]
+
+    possiblePeriodsTimesRate = [0.5,2,2/3,3/2]
+    possiblePeriodsTemp = [period * rate for rate in possiblePeriodsTimesRate]
+
+    possiblePeriodsIndices, possiblePeriods = find_nearest_indices(possiblePeriodsTemp, periods)
+
+    chi2_again = search_multi_periods_again(
+        possiblePeriods,
+        t,
+        y,
+        dy,
+        transit_depth_min,
+        lc_arr,
+        lc_cache_overview,
+        GPUDeviceID
+    )
+
+    chi2[possiblePeriodsIndices] = chi2_again
+    chi2_median = np.median(chi2)
+    # replace the extreme outliers
+    chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
+
+    SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
+    power_again = power[possiblePeriodsIndices]
+    periodIndex = possiblePeriodsIndices[np.argmax(power_again)]
     period = periods[periodIndex]
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
