@@ -328,7 +328,7 @@ def search_multi_periods(
     periodIndex = possiblePeriodsIndices[np.argmax(power_again)]
     period = periods[periodIndex]
 
-    possiblePeriodsTimesRate = [0.5,2,2/3,3/2]
+    possiblePeriodsTimesRate = [0.5,1,2,2/3,3/2]
     possiblePeriodsTemp = [period * rate for rate in possiblePeriodsTimesRate]
 
     possiblePeriodsIndices, possiblePeriods = find_nearest_indices(possiblePeriodsTemp, periods)
