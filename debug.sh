@@ -6,7 +6,7 @@ cd "$BASEDIR"
 python3 -m pip uninstall -y gputls
 python3 -m build
 # python3 -m pip install dist/gputls-0.3.1-py3-none-any.whl --break-system-packages
-python3 -m pip install dist/gputls-0.3.1-py3-none-any.whl
+python3 -m pip install dist/gputls-0.4.0-py3-none-any.whl
 # python3 test1.py
 # python3 generatedTest.py
 python3 KeplerLongCurveSingleTest.py

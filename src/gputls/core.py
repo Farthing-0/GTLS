@@ -97,7 +97,7 @@ def search_multi_periods(
     nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
     singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
 
-    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
+    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods) / 30]))
 
     if singleCalcPeriods < 15:
         singleCalcPeriods = int(singleCalcPeriods / 1.1)
