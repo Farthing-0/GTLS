@@ -755,8 +755,6 @@ def search_single_periods(
     ))
 
     bestLocation = lowestResidualsGPU.argmin().get()
-    # print('bestLocation',bestLocation)
-        # LowestResidualsEachPeriodGPU[iterFlag*singleCalcPeriods + i] = lowestResidualsGPU[i].min()
 
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)    
     durationPointsNum = durations[durationIndex]

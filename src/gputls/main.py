@@ -108,6 +108,7 @@ class gtls(object):
                 M_star_max=self.M_star_max,
                 lc_arr=self.lc_arr,
                 lc_cache_overview=self.lc_cache_overview,
+                T0_fit_margin=self.T0_fit_margin,
                 oversampling_factor = self.oversampling_factor,
                 verbose=self.verbose,
                 useLocalPTXCUBIN=self.useLocalPTXCUBIN,
