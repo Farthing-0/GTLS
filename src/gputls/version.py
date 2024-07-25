@@ -1,2 +1,2 @@
-TLS_VERSIONING = "0.4.0"
-TLS_DATE = "July 2024"
+GTLS_VERSION = '0.4.1'
+GTLS_DATE = 'July'

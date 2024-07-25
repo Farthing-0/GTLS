@@ -6,9 +6,9 @@ from . import version as version
 resources_dir = path.join(path.dirname(__file__))
 TLS_VERSION = (
     "GPU Transit Least Squares GTLS "
-    + version.TLS_VERSIONING
+    + version.GTLS_VERSION
     + " ("
-    + version.TLS_DATE
+    + version.GTLS_DATE
     + ")"
 )
 
