@@ -290,6 +290,7 @@ def search_multi_periods(
     chi2 = LowestResidualsEachPeriodGPU.get()
 
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
+    raw_power = power.copy()
 
     if fast:
         return periods,power
@@ -365,7 +366,7 @@ def search_multi_periods(
         GPUDeviceID
     )
 
-    return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink
+    return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power
 
 def search_multi_periods_again(
     periods,
