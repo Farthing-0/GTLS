@@ -1,5 +1,5 @@
-import numpy
 import numpy as np
+import numpy.ma as ma
 import cupy as cp
 from .stats import spectra,all_transit_times,calculate_transit_duration_in_days,intransit_stats,snr_stats,calcDurationDays
 from .helpers import transit_mask
@@ -77,7 +77,7 @@ def search_multi_periods(
     module = cp.RawModule(code=GPUCode)
     module.compile()
 
-    durations,indices = numpy.unique(lc_cache_overview["width_in_samples"],return_index=True)
+    durations,indices = np.unique(lc_cache_overview["width_in_samples"],return_index=True)
     lc_arr = lc_arr[indices]
     lc_cache_overview = lc_cache_overview[indices]
     maxDuration = int(max(durations))
@@ -86,7 +86,7 @@ def search_multi_periods(
     if maxDuration % 2 != 0:
         maxDuration = maxDuration + 1
     
-    durations = numpy.sort(durations)
+    durations = np.sort(durations)
     
     tSize = len(t)
     patchedDatasSize = int(tSize + maxDuration)
@@ -289,6 +289,12 @@ def search_multi_periods(
 
     chi2 = LowestResidualsEachPeriodGPU.get()
 
+    raw_chi2 = chi2.copy()
+    median = np.median(raw_chi2)
+    chi2_mask = raw_chi2 > (100 * median)
+    chi2 = ma.array(raw_chi2, mask=chi2_mask)
+    periods = ma.array(periods, mask=chi2_mask)
+
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
     raw_power = power.copy()
 
@@ -307,6 +313,7 @@ def search_multi_periods(
 
     possiblePeriodsIndices = top_100_indices + next_100_indices
     possiblePeriods = top_100_periods + next_100_periods
+    print(possiblePeriods)
 
     chi2_again = search_multi_periods_again(
         possiblePeriods,
@@ -321,9 +328,9 @@ def search_multi_periods(
     )
 
     chi2[possiblePeriodsIndices] = chi2_again
-    chi2_median = np.median(chi2)
-    # replace the extreme outliers
-    chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
+    # chi2_median = np.median(chi2)
+    # # replace the extreme outliers
+    # chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
 
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
     power_again = power[possiblePeriodsIndices]
@@ -368,7 +375,8 @@ def search_multi_periods(
         GPUDeviceID
     )
 
-    return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power
+    return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,\
+            SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power,raw_chi2
 
 def search_multi_periods_again(
     periods,
@@ -388,7 +396,7 @@ def search_multi_periods_again(
     GPUCode = GPUFun.getGPUCode()
     module = cp.RawModule(code=GPUCode)
 
-    durations,indices = numpy.unique(lc_cache_overview["width_in_samples"],return_index=True)
+    durations,indices = np.unique(lc_cache_overview["width_in_samples"],return_index=True)
     lc_arr = lc_arr[indices]
     lc_cache_overview = lc_cache_overview[indices]
     maxDuration = int(max(durations))
@@ -397,7 +405,7 @@ def search_multi_periods_again(
     if maxDuration % 2 != 0:
         maxDuration = maxDuration + 1
     
-    durations = numpy.sort(durations)
+    durations = np.sort(durations)
     
     tSize = len(t)
     patchedDatasSize = int(tSize + maxDuration)
@@ -607,14 +615,14 @@ def search_single_periods(
     GPUCode = GPUFun.getGPUCode()
     module = cp.RawModule(code=GPUCode)
 
-    durations = numpy.unique(lc_cache_overview["width_in_samples"])
+    durations = np.unique(lc_cache_overview["width_in_samples"])
     maxDuration = int(max(durations))
 
     # why?
     if maxDuration % 2 != 0:
         maxDuration = maxDuration + 1
     
-    durations = numpy.sort(durations)
+    durations = np.sort(durations)
     
     tSize = len(t)
     patchedDatasSize = int(tSize + maxDuration)
@@ -828,16 +836,16 @@ def search_single_periods(
         per_transit_count=per_transit_count,
     )
 
-    all_flux_intransit = numpy.concatenate(
+    all_flux_intransit = np.concatenate(
         [all_flux_intransit_odd, all_flux_intransit_even]
     )
     intransit = transit_mask(t, period, 2 * rawDuration, T0)
     flux_ootr = y[~intransit]
-    depth_mean = numpy.mean(all_flux_intransit)
-    # depth_mean_std = numpy.std(all_flux_intransit) / numpy.sum(
+    depth_mean = np.mean(all_flux_intransit)
+    # depth_mean_std = np.std(all_flux_intransit) / np.sum(
     #     per_transit_count
     # ) ** (0.5)
-    snr = ((1 - depth_mean) / numpy.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)
+    snr = ((1 - depth_mean) / np.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)
 
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
     
