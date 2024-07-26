@@ -316,7 +316,8 @@ def search_multi_periods(
         transit_depth_min,
         lc_arr,
         lc_cache_overview,
-        GPUDeviceID
+        GPUDeviceID,
+        singleCalcPeriods
     )
 
     chi2[possiblePeriodsIndices] = chi2_again
@@ -342,7 +343,8 @@ def search_multi_periods(
         transit_depth_min,
         lc_arr,
         lc_cache_overview,
-        GPUDeviceID
+        GPUDeviceID,
+        singleCalcPeriods
     )
 
     chi2[possiblePeriodsIndices] = chi2_again
@@ -376,7 +378,8 @@ def search_multi_periods_again(
     transit_depth_min,
     lc_arr,
     lc_cache_overview,
-    GPUDeviceID = 0,
+    GPUDeviceID,
+    singleCalcPeriods,
 ):
     
     # Choose the GPU device
@@ -400,15 +403,15 @@ def search_multi_periods_again(
     patchedDatasSize = int(tSize + maxDuration)
     patchedDatasSizeGPU = cp.asarray(np.array([patchedDatasSize])).astype(cp.int32)
 
-    pynvml.nvmlInit()
-    handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
-    nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
+    # pynvml.nvmlInit()
+    # handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
+    # nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    # singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
 
-    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
+    # # singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods)]))
 
-    if singleCalcPeriods < 15:
-        singleCalcPeriods = int(singleCalcPeriods / 1.1)
+    # # if singleCalcPeriods < 15:
+    # #     singleCalcPeriods = int(singleCalcPeriods / 1.1)
 
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
