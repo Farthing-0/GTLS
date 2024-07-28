@@ -1,2 +1,2 @@
-GTLS_VERSION = '0.4.1'
+GTLS_VERSION = '0.4.2'
 GTLS_DATE = 'July'

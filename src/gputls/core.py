@@ -313,7 +313,6 @@ def search_multi_periods(
 
     possiblePeriodsIndices = top_100_indices + next_100_indices
     possiblePeriods = top_100_periods + next_100_periods
-    print(possiblePeriods)
 
     chi2_again = search_multi_periods_again(
         possiblePeriods,
