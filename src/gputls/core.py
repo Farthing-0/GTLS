@@ -375,7 +375,7 @@ def search_multi_periods(
     )
 
     return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,\
-            SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power,raw_chi2
+            SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriods
 
 def search_multi_periods_again(
     periods,
