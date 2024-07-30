@@ -339,10 +339,10 @@ def search_multi_periods(
     possiblePeriodsTimesRate = [0.5,1,2,2/3,3/2]
     possiblePeriodsTemp = [period * rate for rate in possiblePeriodsTimesRate]
 
-    possiblePeriodsIndices, possiblePeriods = find_nearest_indices(possiblePeriodsTemp, periods)
+    possiblePeriodsIndices_multi, possiblePeriods_multi = find_nearest_indices(possiblePeriodsTemp, periods)
 
     chi2_again = search_multi_periods_again(
-        possiblePeriods,
+        possiblePeriods_multi,
         t,
         y,
         dy,
@@ -353,14 +353,14 @@ def search_multi_periods(
         singleCalcPeriods
     )
 
-    chi2[possiblePeriodsIndices] = chi2_again
+    chi2[possiblePeriodsIndices_multi] = chi2_again
     chi2_median = np.median(chi2)
     # replace the extreme outliers
     chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
 
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
-    power_again = power[possiblePeriodsIndices]
-    periodIndex = possiblePeriodsIndices[np.argmax(power_again)]
+    power_again = power[possiblePeriodsIndices_multi]
+    periodIndex = possiblePeriodsIndices_multi[np.argmax(power_again)]
     period = periods[periodIndex]
 
     rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink = search_single_periods(
@@ -375,7 +375,7 @@ def search_multi_periods(
     )
 
     return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,\
-            SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriods
+            SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods
 
 def search_multi_periods_again(
     periods,

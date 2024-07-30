@@ -76,7 +76,7 @@ class gtls(object):
 
         if self.fast == False:
             self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,\
-                SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriods\
+                SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods\
                 = core.search_multi_periods(
                 periods=periods,
                 t=self.t,
@@ -122,7 +122,7 @@ class gtls(object):
             return periods,power
         self.rawDurations = durations
         return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,\
-                          SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriods)
+                          SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods)
     
     # Useful tools
 
