@@ -353,10 +353,10 @@ def search_multi_periods(
         singleCalcPeriods
     )
 
-    chi2[possiblePeriodsIndices_multi] = chi2_again
-    chi2_median = np.median(chi2)
+    chi2[possiblePeriodsIndices] = chi2_again
+    # chi2_median = np.ma.median(chi2)
     # replace the extreme outliers
-    chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
+    # chi2 = np.where(np.abs(chi2 - chi2_median) > 50 * chi2_median, chi2_median, chi2)
 
     SR, power_raw, power, SDE_raw, SDE = spectra(chi2, oversampling_factor)
     power_again = power[possiblePeriodsIndices_multi]

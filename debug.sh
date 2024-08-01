@@ -1,7 +1,7 @@
 #!/bin/bash
 BASEDIR=$(dirname "$0")
-Version="0.4.2"
-Date="July 2024"
+Version="0.4.3"
+Date="Augest-2024"
 cd "$BASEDIR"
 rm -r dist
 ./changeVersion.sh $Version $Date
