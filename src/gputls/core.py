@@ -19,66 +19,12 @@ def set_cuda_device(device_id):
     cp.cuda.Device(device_id).use()
 
 def calcGridBlockSize(size):
-    # 优化：增加最大线程块大小到256，提高GPU占用率
-    MAX_BLOCK_SIZE = 256
-    blockSize = min(size, MAX_BLOCK_SIZE)
-    # 修复除法问题，使用向上取整
-    gridSizeX = int((size + blockSize - 1) // blockSize)
-    return blockSize, gridSizeX
-
-class OptimizedMemoryManager:
-    """简化的内存管理器，用于减少内存分配开销"""
-    
-    def __init__(self, device_id=0):
-        self.device_id = device_id
-        self.memory_pools = {}
-        self.persistent_arrays = {}
-        cp.cuda.Device(device_id).use()
-    
-    def get_aligned_size(self, size, alignment=256):
-        """内存对齐到指定字节边界"""
-        return ((size + alignment - 1) // alignment) * alignment
-    
-    def allocate_or_reuse(self, name, shape, dtype):
-        """分配或重用GPU内存"""
-        total_size = np.prod(shape)
-        aligned_size = self.get_aligned_size(total_size)
-        
-        # 检查是否已有足够大小的数组
-        if name in self.persistent_arrays:
-            existing = self.persistent_arrays[name]
-            if existing.size >= total_size:
-                return existing[:total_size].reshape(shape)
-        
-        # 分配新数组
-        try:
-            new_array = cp.empty(aligned_size, dtype=dtype)
-            self.persistent_arrays[name] = new_array
-            return new_array[:total_size].reshape(shape)
-        except cp.cuda.memory.OutOfMemoryError:
-            # 清理未使用的内存并重试
-            self.cleanup_unused()
-            new_array = cp.empty(aligned_size, dtype=dtype)
-            self.persistent_arrays[name] = new_array
-            return new_array[:total_size].reshape(shape)
-    
-    def cleanup_unused(self):
-        """清理未使用的内存"""
-        # 简单的清理策略：删除一半的缓存数组
-        keys_to_delete = list(self.persistent_arrays.keys())[::2]
-        for key in keys_to_delete:
-            del self.persistent_arrays[key]
-        cp.get_default_memory_pool().free_all_blocks()
-
-# 全局内存管理器实例
-_memory_manager = None
-
-def get_memory_manager(device_id=0):
-    """获取内存管理器单例"""
-    global _memory_manager
-    if _memory_manager is None:
-        _memory_manager = OptimizedMemoryManager(device_id)
-    return _memory_manager
+    MAX_BLOCK_SIZE = 128
+    blockSize = size
+    if blockSize > MAX_BLOCK_SIZE:
+        blockSize = MAX_BLOCK_SIZE
+    gridSizeX = int((size / blockSize) + 1)
+    return blockSize,gridSizeX
 
 def find_nearest_indices(a, b):
     a = np.array(a)
@@ -122,9 +68,6 @@ def search_multi_periods(
     
     # Choose the GPU device
     set_cuda_device(GPUDeviceID)
-    
-    # 获取内存管理器
-    memory_manager = get_memory_manager(GPUDeviceID)
 
     GPUCode = GPUFun.getGPUCode()
     if T0_fit_margin == 0:
@@ -152,23 +95,12 @@ def search_multi_periods(
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
     nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    
-    # 更精确的内存估算，考虑内存对齐
-    memory_per_period = (
-        patchedDatasSize * 6 * 4 +  # 主要float32数组
-        tSize * 4 * 4 +             # 索引和相位数组
-        len(durations) * (patchedDatasSize + tSize) * 4  # 结果数组
-    )
-    
-    # 更保守的内存分配，避免内存碎片和峰值
-    available_memory = nvmlinfo.free * 0.4  # 使用40%的可用内存，更保守
-    singleCalcPeriods_max = int(available_memory / memory_per_period)
-    
-    singleCalcPeriods = max(10, min(singleCalcPeriods_max, len(periods) // 50))  # 更小的批次
-    
-    if verbose:
-        print(f"优化内存分配: 每迭代处理 {singleCalcPeriods} 个周期")
-        print(f"估计每周期内存: {memory_per_period / 1024**2:.2f} MB")
+    singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
+
+    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max),len(periods) / 30]))
+
+    if singleCalcPeriods < 15:
+        singleCalcPeriods = int(singleCalcPeriods / 1.1)
 
     #Due to GPU memory size limitation, GPU can only do several periods at a time.
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
@@ -176,48 +108,42 @@ def search_multi_periods(
     if verbose:
         pbar = tqdm.tqdm(total=TotalIter,position=bar_location)
 
-    # 使用内存管理器分配变量
-    periodsGPU = memory_manager.allocate_or_reuse('periodsGPU', (singleCalcPeriods,), cp.float64)
-    durationsMaxGPU = memory_manager.allocate_or_reuse('durationsMaxGPU', (singleCalcPeriods,), cp.int32)
-    durationsMinGPU = memory_manager.allocate_or_reuse('durationsMinGPU', (singleCalcPeriods,), cp.int32)
-    locationGPU = memory_manager.allocate_or_reuse('locationGPU', (len(periods),), cp.int32)
-    LowestResidualsEachPeriodGPU = memory_manager.allocate_or_reuse('LowestResidualsEachPeriodGPU', (len(periods),), cp.float32)
+    #Initialize the variables
+    periodsGPU = cp.empty((singleCalcPeriods,),dtype=cp.float64)
+    durationsMaxGPU = cp.empty((singleCalcPeriods,),dtype=cp.int32)
+    durationsMinGPU = cp.empty((singleCalcPeriods,),dtype=cp.int32)
+    locationGPU = cp.empty(len(periods),dtype=cp.int32)
+    LowestResidualsEachPeriodGPU = cp.empty(len(periods),dtype=cp.float32)
 
     iterFlagGPU = cp.int32(0)
 
-    fulldurationsMaxGPU = memory_manager.allocate_or_reuse('fulldurationsMaxGPU', (len(periods),), cp.int32)
-    fulldurationsMinGPU = memory_manager.allocate_or_reuse('fulldurationsMinGPU', (len(periods),), cp.int32)
+    fulldurationsMaxGPU = cp.empty((len(periods),),dtype=cp.int32)
+    fulldurationsMinGPU = cp.empty((len(periods),),dtype=cp.int32)
     fullperiodsSizeGPU = cp.asarray(np.array([len(periods)])).astype(cp.int32)
     tSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
     tLengthGPU = cp.asarray(np.array([max(t) - min(t)])).astype(cp.float32)
-    periodsGPU_full = cp.asarray(periods).astype(cp.float64)
+    periodsGPU = cp.asarray(periods).astype(cp.float64)
     
     durationsGridGPU = module.get_function('durationsGrid')
     blockSize,gridSizeX = calcGridBlockSize(len(periods))
     durationsGridGPU((gridSizeX,1,1),(blockSize,),
-                    (periodsGPU_full,fulldurationsMaxGPU, fulldurationsMinGPU,tLengthGPU,tSizeGPU, fullperiodsSizeGPU))
+                    (periodsGPU,fulldurationsMaxGPU, fulldurationsMinGPU,tLengthGPU,tSizeGPU, fullperiodsSizeGPU))
 
     fulldurationsSizeGPU = cp.asarray(np.array([len(durations)])).astype(cp.int32)
     fulldurationsGPU = cp.asarray(durations).astype(cp.int32)
-    durationBoolArrayGPU = memory_manager.allocate_or_reuse('durationBoolArrayGPU', (len(periods),len(durations)), cp.bool_)
+    durationBoolArrayGPU = cp.empty((len(periods),len(durations)),dtype=cp.bool_)
 
     durationBoolFunGPU = module.get_function('durationBool')
     blockSize,gridSizeX = calcGridBlockSize(len(periods))
     durationBoolFunGPU((gridSizeX,len(durations),1),(blockSize,1,1),
                     (fulldurationsMaxGPU,fulldurationsMinGPU,fulldurationsSizeGPU,fullperiodsSizeGPU,fulldurationsGPU,durationBoolArrayGPU))
 
-    durationsGridCollectionGPU = memory_manager.allocate_or_reuse('durationsGridCollectionGPU', (TotalIter,len(durations)), cp.bool_)
+    durationsGridCollectionGPU = cp.empty((TotalIter,len(durations)),dtype=cp.bool_)
 
-    # 预分配输入数据到GPU，使用内存管理器
-    yGPU = memory_manager.allocate_or_reuse('yGPU', (len(y),), cp.float32)
-    yGPU[:] = cp.asarray(y)
-    dyGPU = memory_manager.allocate_or_reuse('dyGPU', (len(dy),), cp.float32)
-    dyGPU[:] = cp.asarray(dy)
+    yGPU = cp.asarray(y).astype(cp.float32)
+    dyGPU = cp.asarray(dy).astype(cp.float32)
 
     for iterFlag in range(TotalIter):
-        
-        # 为当前迭代定义工作空间后缀
-        workspace_suffix = f"_iter_{iterFlag}"
 
         if iterFlag == TotalIter - 1:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:]
@@ -239,17 +165,13 @@ def search_multi_periods(
         durationsMaxGPU = cp.asarray(SinglePeriods).astype(cp.int32)
         durationsMinGPU = cp.asarray(SinglePeriods).astype(cp.int32)
 
-        lowestResidualsGPU = memory_manager.allocate_or_reuse(f'lowestResidualsGPU{workspace_suffix}', 
-                                                            (singleCalcPeriods, len(singleDurations), tSize), cp.float32)
+        lowestResidualsGPU = cp.empty((singleCalcPeriods,len(singleDurations),tSize),dtype=cp.float32)
+        # lowestResidualsGPU = cp.empty((singleCalcPeriods,len(singleDurations)*tSize),dtype=cp.float32)
 
-        # Phase fold - 使用内存管理器分配
-        phasesGPU = memory_manager.allocate_or_reuse(f'phasesGPU{workspace_suffix}', 
-                                                   (singleCalcPeriods, tSize), cp.float64)
-        sortIndexGPU = memory_manager.allocate_or_reuse(f'sortIndexGPU{workspace_suffix}', 
-                                                      (singleCalcPeriods, tSize), cp.int32)
-        tGPU = memory_manager.allocate_or_reuse('tGPU_global', (tSize,), cp.float64)
-        tGPU[:] = cp.asarray(t)  # 设置时间数据
-        
+        # Phase fold
+        phasesGPU = cp.empty((singleCalcPeriods,tSize),dtype=cp.float64)
+        sortIndexGPU = cp.empty((singleCalcPeriods,tSize),dtype=cp.int32)
+        tGPU = cp.asarray(t).astype(cp.float64)
         periodsSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         tSizeGPU = cp.asarray(np.array([tSize])).astype(cp.int32)
         tLengthGPU = cp.asarray(np.array([max(t) - min(t)])).astype(cp.float32)
@@ -259,12 +181,8 @@ def search_multi_periods(
         durationsGridGPU((gridSizeX,1,1),(blockSize,),
                         (periodsGPU,durationsMaxGPU, durationsMinGPU,tLengthGPU,tSizeGPU, periodsSizeGPU))
 
-        # 使用内存管理器分配工作空间数组，带内存对齐优化
-        workspace_suffix = f"_iter_{iterFlag}"
-        patchedDatasGPU = memory_manager.allocate_or_reuse(f'patchedDatasGPU{workspace_suffix}', 
-                                                         (singleCalcPeriods, tSize + maxDuration), cp.float32)
-        patchedDysGPU = memory_manager.allocate_or_reuse(f'patchedDysGPU{workspace_suffix}', 
-                                                       (singleCalcPeriods, tSize + maxDuration), cp.float32)
+        patchedDatasGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
+        patchedDysGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
 
         lc_arr_max_len = np.array([np.max(singleDurations)]).astype(np.int32)
         lc_arr_full_length = 1 - np.array([np.pad(x, (0, lc_arr_max_len[0] - len(x)), 'constant') for x in single_lc_arr])
@@ -272,11 +190,9 @@ def search_multi_periods(
         lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
         lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
         
-        edgeEffectCorrectionsGPU = memory_manager.allocate_or_reuse(f'edgeEffectCorrectionsGPU{workspace_suffix}', 
-                                                                  (singleCalcPeriods,), cp.float32)
+        edgeEffectCorrectionsGPU = cp.empty((singleCalcPeriods),dtype=cp.float32)
 
-        inverseSquaredPatchedDysGPU = memory_manager.allocate_or_reuse(f'inverseSquaredPatchedDysGPU{workspace_suffix}', 
-                                                                     (singleCalcPeriods, tSize + maxDuration), cp.float32)
+        inverseSquaredPatchedDysGPU = cp.empty((singleCalcPeriods,tSize + maxDuration),dtype=cp.float32)
         maxDurationGPU = cp.asarray(np.array([maxDuration])).astype(cp.int32)
         periodSizeGPU = cp.asarray(np.array([singleCalcPeriods])).astype(cp.int32)
         durationsGPU = cp.asarray(singleDurations).astype(cp.int32)
@@ -284,66 +200,33 @@ def search_multi_periods(
         datapointsGPU = cp.array([len(y)]).astype(cp.int32)
         transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
 
-        #GPU variables for the loop - 使用内存管理器
-        fullSumGPU = memory_manager.allocate_or_reuse(f'fullSumGPU{workspace_suffix}', 
-                                                    (singleCalcPeriods, len(singleDurations)), cp.float32)
-        cumsumGPU = memory_manager.allocate_or_reuse(f'cumsumGPU{workspace_suffix}', 
-                                                   (singleCalcPeriods, patchedDatasSize), cp.float32)
-        ootrGPU = memory_manager.allocate_or_reuse(f'ootrGPU{workspace_suffix}', 
-                                                 (singleCalcPeriods, len(singleDurations), tSize), cp.float32)
+        #GPU variables for the loop
+        fullSumGPU = cp.empty((singleCalcPeriods,len(singleDurations)),dtype=cp.float32)
+        cumsumGPU = cp.empty((singleCalcPeriods,patchedDatasSize),dtype=cp.float32)
+        ootrGPU = cp.empty((singleCalcPeriods,len(singleDurations),(tSize)),dtype=cp.float32)
 
-        # 创建CUDA流用于重叠计算
-        stream1 = cp.cuda.Stream()
-        stream2 = cp.cuda.Stream()
-        
-        # 流1：相位折叠
-        with stream1:
-            fastFoldGPU = module.get_function('foldFast')
-            blockSize,gridSizeX = calcGridBlockSize(tSize)
-            fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
+        fastFoldGPU = module.get_function('foldFast')
+        blockSize,gridSizeX = calcGridBlockSize(tSize)
+        fastFoldGPU((gridSizeX,singleCalcPeriods,),(blockSize,), (tGPU, periodsGPU,phasesGPU,periodsSizeGPU,tSizeGPU))
 
-        # 流2：预备其他数据
-        with stream2:
-            # 预先计算持续时间相关的常量
-            pass
+        # # incase gpu memory is not enough, split the phasesGPU into several parts
+        i_max = 10
+        for i in range(1,i_max + 1):
+            sortIndexGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max] = phasesGPU[(i-1)*singleCalcPeriods/i_max:i*singleCalcPeriods/i_max].argsort()
+        # todo: change to below way, seems a bug here
+        # sortIndexGPU = phasesGPU.argsort()
 
-        # 等待相位折叠完成
-        stream1.synchronize()
+        #calculate patched data
+        patchDataGPU = module.get_function('patchData')
+        blockSize,gridSizeX = calcGridBlockSize(tSize + maxDuration)
+        patchDataGPU((gridSizeX,singleCalcPeriods,),(blockSize,),
+        (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
+        maxDurationGPU,yGPU,dyGPU,tSizeGPU))
 
-        # 优化排序部分 - 减少分批次数
-        i_max = min(5, singleCalcPeriods)  # 减少分批次数以提高效率
-        batch_size = singleCalcPeriods // i_max
-        for i in range(i_max):
-            start_idx = i * batch_size
-            end_idx = min((i + 1) * batch_size, singleCalcPeriods)
-            if start_idx < end_idx:
-                sortIndexGPU[start_idx:end_idx] = phasesGPU[start_idx:end_idx].argsort()
-
-        # 使用多流并行执行核心函数
-        # 创建事件用于流同步
-        sync_event = cp.cuda.Event()
-        
-        with stream1:
-            #calculate patched data
-            patchDataGPU = module.get_function('patchData')
-            blockSize,gridSizeX = calcGridBlockSize(tSize + maxDuration)
-            patchDataGPU((gridSizeX,singleCalcPeriods,),(blockSize,),
-            (patchedDatasGPU,patchedDysGPU,patchedDatasSizeGPU,sortIndexGPU,
-            maxDurationGPU,yGPU,dyGPU,tSizeGPU))
-            # 记录完成事件
-            sync_event.record(stream1)
-
-        with stream2:
-            # 等待patchData完成
-            stream2.wait_event(sync_event)
-            calcInverseSquaredPatchedDyGPU = module.get_function('calcInverseSquaredPatchedDy')
-            blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize)
-            calcInverseSquaredPatchedDyGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
-            (inverseSquaredPatchedDysGPU,patchedDysGPU,patchedDatasSizeGPU,))
-
-        # 同步所有流
-        stream1.synchronize()
-        stream2.synchronize()
+        calcInverseSquaredPatchedDyGPU = module.get_function('calcInverseSquaredPatchedDy')
+        blockSize,gridSizeX = calcGridBlockSize(patchedDatasSize)
+        calcInverseSquaredPatchedDyGPU((gridSizeX,singleCalcPeriods,1),(blockSize,1,1),
+        (inverseSquaredPatchedDysGPU,patchedDysGPU,patchedDatasSizeGPU,))
 
         calcEdgeEffectCorrectionsGPU = module.get_function('calcEdgeEffectCorrections')
         blockSize,gridSizeX = calcGridBlockSize(singleCalcPeriods)
@@ -400,17 +283,6 @@ def search_multi_periods(
         LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
 
         iterFlagGPU = iterFlagGPU + 1
-        
-        # 清理当前迭代的流资源
-        stream1.synchronize()
-        stream2.synchronize()
-        del stream1, stream2, sync_event
-        
-        # 强制清理GPU内存，减少内存碎片
-        cp.get_default_memory_pool().free_all_blocks()
-        
-        # 清理当前迭代的工作空间变量
-        memory_manager.cleanup_unused()
 
         if verbose:
             pbar.update(1)
