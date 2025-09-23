@@ -245,19 +245,48 @@ def search_multi_periods(
         patchedDatasSizeGPU,durationsGPU,durationsSizeGPU,
         periodSizeGPU,))
 
-        calcAllOutOfTransitResiduals_step1_2GPU = module.get_function('calcAllOutOfTransitResiduals_step1_2GPU')
-        blockSize,gridSizeX = calcGridBlockSize(tSize)
-        calcAllOutOfTransitResiduals_step1_2GPU((gridSizeX,len(singleDurations),singleCalcPeriods),
-        (blockSize,1,1),(ootrGPU,patchedDatasGPU,durationsGPU,durationsSizeGPU,
-        inverseSquaredPatchedDysGPU,patchedDatasSizeGPU,tSizeGPU,))
+        patchedDatasSize = patchedDatasGPU.shape[1] 
 
-        ootrGPU = cp.cumsum(ootrGPU,axis=-1)
-        calcAllOutOfTransitResiduals_step2_2GPU = module.get_function('calcAllOutOfTransitResiduals_step2_2GPU')
-        blockSize,gridSizeX = calcGridBlockSize(tSize)
-        calcAllOutOfTransitResiduals_step2_2GPU((gridSizeX,len(singleDurations),singleCalcPeriods),
-        (blockSize,1,1),(ootrGPU,
-        durationsSizeGPU,patchedDatasSizeGPU,
-        durationsGPU,tSizeGPU,fullSumGPU,))
+        # --- STAGE 1: Pre-compute Error Prefix Sum ---
+
+        # 1a. Allocate space for the base error term. Size is based on the full data.
+        base_error = cp.empty((singleCalcPeriods, patchedDatasSize), dtype=cp.float32)
+
+        # 1b. Launch kernel to calculate base error.
+        kernel_calc_error = module.get_function('calculate_base_error')
+        block_dim_1d = (256,)
+        grid_dim_2d = ((patchedDatasSize + block_dim_1d[0] - 1) // block_dim_1d[0], singleCalcPeriods)
+
+        kernel_calc_error(
+            grid=grid_dim_2d, block=block_dim_1d,
+            args=(base_error, patchedDatasGPU, inverseSquaredPatchedDysGPU, patchedDatasSize, singleCalcPeriods)
+        )
+
+        # 1c. Perform cumsum on the ENTIRE base_error array.
+        error_prefix_sum = cp.cumsum(base_error, axis=1)
+
+        # --- STAGE 2: Calculate Final OOTR using the corrected kernel ---
+
+        kernel_final_ootr = module.get_function('calculate_final_ootr_v3')
+        # Grid is based on the final output dimensions
+        grid_dim_3d = ((tSize + 255) // 256, len(singleDurations), singleCalcPeriods)
+        block_dim_3d = (256, 1, 1)
+
+        kernel_final_ootr(
+            grid=grid_dim_3d, block=block_dim_3d,
+            args=(
+                ootrGPU, 
+                error_prefix_sum,
+                fullSumGPU,
+                durationsGPU,
+                tSize,
+                patchedDatasSize, # Pass the full data size for correct boundary checks
+                len(singleDurations),
+                singleCalcPeriods
+            )
+        )
+
+
 
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
         blockSize,gridSizeX = calcGridBlockSize(tSize)
@@ -393,7 +422,7 @@ def search_multi_periods_again(
     set_cuda_device(GPUDeviceID)
 
     GPUCode = GPUFun.getGPUCode()
-    module = cp.RawModule(code=GPUCode)
+    module = cp.RawModule(code=GPUCode,options=('-lineinfo', ))
 
     durations,indices = np.unique(lc_cache_overview["width_in_samples"],return_index=True)
     lc_arr = lc_arr[indices]
