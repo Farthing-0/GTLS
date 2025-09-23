@@ -343,6 +343,91 @@ extern "C"{
         }
     }
 
+    #define TILE_WIDTH 256
+
+    /**
+    * FINAL CORRECTED VERSION: calcAllLowestResidualsGPUB_SignalTiled_v2
+    * This version corrects the 'actualLossFraction' calculation to be
+    * bit-for-bit identical to the original kernel, while retaining the
+    * performance optimization for the 'signal' array.
+    */
+    __global__ void calcAllLowestResidualsGPUB_SignalTiled_v2(
+        /* ... 参数列表与原版完全相同 ... */
+        float *out, int *resultArrayXAxisSize,
+        float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
+        float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
+        float *in_overshoot, float *in_ootr, float *in_fullsum,
+        float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
+        float *in_transit_depth_min
+    ) {
+        // 仅为 signal 定义共享内存
+        __shared__ float s_signal[TILE_WIDTH];
+
+        // 线程索引和初始设置 (与原版完全相同)
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        int y = blockIdx.y;
+        int z = blockIdx.z;
+
+        if (tid >= *resultArrayXAxisSize) {
+            return;
+        }
+
+        int duration = in_duration[y];
+        
+        // (所有前置计算逻辑与原版完全相同)
+        int skipPoint = (duration > SKIP_POINT) ? (duration / SKIP_POINT) : 1;
+        float transit_depth_min = *in_transit_depth_min;
+        int datapoints = *in_datapoints;
+        float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, z);
+
+        float current_stat = (float)datapoints;
+
+        if (calc_mean > transit_depth_min && tid % skipPoint == 0) {
+            float ootr = (tid == 0) ? 
+                in_fullsum[(long long)z * (*in_duration_size) + y] :
+                in_ootr[(long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
+            
+            // 指针设置 (与原版完全相同)
+            float *data = in_patched_datas + (long long)z * (*in_patched_datas_size) + tid;
+            float *dy = in_inverse_squared_patched_dys + (long long)z * (*in_patched_datas_size) + tid;
+            float *signal = in_signal + (long long)y * (*in_max_signal_x_size);
+            
+            float reverse_scale = calc_mean * in_overshoot[y] * 2.0f;
+            float summed_edge_effect_correction = in_summed_edge_effect_correction[z];
+            float intransit_residual = 0.0f;
+            int skipSearchPoint = 1;
+
+            // --- 核心优化循环 (分块缓存signal) ---
+            for (int tile_start = 0; tile_start < duration; tile_start += TILE_WIDTH) {
+                
+                int load_idx = tile_start + threadIdx.x;
+                if (load_idx < duration) {
+                    s_signal[threadIdx.x] = signal[load_idx];
+                }
+                __syncthreads();
+
+                int current_tile_width = min(TILE_WIDTH, duration - tile_start);
+                for (int i = 0; i < current_tile_width; i += skipSearchPoint) {
+                    float sigi = s_signal[i] * reverse_scale;
+                    int global_i = tile_start + i;
+                    float loss = data[global_i] - (1.0f - sigi);
+                    intransit_residual += loss * loss * dy[global_i];
+                }
+                __syncthreads();
+            }
+            
+            // *** 关键修正点 ***
+            // 使用与原始内核完全相同的公式来计算 actualLossFraction
+            float actualLossFraction = (float)duration / (((duration - 1) / skipSearchPoint) + 1);
+            
+            current_stat = intransit_residual * actualLossFraction + ootr - summed_edge_effect_correction;
+        }
+
+        out[(long long)tid + (long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
+    }
+
+
+
     /**
      * Highly optimized main residuals calculation kernel
      */

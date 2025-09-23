@@ -286,9 +286,8 @@ def search_multi_periods(
             )
         )
 
-
-
-        calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
+        # calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
+        calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB_SignalTiled_v2')
         blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllLowestResidualsGPU((gridSizeX,len(singleDurations),singleCalcPeriods),
         # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
