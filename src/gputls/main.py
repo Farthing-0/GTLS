@@ -23,7 +23,7 @@ class gtls(object):
             print(constants.TLS_VERSION)
 
         # Generate possible periods
-        if self.periods == []:
+        if len(self.periods) == 0:
             periods = period_grid(
                 R_star=self.R_star,
                 M_star=self.M_star,
