@@ -19,7 +19,7 @@ def set_cuda_device(device_id):
     cp.cuda.Device(device_id).use()
 
 def calcGridBlockSize(size):
-    MAX_BLOCK_SIZE = 128
+    MAX_BLOCK_SIZE = 256
     blockSize = size
     if blockSize > MAX_BLOCK_SIZE:
         blockSize = MAX_BLOCK_SIZE
