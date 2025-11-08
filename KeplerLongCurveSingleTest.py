@@ -91,7 +91,12 @@ for index,line in data.iterrows():
 
     if GTLSTestFlag:
         GTLSmodel = gtls(t = AllTimes, y = AllFluxes, dy = AllDys)
-        gtlsResult = GTLSmodel.power(bar_location = 0,GPUDeviceID = 1,T0_fit_margin = T0_fit_margin)
+        # gtlsResult = GTLSmodel.power(bar_location = 0,GPUDeviceID = 1,T0_fit_margin = T0_fit_margin)
+        gtlsResult = GTLSmodel.power(
+            # periods = np.linspace(100,150,500),
+            bar_location = 0,GPUDeviceID = 1,T0_fit_margin = T0_fit_margin)
+        
+        print(gtlsResult.raw_chi2.tolist())
         print(gtlsResult.period,gtlsResult.T0,gtlsResult.duration,gtlsResult.depth,gtlsResult.snr,gtlsResult.SDE)
     break
 
