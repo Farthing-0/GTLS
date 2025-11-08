@@ -147,13 +147,22 @@ def search_multi_periods(
 
         if iterFlag == TotalIter - 1:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:]
-            # enlarge the SinglePeriods array to the same size as singleCalcPeriods
-            SinglePeriods = np.append(SinglePeriods,np.zeros((singleCalcPeriods - len(SinglePeriods),)))
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[-1])
+            actual_period_count = len(SinglePeriods)
+            # 用最后一个有效period填充而不是0，避免除零错误
+            if actual_period_count < singleCalcPeriods:
+                SinglePeriods = np.append(SinglePeriods, 
+                                         np.full(singleCalcPeriods - actual_period_count, SinglePeriods[-1]))
+            # 正确处理duration bool: 使用所有有效periods的duration范围
+            start_idx = iterFlag*singleCalcPeriods
+            end_idx = min(start_idx + actual_period_count, len(periods))
+            # 对所有有效的periods进行 logical_or 操作，获取这批periods需要的所有durations
+            temp_bool = durationBoolArrayGPU[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+            durationsGridCollectionGPU[iterFlag] = temp_bool
         else:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            # durationsGridGPU = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
+            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods-1])
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
@@ -489,13 +498,22 @@ def search_multi_periods_again(
 
         if iterFlag == TotalIter - 1:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:]
-            # enlarge the SinglePeriods array to the same size as singleCalcPeriods
-            SinglePeriods = np.append(SinglePeriods,np.zeros((singleCalcPeriods - len(SinglePeriods),)))
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[-1])
+            actual_period_count = len(SinglePeriods)
+            # 用最后一个有效period填充而不是0，避免除零错误
+            if actual_period_count < singleCalcPeriods:
+                SinglePeriods = np.append(SinglePeriods, 
+                                         np.full(singleCalcPeriods - actual_period_count, SinglePeriods[-1]))
+            # 正确处理duration bool: 使用所有有效periods的duration范围
+            start_idx = iterFlag*singleCalcPeriods
+            end_idx = min(start_idx + actual_period_count, len(periods))
+            # 对所有有效的periods进行logical_or操作，获取这批periods需要的所有durations
+            temp_bool = durationBoolArrayGPU[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+            durationsGridCollectionGPU[iterFlag] = temp_bool
         else:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            # durationsGridGPU = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods])
+            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods-1])
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
