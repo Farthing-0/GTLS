@@ -360,6 +360,9 @@ extern "C"{
         float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
         float *in_transit_depth_min
     ) {
+        // 仅为 signal 定义共享内存
+        __shared__ float s_signal[TILE_WIDTH];
+
         // 线程索引和初始设置 (与原版完全相同)
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
         int y = blockIdx.y;
@@ -379,10 +382,7 @@ extern "C"{
 
         float current_stat = (float)datapoints;
 
-        // 检查是否满足条件
-        bool should_compute = (calc_mean > transit_depth_min && tid % skipPoint == 0);
-
-        if (should_compute) {
+        if (calc_mean > transit_depth_min && tid % skipPoint == 0) {
             float ootr = (tid == 0) ? 
                 in_fullsum[(long long)z * (*in_duration_size) + y] :
                 in_ootr[(long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
@@ -397,12 +397,23 @@ extern "C"{
             float intransit_residual = 0.0f;
             int skipSearchPoint = 1;
 
-            // --- 不使用共享内存，直接从全局内存读取 signal ---
-            // 这样可以避免 __syncthreads() 在条件分支中的问题
-            for (int i = 0; i < duration; i += skipSearchPoint) {
-                float sigi = signal[i] * reverse_scale;
-                float loss = data[i] - (1.0f - sigi);
-                intransit_residual += loss * loss * dy[i];
+            // --- 核心优化循环 (分块缓存signal) ---
+            for (int tile_start = 0; tile_start < duration; tile_start += TILE_WIDTH) {
+                
+                int load_idx = tile_start + threadIdx.x;
+                if (load_idx < duration) {
+                    s_signal[threadIdx.x] = signal[load_idx];
+                }
+                __syncthreads();
+
+                int current_tile_width = min(TILE_WIDTH, duration - tile_start);
+                for (int i = 0; i < current_tile_width; i += skipSearchPoint) {
+                    float sigi = s_signal[i] * reverse_scale;
+                    int global_i = tile_start + i;
+                    float loss = data[global_i] - (1.0f - sigi);
+                    intransit_residual += loss * loss * dy[global_i];
+                }
+                __syncthreads();
             }
             
             // *** 关键修正点 ***

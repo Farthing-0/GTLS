@@ -1,6 +1,6 @@
 #!/bin/bash
 BASEDIR=$(dirname "$0")
-Version="0.4.4"
+Version="0.5.0"
 Date="Oct-2025"
 cd "$BASEDIR"
 rm -r dist
