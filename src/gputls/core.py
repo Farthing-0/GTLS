@@ -162,10 +162,26 @@ def search_multi_periods(
             durationsGridCollectionGPU[iterFlag] = temp_bool
         else:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods-1])
+            # 修复：对当前批次的所有periods做logical_or，而不是只对比首尾两个
+            start_idx = iterFlag*singleCalcPeriods
+            end_idx = (iterFlag+1)*singleCalcPeriods
+            temp_bool = durationBoolArrayGPU[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+            durationsGridCollectionGPU[iterFlag] = temp_bool
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
+        
+        # Check if any durations are selected
+        if len(singleDurations) == 0:
+            # Skip this batch and fill with NaN
+            start_idx = iterFlag * singleCalcPeriods
+            valid_range = min(start_idx + singleCalcPeriods, len(periods)) - start_idx
+            LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = cp.nan
+            if verbose:
+                pbar.update(1)
+            continue
         single_lc_arr = lc_arr[durationsBoolGrid]
         single_lc_cache_overview = lc_cache_overview[durationsBoolGrid]
         overshootGPU = cp.array(single_lc_cache_overview["overshoot"]).astype(cp.float32)
@@ -273,6 +289,9 @@ def search_multi_periods(
 
         # 1c. Perform cumsum on the ENTIRE base_error array.
         error_prefix_sum = cp.cumsum(base_error, axis=1)
+        
+        # 同步 GPU 确保所有计算完成
+        cp.cuda.Stream.null.synchronize()
 
         # --- STAGE 2: Calculate Final OOTR using the corrected kernel ---
 
@@ -294,8 +313,7 @@ def search_multi_periods(
                 singleCalcPeriods
             )
         )
-
-        # calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
+        
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB_SignalTiled_v2')
         blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllLowestResidualsGPU((gridSizeX,len(singleDurations),singleCalcPeriods),
@@ -316,6 +334,7 @@ def search_multi_periods(
         flattened_residuals = valid_lowest_residuals.reshape(valid_range, -1)
         min_indices = cp.argmin(flattened_residuals, axis=-1)
         min_values = cp.min(flattened_residuals, axis=-1)
+        
         locationGPU[start_idx:start_idx + valid_range] = min_indices
         LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
 
@@ -513,7 +532,13 @@ def search_multi_periods_again(
             durationsGridCollectionGPU[iterFlag] = temp_bool
         else:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods-1])
+            # 修复：对当前批次的所有periods做logical_or，而不是只对比首尾两个
+            start_idx = iterFlag*singleCalcPeriods
+            end_idx = (iterFlag+1)*singleCalcPeriods
+            temp_bool = durationBoolArrayGPU[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+            durationsGridCollectionGPU[iterFlag] = temp_bool
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
