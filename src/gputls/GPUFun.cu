@@ -199,6 +199,37 @@ extern "C"{
     }
     
     /**
+     * Optimized full sum calculation using precomputed error_prefix_sum
+     * This is O(1) per thread instead of O(N) - major performance improvement
+     */
+    __global__ void calcAllFullSum_v2(float* fullsums, 
+                                      float *error_prefix_sum,
+                                      int patched_data_size,
+                                      int *in_duration, 
+                                      int duration_size,
+                                      int singleCalcPeriods) {
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // duration index
+        int period_idx = blockIdx.y;                         // period index
+
+        if (tid >= duration_size || period_idx >= singleCalcPeriods) {
+            return;
+        }
+
+        // Get pointer to this period's error_prefix_sum row
+        float *prefix_sum = error_prefix_sum + period_idx * patched_data_size;
+        
+        // fullsum = total sum = prefix_sum[last_element]
+        float fullsum = prefix_sum[patched_data_size - 1];
+        
+        // window_sum = prefix_sum[window - 1] (sum of first 'window' elements)
+        int window = in_duration[tid];
+        float window_sum = (window > 0) ? prefix_sum[window - 1] : 0.0f;
+        
+        // Result: fullsum - window_sum = sum from window to end
+        fullsums[tid + period_idx * duration_size] = fullsum - window_sum;
+    }
+    
+    /**
      * Optimized out-of-transit residuals calculation - Step 1
      */
     __global__ void calcAllOutOfTransitResiduals_step1_2GPU(float *temp_ootr,
@@ -341,13 +372,10 @@ extern "C"{
         }
     }
 
-    #define TILE_WIDTH 256
-
     /**
-    * FINAL CORRECTED VERSION: calcAllLowestResidualsGPUB_SignalTiled_v2
-    * This version corrects the 'actualLossFraction' calculation to be
-    * bit-for-bit identical to the original kernel, while retaining the
-    * performance optimization for the 'signal' array.
+    * FIXED VERSION: calcAllLowestResidualsGPUB_SignalTiled_v2
+    * REMOVED shared memory tiling to fix __syncthreads() inside conditional branch bug.
+    * This was causing NaN values when some threads skipped the conditional block.
     */
     __global__ void calcAllLowestResidualsGPUB_SignalTiled_v2(
         /* ... 参数列表与原版完全相同 ... */
@@ -358,10 +386,7 @@ extern "C"{
         float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
         float *in_transit_depth_min
     ) {
-        // 仅为 signal 定义共享内存
-        __shared__ float s_signal[TILE_WIDTH];
-
-        // 线程索引和初始设置 (与原版完全相同)
+        // 线程索引和初始设置
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
         int y = blockIdx.y;
         int z = blockIdx.z;
@@ -372,7 +397,6 @@ extern "C"{
 
         int duration = in_duration[y];
         
-        // (所有前置计算逻辑与原版完全相同)
         int skipPoint = (duration > SKIP_POINT) ? (duration / SKIP_POINT) : 1;
         float transit_depth_min = *in_transit_depth_min;
         int datapoints = *in_datapoints;
@@ -385,7 +409,7 @@ extern "C"{
                 in_fullsum[(long long)z * (*in_duration_size) + y] :
                 in_ootr[(long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
             
-            // 指针设置 (与原版完全相同)
+            // 指针设置
             float *data = in_patched_datas + (long long)z * (*in_patched_datas_size) + tid;
             float *dy = in_inverse_squared_patched_dys + (long long)z * (*in_patched_datas_size) + tid;
             float *signal = in_signal + (long long)y * (*in_max_signal_x_size);
@@ -395,27 +419,14 @@ extern "C"{
             float intransit_residual = 0.0f;
             int skipSearchPoint = 1;
 
-            // --- 核心优化循环 (分块缓存signal) ---
-            for (int tile_start = 0; tile_start < duration; tile_start += TILE_WIDTH) {
-                
-                int load_idx = tile_start + threadIdx.x;
-                if (load_idx < duration) {
-                    s_signal[threadIdx.x] = signal[load_idx];
-                }
-                __syncthreads();
-
-                int current_tile_width = min(TILE_WIDTH, duration - tile_start);
-                for (int i = 0; i < current_tile_width; i += skipSearchPoint) {
-                    float sigi = s_signal[i] * reverse_scale;
-                    int global_i = tile_start + i;
-                    float loss = data[global_i] - (1.0f - sigi);
-                    intransit_residual += loss * loss * dy[global_i];
-                }
-                __syncthreads();
+            // --- 直接全局内存访问 (无 __syncthreads) ---
+            for (int i = 0; i < duration; i += skipSearchPoint) {
+                float sigi = signal[i] * reverse_scale;
+                float loss = data[i] - (1.0f - sigi);
+                intransit_residual += loss * loss * dy[i];
             }
             
-            // *** 关键修正点 ***
-            // 使用与原始内核完全相同的公式来计算 actualLossFraction
+            // actualLossFraction 计算
             float actualLossFraction = (float)duration / (((duration - 1) / skipSearchPoint) + 1);
             
             current_stat = intransit_residual * actualLossFraction + ootr - summed_edge_effect_correction;
