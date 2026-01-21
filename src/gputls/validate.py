@@ -51,6 +51,9 @@ def validate_args(self, kwargs):
     self.useLocalPTXCUBIN = kwargs.get("useLocalPTXCUBIN", constants.USE_LOCAL_PTXCUBIN)
 
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
+    
+    # Multi-GPU support: list of GPU device IDs
+    self.GPUDeviceIDs = kwargs.get("GPUDeviceIDs", None)
 
     self.legacy = kwargs.get("legacy", constants.LEGACY)
     self.fast = kwargs.get("fast", constants.FAST)

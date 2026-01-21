@@ -74,29 +74,57 @@ class gtls(object):
 
         periods = np.sort(periods)
 
+        # Check if multi-GPU mode is requested
+        use_multi_gpu = self.GPUDeviceIDs is not None and len(self.GPUDeviceIDs) > 1
+        
         if self.fast == False:
-            self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,\
-                SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods\
-                = core.search_multi_periods(
-                periods=periods,
-                t=self.t,
-                y=self.y,
-                dy=self.dy,
-                transit_depth_min=self.transit_depth_min,
-                R_star_min=self.R_star_min,
-                R_star_max=self.R_star_max,
-                M_star_min=self.M_star_min,
-                M_star_max=self.M_star_max,
-                lc_arr=self.lc_arr,
-                lc_cache_overview=self.lc_cache_overview,
-                T0_fit_margin=self.T0_fit_margin,
-                oversampling_factor = self.oversampling_factor,
-                verbose=self.verbose,
-                useLocalPTXCUBIN=self.useLocalPTXCUBIN,
-                GPUDeviceID=self.GPUDeviceID,
-                legacy=self.legacy,
-                bar_location=self.bar_location
-            )
+            if use_multi_gpu:
+                # Use multi-GPU version
+                self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,\
+                    SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods\
+                    = core.search_multi_periods_multiGPU(
+                    periods=periods,
+                    t=self.t,
+                    y=self.y,
+                    dy=self.dy,
+                    transit_depth_min=self.transit_depth_min,
+                    R_star_min=self.R_star_min,
+                    R_star_max=self.R_star_max,
+                    M_star_min=self.M_star_min,
+                    M_star_max=self.M_star_max,
+                    lc_arr=self.lc_arr,
+                    lc_cache_overview=self.lc_cache_overview,
+                    T0_fit_margin=self.T0_fit_margin,
+                    oversampling_factor = self.oversampling_factor,
+                    verbose=self.verbose,
+                    useLocalPTXCUBIN=self.useLocalPTXCUBIN,
+                    GPUDeviceIDs=self.GPUDeviceIDs,
+                    legacy=self.legacy,
+                    bar_location=self.bar_location
+                )
+            else:
+                self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,\
+                    SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods\
+                    = core.search_multi_periods(
+                    periods=periods,
+                    t=self.t,
+                    y=self.y,
+                    dy=self.dy,
+                    transit_depth_min=self.transit_depth_min,
+                    R_star_min=self.R_star_min,
+                    R_star_max=self.R_star_max,
+                    M_star_min=self.M_star_min,
+                    M_star_max=self.M_star_max,
+                    lc_arr=self.lc_arr,
+                    lc_cache_overview=self.lc_cache_overview,
+                    T0_fit_margin=self.T0_fit_margin,
+                    oversampling_factor = self.oversampling_factor,
+                    verbose=self.verbose,
+                    useLocalPTXCUBIN=self.useLocalPTXCUBIN,
+                    GPUDeviceID=self.GPUDeviceID,
+                    legacy=self.legacy,
+                    bar_location=self.bar_location
+                )
         else:
             periods,power = core.search_multi_periods(
                 periods=periods,
