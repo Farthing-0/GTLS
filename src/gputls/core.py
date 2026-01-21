@@ -325,10 +325,10 @@ def search_multi_periods(
             )
         )
         
+        # Use v2 kernel (fixed version without shared memory issues)
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB_SignalTiled_v2')
         blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllLowestResidualsGPU((gridSizeX,len(singleDurations),singleCalcPeriods),
-        # calcAllLowestResidualsGPU((gridSizeX,singleCalcPeriods,1),
         (blockSize,1,1),(lowestResidualsGPU,tSizeGPU_cached,
         patchedDatasGPU,patchedDatasSizeGPU,
         durationsGPU,durationsSizeGPU,

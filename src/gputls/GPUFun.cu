@@ -436,6 +436,129 @@ extern "C"{
     }
 
     /**
+    * OPTIMIZED VERSION: calcAllLowestResidualsGPUB_SignalTiled_v3
+    * Optimizations:
+    * 1. Pre-load signal array into shared memory (before conditional branch)
+    * 2. Loop unrolling (4-way) for inner loop
+    * 3. Use __ldg() for read-only global memory access
+    * 4. Precompute (1.0f - signal[i] * reverse_scale) pattern
+    */
+    __global__ void calcAllLowestResidualsGPUB_SignalTiled_v3(
+        float *out, int *resultArrayXAxisSize,
+        float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
+        float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
+        float *in_overshoot, float *in_ootr, float *in_fullsum,
+        float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
+        float *in_transit_depth_min
+    ) {
+        // Dynamic shared memory for signal array
+        extern __shared__ float s_signal[];
+        
+        int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        int y = blockIdx.y;   // duration index
+        int z = blockIdx.z;   // period index
+        
+        // Load constants once using __ldg for read-only cache
+        int resultArraySize = __ldg(resultArrayXAxisSize);
+        int duration = __ldg(&in_duration[y]);
+        int patched_data_size = __ldg(in_patched_datas_size);
+        int duration_size = __ldg(in_duration_size);
+        float transit_depth_min = __ldg(in_transit_depth_min);
+        int datapoints = __ldg(in_datapoints);
+        float overshoot_y = __ldg(&in_overshoot[y]);
+        float summed_edge_effect_correction = __ldg(&in_summed_edge_effect_correction[z]);
+        
+        // === STAGE 1: Cooperatively load signal into shared memory ===
+        // All threads participate, regardless of later conditions (safe for __syncthreads)
+        float *signal_global = in_signal + (long long)y * __ldg(in_max_signal_x_size);
+        for (int i = threadIdx.x; i < duration; i += blockDim.x) {
+            s_signal[i] = __ldg(&signal_global[i]);
+        }
+        __syncthreads();  // Safe: all threads execute this
+        
+        // === STAGE 2: Early exit for out-of-bounds threads ===
+        if (tid >= resultArraySize) {
+            return;
+        }
+        
+        // === STAGE 3: Main computation ===
+        int skipPoint = (duration > SKIP_POINT) ? (duration / SKIP_POINT) : 1;
+        float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, z);
+        
+        float current_stat = (float)datapoints;
+        
+        if (calc_mean > transit_depth_min && tid % skipPoint == 0) {
+            // Calculate ootr
+            float ootr;
+            if (tid == 0) {
+                ootr = in_fullsum[(long long)z * duration_size + y];
+            } else {
+                ootr = in_ootr[(long long)y * resultArraySize + (long long)z * resultArraySize * duration_size + tid - 1];
+            }
+            
+            // Setup pointers with offset
+            long long base_offset = (long long)z * patched_data_size + tid;
+            const float *data = in_patched_datas + base_offset;
+            const float *dy = in_inverse_squared_patched_dys + base_offset;
+            
+            // Precompute scale factor
+            float reverse_scale = calc_mean * overshoot_y * 2.0f;
+            
+            // === OPTIMIZED INNER LOOP with 4-way unrolling ===
+            float intransit_residual = 0.0f;
+            int i = 0;
+            
+            // Process 4 elements at a time
+            int duration_unroll = duration & ~3;  // Round down to multiple of 4
+            for (; i < duration_unroll; i += 4) {
+                // Prefetch signal from shared memory
+                float sig0 = s_signal[i];
+                float sig1 = s_signal[i + 1];
+                float sig2 = s_signal[i + 2];
+                float sig3 = s_signal[i + 3];
+                
+                // Load data and dy using __ldg
+                float d0 = __ldg(&data[i]);
+                float d1 = __ldg(&data[i + 1]);
+                float d2 = __ldg(&data[i + 2]);
+                float d3 = __ldg(&data[i + 3]);
+                
+                float dy0 = __ldg(&dy[i]);
+                float dy1 = __ldg(&dy[i + 1]);
+                float dy2 = __ldg(&dy[i + 2]);
+                float dy3 = __ldg(&dy[i + 3]);
+                
+                // Compute losses: loss = data - (1 - signal * reverse_scale)
+                float loss0 = d0 - (1.0f - sig0 * reverse_scale);
+                float loss1 = d1 - (1.0f - sig1 * reverse_scale);
+                float loss2 = d2 - (1.0f - sig2 * reverse_scale);
+                float loss3 = d3 - (1.0f - sig3 * reverse_scale);
+                
+                // Accumulate residuals using FMA
+                intransit_residual = fmaf(loss0 * loss0, dy0, intransit_residual);
+                intransit_residual = fmaf(loss1 * loss1, dy1, intransit_residual);
+                intransit_residual = fmaf(loss2 * loss2, dy2, intransit_residual);
+                intransit_residual = fmaf(loss3 * loss3, dy3, intransit_residual);
+            }
+            
+            // Handle remaining elements
+            for (; i < duration; i++) {
+                float sig = s_signal[i];
+                float d = __ldg(&data[i]);
+                float dy_val = __ldg(&dy[i]);
+                float loss = d - (1.0f - sig * reverse_scale);
+                intransit_residual = fmaf(loss * loss, dy_val, intransit_residual);
+            }
+            
+            current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+        }
+        
+        // Write output
+        long long out_idx = (long long)tid + (long long)y * resultArraySize + (long long)z * resultArraySize * duration_size;
+        out[out_idx] = current_stat;
+    }
+
+    /**
      * Optimized trapezoid fit kernel
      */
     __global__ void trapezoidFit(float *results, float *inData, float *inInverseSquaredDys,
