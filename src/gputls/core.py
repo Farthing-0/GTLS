@@ -7,9 +7,11 @@ from .transit import mutipleTransitFit
 from . import GPUFun
 import pynvml
 import tqdm
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
 import warnings
+import subprocess
+import tempfile
+import pickle
+import os
 
 def foldCPU(time,flux,dy,period):
     """Fold time series data."""
@@ -369,35 +371,72 @@ def search_multi_periods_multiGPU(
         for i, (gpu_id, chunk) in enumerate(zip(GPUDeviceIDs, periods_chunks)):
             print(f"  GPU {gpu_id}: {len(chunk)} periods")
     
-    # Prepare arguments for each worker
-    worker_args = []
-    for i, (gpu_id, chunk, start_idx) in enumerate(zip(GPUDeviceIDs, periods_chunks, chunk_start_indices)):
-        args = (
-            chunk, start_idx, t, y, dy, transit_depth_min, R_star_min, R_star_max,
-            M_star_min, M_star_max, lc_arr, lc_cache_overview, T0_fit_margin,
-            oversampling_factor, gpu_id, SimplifyEdgeEffect
-        )
-        worker_args.append(args)
-    
-    # Use spawn context for multiprocessing (required for CUDA)
-    # This creates an isolated context that won't affect the user's code
-    spawn_ctx = mp.get_context('spawn')
-    
-    # Run workers in parallel
+    # Use subprocess to run workers in completely separate Python processes
+    # This avoids the multiprocessing spawn issues entirely
     chi2_results = {}
+    processes = []
+    temp_files = []
     
     try:
-        with spawn_ctx.Pool(processes=n_gpus) as pool:
-            results = pool.map(_search_periods_chunk_worker, worker_args)
-            for chunk_start_idx, chi2_chunk in results:
-                chi2_results[chunk_start_idx] = chi2_chunk
+        # Create temporary files for input/output
+        for i, (gpu_id, chunk, start_idx) in enumerate(zip(GPUDeviceIDs, periods_chunks, chunk_start_indices)):
+            # Save input data to temp file
+            input_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pkl')
+            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pkl')
+            temp_files.extend([input_file.name, output_file.name])
+            
+            input_data = {
+                'periods_chunk': chunk,
+                'chunk_start_idx': start_idx,
+                't': t, 'y': y, 'dy': dy,
+                'transit_depth_min': transit_depth_min,
+                'R_star_min': R_star_min, 'R_star_max': R_star_max,
+                'M_star_min': M_star_min, 'M_star_max': M_star_max,
+                'lc_arr': lc_arr, 'lc_cache_overview': lc_cache_overview,
+                'T0_fit_margin': T0_fit_margin,
+                'oversampling_factor': oversampling_factor,
+                'GPUDeviceID': gpu_id,
+                'SimplifyEdgeEffect': SimplifyEdgeEffect
+            }
+            pickle.dump(input_data, input_file)
+            input_file.close()
+            
+            # Launch subprocess
+            worker_script = os.path.join(os.path.dirname(__file__), '_worker.py')
+            proc = subprocess.Popen(
+                ['python', worker_script, input_file.name, output_file.name],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            processes.append((proc, start_idx, output_file.name))
+        
+        # Wait for all processes and collect results
+        for proc, start_idx, output_file in processes:
+            stdout, stderr = proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError(f"Worker process failed: {stderr.decode()}")
+            
+            with open(output_file, 'rb') as f:
+                chi2_chunk = pickle.load(f)
+            chi2_results[start_idx] = chi2_chunk
+            
     except Exception as e:
-        # Fallback to sequential execution if multiprocessing fails
         if verbose:
-            warnings.warn(f"Multi-GPU parallel execution failed: {e}. Falling back to sequential execution.")
-        for args in worker_args:
+            warnings.warn(f"Multi-GPU subprocess execution failed: {e}. Falling back to sequential execution.")
+        # Fallback to sequential execution
+        chi2_results = {}
+        for gpu_id, chunk, start_idx in zip(GPUDeviceIDs, periods_chunks, chunk_start_indices):
+            args = (chunk, start_idx, t, y, dy, transit_depth_min, R_star_min, R_star_max,
+                    M_star_min, M_star_max, lc_arr, lc_cache_overview, T0_fit_margin,
+                    oversampling_factor, gpu_id, SimplifyEdgeEffect)
             chunk_start_idx, chi2_chunk = _search_periods_chunk_worker(args)
             chi2_results[chunk_start_idx] = chi2_chunk
+    finally:
+        # Cleanup temp files
+        for f in temp_files:
+            try:
+                os.unlink(f)
+            except:
+                pass
     
     # Merge results in correct order
     chi2 = np.concatenate([chi2_results[idx] for idx in sorted(chi2_results.keys())])
