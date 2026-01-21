@@ -379,20 +379,24 @@ def search_multi_periods_multiGPU(
         )
         worker_args.append(args)
     
-    # Use spawn method for multiprocessing (required for CUDA)
-    try:
-        mp.set_start_method('spawn', force=True)
-    except RuntimeError:
-        pass  # Already set
+    # Use spawn context for multiprocessing (required for CUDA)
+    # This creates an isolated context that won't affect the user's code
+    spawn_ctx = mp.get_context('spawn')
     
     # Run workers in parallel
     chi2_results = {}
     
-    with ProcessPoolExecutor(max_workers=n_gpus) as executor:
-        futures = [executor.submit(_search_periods_chunk_worker, args) for args in worker_args]
-        
-        for future in futures:
-            chunk_start_idx, chi2_chunk = future.result()
+    try:
+        with spawn_ctx.Pool(processes=n_gpus) as pool:
+            results = pool.map(_search_periods_chunk_worker, worker_args)
+            for chunk_start_idx, chi2_chunk in results:
+                chi2_results[chunk_start_idx] = chi2_chunk
+    except Exception as e:
+        # Fallback to sequential execution if multiprocessing fails
+        if verbose:
+            warnings.warn(f"Multi-GPU parallel execution failed: {e}. Falling back to sequential execution.")
+        for args in worker_args:
+            chunk_start_idx, chi2_chunk = _search_periods_chunk_worker(args)
             chi2_results[chunk_start_idx] = chi2_chunk
     
     # Merge results in correct order
