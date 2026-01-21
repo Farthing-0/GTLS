@@ -8,6 +8,7 @@ import pickle
 import numpy as np
 import cupy as cp
 import pynvml
+import tqdm
 
 def set_cuda_device(device_id):
     """Set the CUDA device."""
@@ -28,6 +29,7 @@ def run_worker(input_file, output_file):
     
     periods_chunk = data['periods_chunk']
     chunk_start_idx = data['chunk_start_idx']
+    total_periods = data.get('total_periods', len(periods_chunk))  # For consistent singleCalcPeriods
     t = data['t']
     y = data['y']
     dy = data['dy']
@@ -36,6 +38,8 @@ def run_worker(input_file, output_file):
     lc_cache_overview = data['lc_cache_overview']
     T0_fit_margin = data['T0_fit_margin']
     GPUDeviceID = data['GPUDeviceID']
+    verbose = data.get('verbose', True)
+    bar_location = data.get('bar_location', 0)
     
     # Import GPUFun from gputls package
     from gputls import GPUFun
@@ -71,7 +75,10 @@ def run_worker(input_file, output_file):
     nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
     singleCalcPeriods_max = (nvmlinfo.free) / (5*(patchedDatasSize * 2 + 2 + len(durations)*patchedDatasSize*4 + 2*len(durations)))
 
-    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max), len(periods_chunk) / 30]))
+    # Use total_periods / 30 as the base (same as core.py's singleCalcPeriods_estimate)
+    # Only reduce if GPU memory is insufficient
+    singleCalcPeriods_base = max(1, int(total_periods / 30))
+    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max), singleCalcPeriods_base]))
 
     if singleCalcPeriods < 15:
         singleCalcPeriods = int(singleCalcPeriods / 1.1)
@@ -79,7 +86,15 @@ def run_worker(input_file, output_file):
     if singleCalcPeriods < 1:
         singleCalcPeriods = 1
 
-    TotalIter = int(np.ceil(len(periods_chunk) / singleCalcPeriods))
+    # Calculate global batch boundaries that this chunk intersects with
+    # Global batch i covers periods [i*singleCalcPeriods, (i+1)*singleCalcPeriods)
+    chunk_end_idx = chunk_start_idx + len(periods_chunk)
+    
+    # Find the first and last global batch that this chunk intersects
+    first_global_batch = chunk_start_idx // singleCalcPeriods
+    last_global_batch = (chunk_end_idx - 1) // singleCalcPeriods
+    
+    TotalIter = last_global_batch - first_global_batch + 1
 
     # Initialize the variables
     locationGPU = cp.empty(len(periods_chunk), dtype=cp.int32)
@@ -131,35 +146,43 @@ def run_worker(input_file, output_file):
     cumsumGPU_cached = cp.empty((singleCalcPeriods, patchedDatasSize), dtype=cp.float32)
     base_error_cached = cp.empty((singleCalcPeriods, patchedDatasSize), dtype=cp.float32)
 
+    # Initialize progress bar if verbose
+    pbar = None
+    if verbose:
+        pbar = tqdm.tqdm(total=TotalIter, position=bar_location, desc=f"GPU {GPUDeviceID}", leave=True)
+
     for iterFlag in range(TotalIter):
-        if iterFlag == TotalIter - 1:
-            SinglePeriods = periods_chunk[iterFlag*singleCalcPeriods:]
-            actual_period_count = len(SinglePeriods)
-            if actual_period_count < singleCalcPeriods:
-                SinglePeriods = np.append(SinglePeriods, 
-                                         np.full(singleCalcPeriods - actual_period_count, SinglePeriods[-1]))
-            start_idx = iterFlag*singleCalcPeriods
-            end_idx = min(start_idx + actual_period_count, len(periods_chunk))
-            temp_bool = durationBoolArrayGPU[start_idx]
-            for i in range(start_idx + 1, end_idx):
-                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
-            durationsGridCollectionGPU[iterFlag] = temp_bool
-        else:
-            SinglePeriods = periods_chunk[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            start_idx = iterFlag*singleCalcPeriods
-            end_idx = (iterFlag+1)*singleCalcPeriods
-            temp_bool = durationBoolArrayGPU[start_idx]
-            for i in range(start_idx + 1, end_idx):
-                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
-            durationsGridCollectionGPU[iterFlag] = temp_bool
+        # Calculate global batch index
+        global_batch = first_global_batch + iterFlag
+        
+        # Global batch covers periods [global_start, global_end) in the full periods array
+        global_start = global_batch * singleCalcPeriods
+        global_end = min((global_batch + 1) * singleCalcPeriods, total_periods)
+        
+        # Map to local chunk indices
+        local_start = max(0, global_start - chunk_start_idx)
+        local_end = min(len(periods_chunk), global_end - chunk_start_idx)
+        
+        # Get periods for this batch (need exactly singleCalcPeriods for GPU arrays)
+        actual_period_count = local_end - local_start
+        SinglePeriods = periods_chunk[local_start:local_end]
+        
+        if actual_period_count < singleCalcPeriods:
+            # Pad to singleCalcPeriods for GPU computation
+            SinglePeriods = np.append(SinglePeriods, 
+                                     np.full(singleCalcPeriods - actual_period_count, SinglePeriods[-1]))
+        
+        # Compute duration bool OR for this batch (using local indices)
+        temp_bool = durationBoolArrayGPU[local_start]
+        for i in range(local_start + 1, local_end):
+            temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+        durationsGridCollectionGPU[iterFlag] = temp_bool
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
         
         if len(singleDurations) == 0:
-            start_idx = iterFlag * singleCalcPeriods
-            valid_range = min(start_idx + singleCalcPeriods, len(periods_chunk)) - start_idx
-            LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = cp.nan
+            LowestResidualsEachPeriodGPU[local_start:local_end] = cp.nan
             continue
             
         single_lc_arr = lc_arr_local[durationsBoolGrid]
@@ -278,18 +301,28 @@ def run_worker(input_file, output_file):
         transitDepthMinGPU_cached
         ))
 
-        start_idx = iterFlag * singleCalcPeriods
-        end_idx = start_idx + singleCalcPeriods
-        valid_range = min(end_idx, len(periods_chunk)) - start_idx
-        valid_lowest_residuals = lowestResidualsGPU[:valid_range]
-        flattened_residuals = valid_lowest_residuals.reshape(valid_range, -1)
+        # Store results using local indices
+        valid_lowest_residuals = lowestResidualsGPU[:actual_period_count]
+        flattened_residuals = valid_lowest_residuals.reshape(actual_period_count, -1)
         min_indices = cp.argmin(flattened_residuals, axis=-1)
-        min_values = flattened_residuals[cp.arange(valid_range), min_indices]
+        min_values = flattened_residuals[cp.arange(actual_period_count), min_indices]
         
-        locationGPU[start_idx:start_idx + valid_range] = min_indices
-        LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
+        locationGPU[local_start:local_end] = min_indices
+        LowestResidualsEachPeriodGPU[local_start:local_end] = min_values
+
+        # Update progress bar
+        if pbar is not None:
+            pbar.update(1)
+
+    # Close progress bar
+    if pbar is not None:
+        pbar.close()
 
     chi2_chunk = LowestResidualsEachPeriodGPU.get()
+    
+    # Clean up GPU memory before saving
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
     
     # Save output
     with open(output_file, 'wb') as f:

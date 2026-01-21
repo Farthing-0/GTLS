@@ -360,16 +360,48 @@ def search_multi_periods_multiGPU(
             fast, legacy, SimplifyEdgeEffect, bar_location
         )
     
-    # Split periods into chunks for each GPU
-    periods_chunks = np.array_split(periods, n_gpus)
-    chunk_start_indices = [0]
-    for i in range(n_gpus - 1):
-        chunk_start_indices.append(chunk_start_indices[-1] + len(periods_chunks[i]))
+    # Pre-calculate singleCalcPeriods to align chunk boundaries with batch boundaries
+    # This ensures that each GPU processes complete batches, avoiding duration bool inconsistencies
+    durations_temp, _ = np.unique(lc_cache_overview["width_in_samples"], return_index=True)
+    maxDuration_temp = int(max(durations_temp))
+    if maxDuration_temp % 2 != 0:
+        maxDuration_temp = maxDuration_temp + 1
+    tSize_temp = len(t)
+    patchedDatasSize_temp = int(tSize_temp + maxDuration_temp)
+    
+    # Estimate singleCalcPeriods (we'll use a conservative estimate)
+    # The actual value depends on GPU memory, but we use len(periods)/30 as the formula
+    singleCalcPeriods_estimate = max(1, int(len(periods) / 30))
+    
+    # Calculate total number of batches
+    total_batches = int(np.ceil(len(periods) / singleCalcPeriods_estimate))
+    
+    # Distribute batches evenly across GPUs
+    batches_per_gpu = int(np.ceil(total_batches / n_gpus))
+    
+    # Calculate chunk boundaries aligned to batch boundaries
+    chunk_start_indices = []
+    periods_chunks = []
+    for i in range(n_gpus):
+        start_batch = i * batches_per_gpu
+        end_batch = min((i + 1) * batches_per_gpu, total_batches)
+        
+        start_idx = start_batch * singleCalcPeriods_estimate
+        end_idx = min(end_batch * singleCalcPeriods_estimate, len(periods))
+        
+        if start_idx < len(periods):
+            chunk_start_indices.append(start_idx)
+            periods_chunks.append(periods[start_idx:end_idx])
+    
+    # Update n_gpus if some GPUs got no work
+    n_gpus = len(periods_chunks)
+    GPUDeviceIDs = GPUDeviceIDs[:n_gpus]
     
     if verbose:
         print(f"Multi-GPU: Splitting {len(periods)} periods across {n_gpus} GPUs")
-        for i, (gpu_id, chunk) in enumerate(zip(GPUDeviceIDs, periods_chunks)):
-            print(f"  GPU {gpu_id}: {len(chunk)} periods")
+        print(f"  (batch size = {singleCalcPeriods_estimate}, aligned to batch boundaries)")
+        for i, (gpu_id, chunk, start_idx) in enumerate(zip(GPUDeviceIDs, periods_chunks, chunk_start_indices)):
+            print(f"  GPU {gpu_id}: {len(chunk)} periods (starting at index {start_idx})")
     
     # Use subprocess to run workers in completely separate Python processes
     # This avoids the multiprocessing spawn issues entirely
@@ -388,6 +420,7 @@ def search_multi_periods_multiGPU(
             input_data = {
                 'periods_chunk': chunk,
                 'chunk_start_idx': start_idx,
+                'total_periods': len(periods),  # Pass total periods count for consistent singleCalcPeriods
                 't': t, 'y': y, 'dy': dy,
                 'transit_depth_min': transit_depth_min,
                 'R_star_min': R_star_min, 'R_star_max': R_star_max,
@@ -396,24 +429,26 @@ def search_multi_periods_multiGPU(
                 'T0_fit_margin': T0_fit_margin,
                 'oversampling_factor': oversampling_factor,
                 'GPUDeviceID': gpu_id,
-                'SimplifyEdgeEffect': SimplifyEdgeEffect
+                'SimplifyEdgeEffect': SimplifyEdgeEffect,
+                'verbose': verbose,
+                'bar_location': i  # Each GPU gets its own progress bar position
             }
             pickle.dump(input_data, input_file)
             input_file.close()
             
-            # Launch subprocess
+            # Launch subprocess - don't capture stdout/stderr so progress bars show
             worker_script = os.path.join(os.path.dirname(__file__), '_worker.py')
             proc = subprocess.Popen(
                 ['python', worker_script, input_file.name, output_file.name],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                stdout=None, stderr=None  # Let output go to terminal
             )
             processes.append((proc, start_idx, output_file.name))
         
         # Wait for all processes and collect results
         for proc, start_idx, output_file in processes:
-            stdout, stderr = proc.communicate()
+            proc.wait()  # Wait for process to complete
             if proc.returncode != 0:
-                raise RuntimeError(f"Worker process failed: {stderr.decode()}")
+                raise RuntimeError(f"Worker process on GPU failed with code {proc.returncode}")
             
             with open(output_file, 'rb') as f:
                 chi2_chunk = pickle.load(f)
@@ -520,6 +555,10 @@ def search_multi_periods_multiGPU(
         period, t, y, dy, transit_depth_min,
         lc_arr, lc_cache_overview, primary_gpu
     )
+
+    # Clean up GPU memory
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
 
     return periods_masked, period, rawDuration, durationPointsNum, transit_duration_in_days, transitDepth, T0,\
             SDE, chi2, transit_times, power, snr, snr_pink, snrFit, snrFitPink, raw_power, raw_chi2, possiblePeriodsIndices, possiblePeriods
@@ -837,6 +876,14 @@ def search_multi_periods(
 
         iterFlagGPU = iterFlagGPU + 1
 
+        # Clean up iteration-specific temporary arrays
+        del lowestResidualsGPU, periodsGPU, durationsMaxGPU, durationsMinGPU
+        del overshootGPU, durationsGPU, durationsSizeGPU
+        del fullSumGPU, ootrGPU
+        if 'lcArrFullLengthGPU' in dir():
+            del lcArrFullLengthGPU, lcArrMaxLenGPU
+        # patchedDatasSizeGPU is defined outside loop and reused
+
         if verbose:
             pbar.update(1)
 
@@ -867,6 +914,19 @@ def search_multi_periods(
     possiblePeriodsIndices = top_100_indices + next_100_indices
     possiblePeriods = top_100_periods + next_100_periods
 
+    # Delete pre-allocated cached arrays
+    del phasesGPU_cached, sortIndexGPU_cached, patchedDatasGPU_cached, patchedDysGPU_cached
+    del edgeEffectCorrectionsGPU_cached, inverseSquaredPatchedDysGPU_cached
+    del cumsumGPU_cached, base_error_cached
+    del tGPU_cached, tSizeGPU_cached, tLengthGPU_cached, periodsSizeGPU_cached
+    del maxDurationGPU_cached, periodSizeGPU_cached, datapointsGPU_cached, transitDepthMinGPU_cached
+    del yGPU, dyGPU, locationGPU, LowestResidualsEachPeriodGPU
+    del durationBoolArrayGPU, durationsGridCollectionGPU
+
+    # Clean up GPU memory before next phase
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
+
     chi2_again = search_multi_periods_again(
         possiblePeriods,
         t,
@@ -893,6 +953,10 @@ def search_multi_periods(
     possiblePeriodsTemp = [period * rate for rate in possiblePeriodsTimesRate]
 
     possiblePeriodsIndices_multi, possiblePeriods_multi = find_nearest_indices(possiblePeriodsTemp, periods)
+
+    # Clean up GPU memory before next phase
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
 
     chi2_again = search_multi_periods_again(
         possiblePeriods_multi,
@@ -926,6 +990,10 @@ def search_multi_periods(
         lc_cache_overview,
         GPUDeviceID
     )
+
+    # Clean up GPU memory
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
 
     return periods,period,rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,\
             SDE,chi2,transit_times,power,snr,snr_pink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods
@@ -1161,6 +1229,10 @@ def search_multi_periods_again(
         iterFlagGPU = iterFlagGPU + 1
 
     chi2 = LowestResidualsEachPeriodGPU.get()
+
+    # Clean up GPU memory
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
 
     return chi2
 
@@ -1415,5 +1487,9 @@ def search_single_periods(
     snr = ((1 - depth_mean) / np.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)
 
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times)**(0.5))
+    
+    # Clean up GPU memory
+    cp.get_default_memory_pool().free_all_blocks()
+    cp.get_default_pinned_memory_pool().free_all_blocks()
     
     return rawDuration,durationPointsNum,transit_duration_in_days,transitDepth,T0,transit_times,snr,snr_pink,snrFit,snrFitPink
