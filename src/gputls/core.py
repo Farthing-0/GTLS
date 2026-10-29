@@ -162,7 +162,13 @@ def search_multi_periods(
             durationsGridCollectionGPU[iterFlag] = temp_bool
         else:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods-1])
+            # 修复：对当前批次的所有periods做logical_or，而不是只对比首尾两个
+            start_idx = iterFlag*singleCalcPeriods
+            end_idx = (iterFlag+1)*singleCalcPeriods
+            temp_bool = durationBoolArrayGPU[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+            durationsGridCollectionGPU[iterFlag] = temp_bool
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]
@@ -295,7 +301,6 @@ def search_multi_periods(
             )
         )
 
-        # calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB')
         calcAllLowestResidualsGPU = module.get_function('calcAllLowestResidualsGPUB_SignalTiled_v2')
         blockSize,gridSizeX = calcGridBlockSize(tSize)
         calcAllLowestResidualsGPU((gridSizeX,len(singleDurations),singleCalcPeriods),
@@ -308,7 +313,7 @@ def search_multi_periods(
         overshootGPU,ootrGPU,fullSumGPU,edgeEffectCorrectionsGPU,datapointsGPU,cumsumGPU,
         transitDepthMinGPU
         ))
-
+        
         start_idx = iterFlag * singleCalcPeriods
         end_idx = start_idx + singleCalcPeriods
         valid_range = min(end_idx, len(periods)) - start_idx
@@ -316,6 +321,7 @@ def search_multi_periods(
         flattened_residuals = valid_lowest_residuals.reshape(valid_range, -1)
         min_indices = cp.argmin(flattened_residuals, axis=-1)
         min_values = cp.min(flattened_residuals, axis=-1)
+        
         locationGPU[start_idx:start_idx + valid_range] = min_indices
         LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
 
@@ -513,7 +519,13 @@ def search_multi_periods_again(
             durationsGridCollectionGPU[iterFlag] = temp_bool
         else:
             SinglePeriods = periods[iterFlag*singleCalcPeriods:(iterFlag+1)*singleCalcPeriods]
-            durationsGridCollectionGPU[iterFlag] = cp.logical_or(durationBoolArrayGPU[iterFlag*singleCalcPeriods],durationBoolArrayGPU[(iterFlag+1)*singleCalcPeriods-1])
+            # 修复：对当前批次的所有periods做logical_or，而不是只对比首尾两个
+            start_idx = iterFlag*singleCalcPeriods
+            end_idx = (iterFlag+1)*singleCalcPeriods
+            temp_bool = durationBoolArrayGPU[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                temp_bool = cp.logical_or(temp_bool, durationBoolArrayGPU[i])
+            durationsGridCollectionGPU[iterFlag] = temp_bool
 
         durationsBoolGrid = durationsGridCollectionGPU[iterFlag].get()
         singleDurations = durations[durationsBoolGrid]

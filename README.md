@@ -29,6 +29,25 @@ You can also use the test script in the repository:
 python3 generatedTest.py
 ```
 
+### Local debugging
+With your virtual environment activated and the runtime dependencies installed, run:
+```bash
+./debug.sh
+```
+This builds a wheel with `python3 -m pip wheel` (no separate `build` package
+needed), reinstalls only the local package without changing its dependencies,
+and runs `KeplerLongCurveSingleTest.py`. A failed build stops the script before
+replacing the installed package.
+
+The Kepler test also needs `matplotlib`, `pandas`, `astropy`,
+`transitleastsquares`, `lightkurve`, and `wotan`. Its single-curve test data is
+stored in `test_data/public_Q3_long_5/` and is read relative to the script
+location, so it does not depend on `/mnt/HDD0/Kepler/lightcurves` or other
+files referenced by `allKoi2lcResult_update.csv`. It reads FITS data directly
+and uses `gputls.helpers.cleaned_array`; no external
+`GTLSTest/precision/lcFuns.py` is required. Flux and its uncertainty are divided
+by the same mean flux before detrending. The test currently selects GPU device 1.
+
 For now, There are no detailed documents. Please refer to the [TLS](https://github.com/hippke/tls) first, since the usage of this program is almost the same as TLS.
 
 ## License

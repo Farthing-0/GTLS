@@ -137,7 +137,12 @@ extern "C"{
 
         if (tid < *patched_data_size) {
             float dy_val = patched_dys[tid + y * (*patched_data_size)];
-            out[tid + y * (*patched_data_size)] = 1.0f / (dy_val * dy_val);
+            // Prevent division by zero: use minimum threshold
+            float dy_squared = dy_val * dy_val;
+            if (dy_squared < 1e-10f) {
+                dy_squared = 1e-10f;
+            }
+            out[tid + y * (*patched_data_size)] = 1.0f / dy_squared;
         }
     }
 
