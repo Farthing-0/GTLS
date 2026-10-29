@@ -1,26 +1,25 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import sys
+from pathlib import Path
 from astropy.io import fits
-sys.path.insert(1, '../../GTLSTest/precision')
-from lcFuns import gpubls, cleaned_array,normalize,checkParams
 from transitleastsquares import transitleastsquares
 from gputls import gtls
+from gputls.helpers import cleaned_array
 import lightkurve as lk
 import wotan
 
+project_dir = Path(__file__).resolve().parent
 saveFile = 'KeplerGTLSFastTest.csv'
 saveFileData = pd.DataFrame(columns=['KIC','period','T0','duration','depth','SNR','SDE'])
 
-data = pd.read_csv('allKoi2lcResult_update.csv')
+data = pd.read_csv(project_dir / 'allKoi2lcResult_update.csv')
 # rank by pointsLength
 data = data.sort_values(by='pointsLength', ascending=False)
+test_data_dir = project_dir / 'test_data'
 
 from tqdm import tqdm
 for index,line in data.iterrows():
-    # iter over all columns
-    dir = '/mnt/HDD0/Kepler/lightcurves'
     files = []
 
     if 11403044 != int(line["kepid"]):
@@ -30,35 +29,32 @@ for index,line in data.iterrows():
     # if 11013201 != int(line["kepid"]):
         continue
 
-    for name in line.index:
-        if "public" in name and "long" in name:
-            if type(line[name]) == str:
-                files.append(dir + '/' + name + '/' + line[name])
+    name = 'public_Q3_long_5'
+    if isinstance(line[name], str):
+        files.append(test_data_dir / name / line[name])
     AllTimes = []
     AllFluxes = []
     AllDys = []
     for file in (files):
         with fits.open(file) as hdul:
-            # times = hdul[1].data['TIME']
-            # fluxes = hdul[1].data['PDCSAP_FLUX']
-            # dys = hdul[1].data['PDCSAP_FLUX_ERR']
-            # # remove nan
-            # times, fluxes, dys = cleaned_array(times, fluxes, dys)
-            # # normalize
-            # times,fluxes,dy = normalize(times,fluxes,dys)
-
-            # window = 0.5
-            times,fluxes,dys,radius,logg = checkParams(file)
+            times = hdul[1].data['TIME']
+            fluxes = hdul[1].data['PDCSAP_FLUX']
+            dys = hdul[1].data['PDCSAP_FLUX_ERR']
+            radius = hdul[0].header.get('RADIUS')
+            logg = hdul[0].header.get('LOGG')
             times,fluxes,dys = cleaned_array(times,fluxes,dys)
-            times,fluxes,dys = normalize(times,fluxes,dys)
+
+            if len(times) < 10:
+                continue
+
+            mean_flux = np.mean(fluxes)
+            fluxes = fluxes / mean_flux
+            dys = dys / mean_flux
 
             # detrend
             M_s = 1.98892e30 # mass of sun in kg
             R_s = 6.957e8 # radius of sun in m
             Gc = 6.67408e-11 # gravitational constant in m^3 kg^-1 s^-2
-
-            if len(times) < 10:
-                continue
 
             if (radius != None and logg != None):
                 mass = np.power(10,logg) / 100 * np.power(radius*R_s,2) / Gc / M_s # mass in solar mass
