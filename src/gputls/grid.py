@@ -33,13 +33,13 @@ def duration_grid(periods, shortest, log_step=constants.DURATION_GRID_STEP):
     
     duration_max = T14(
         R_s=constants.R_STAR_MAX,
-        M_s=constants.M_STAR_MAX,
+        M_s=constants.M_STAR_MIN,
         P=min(periods),
         small=False  # large planet for long transit duration
     )
     duration_min = T14(
         R_s=constants.R_STAR_MIN,
-        M_s=constants.M_STAR_MIN,
+        M_s=constants.M_STAR_MAX,
         P=max(periods),
         small=True  # small planet for short transit duration
     )

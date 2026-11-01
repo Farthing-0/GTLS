@@ -18,7 +18,7 @@ extern "C"{
 
     // Transit fitting constants
     #define SIGNAL_DEPTH 0.5                   // Standard signal depth for fitting
-    #define FLOAT_INFINITY 0x7f800000          // IEEE-754 float infinity
+    #define FLOAT_INFINITY __int_as_float(0x7f800000) // IEEE-754 float infinity
     #define SCALE_FACTOR 1000000000000000.0    // Scale factor for duration calculations
 
     /**
@@ -214,25 +214,28 @@ extern "C"{
         int y = blockIdx.y * blockDim.y + threadIdx.y;      // duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;      // period index
 
-        if (tid >= *resultArrayXAxisSize) {
+        if (tid >= *resultArrayXAxisSize || y >= *duration_size) {
             return;
         }
 
-        float *patched_data = in_patched_data + z * (*patched_data_size);
-        float *inverse_squared_patched = in_inverse_squared_patched_dy + z * (*patched_data_size);
+        float *patched_data = in_patched_data + (long long)z * (*patched_data_size);
+        float *inverse_squared_patched = in_inverse_squared_patched_dy + (long long)z * (*patched_data_size);
         int window = in_duration[y];
         
         int becomes_visible = tid;
         int becomes_invisible = tid + window;
-                
-        float diff_visible = 1.0f - patched_data[becomes_visible];
-        float diff_invisible = 1.0f - patched_data[becomes_invisible];
         
-        float add_visible_left = diff_visible * diff_visible * inverse_squared_patched[becomes_visible];
-        float remove_invisible_right = diff_invisible * diff_invisible * inverse_squared_patched[becomes_invisible];
-        float weight = add_visible_left - remove_invisible_right;
+        float weight = 0.0f;
+        if (becomes_visible < *patched_data_size && becomes_invisible < *patched_data_size) {
+            float diff_visible = 1.0f - patched_data[becomes_visible];
+            float diff_invisible = 1.0f - patched_data[becomes_invisible];
+            
+            float add_visible_left = diff_visible * diff_visible * inverse_squared_patched[becomes_visible];
+            float remove_invisible_right = diff_invisible * diff_invisible * inverse_squared_patched[becomes_invisible];
+            weight = add_visible_left - remove_invisible_right;
+        }
         
-        temp_ootr[tid + y * (*resultArrayXAxisSize) + z * (*resultArrayXAxisSize) * (*duration_size)] = weight;
+        temp_ootr[(long long)tid + (long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*duration_size)] = weight;
     }
 
     /**
@@ -245,14 +248,14 @@ extern "C"{
         int tid = blockIdx.y * blockDim.y + threadIdx.y;    // duration index
         int z = blockIdx.z * blockDim.z + threadIdx.z;      // period index
 
-        if (i >= (*resultArrayXAxisSize)) {
+        if (i >= (*resultArrayXAxisSize) || tid >= (*duration_size)) {
             return;
         }
 
-        float *fullsum = in_fullsum + z * (*duration_size);
-        float *ootr = in_ootr + z * (*resultArrayXAxisSize) * (*duration_size);
+        float *fullsum = in_fullsum + (long long)z * (*duration_size);
+        float *ootr = in_ootr + (long long)z * (*resultArrayXAxisSize) * (*duration_size);
         
-        ootr[i + tid * (*resultArrayXAxisSize)] = fullsum[tid] + ootr[i + tid * (*resultArrayXAxisSize)];
+        ootr[(long long)i + (long long)tid * (*resultArrayXAxisSize)] = fullsum[tid] + ootr[(long long)i + (long long)tid * (*resultArrayXAxisSize)];
     }
 
     /**
@@ -383,7 +386,7 @@ extern "C"{
         int datapoints = *in_datapoints;
         float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, z);
 
-        float current_stat = (float)datapoints;
+        float current_stat = FLOAT_INFINITY;
 
         if (calc_mean > transit_depth_min && tid % skipPoint == 0) {
             float ootr = (tid == 0) ? 
@@ -559,7 +562,7 @@ extern "C"{
             float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
             out[tid + durationIndex * (*resultArrayXAxisSize)] = current_stat;
         } else {
-            out[tid + durationIndex * (*resultArrayXAxisSize)] = datapoints;
+            out[tid + durationIndex * (*resultArrayXAxisSize)] = FLOAT_INFINITY;
         }
     }
 
@@ -595,7 +598,7 @@ extern "C"{
                     float overshoot = in_overshoot[durationIndex];
                     
                     if (tid < *resultArrayXAxisSize) {
-                        out[tid + durationIndex * (*resultArrayXAxisSize) + y * (*resultArrayXAxisSize) * (*in_duration_size)] = datapoints;
+                        out[tid + durationIndex * (*resultArrayXAxisSize) + y * (*resultArrayXAxisSize) * (*in_duration_size)] = FLOAT_INFINITY;
                     }
                     
                     if (tid < mean_size && calc_mean > transit_depth_min) {
@@ -737,7 +740,7 @@ extern "C"{
             float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
             out[tid + durationIndex * (*resultArrayXAxisSize) + periodIndex * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
         } else {
-            out[tid + durationIndex * (*resultArrayXAxisSize) + periodIndex * (*resultArrayXAxisSize) * (*in_duration_size)] = datapoints;
+            out[tid + durationIndex * (*resultArrayXAxisSize) + periodIndex * (*resultArrayXAxisSize) * (*in_duration_size)] = FLOAT_INFINITY;
         }
     }
 

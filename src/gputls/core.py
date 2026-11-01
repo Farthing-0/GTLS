@@ -142,6 +142,7 @@ def search_multi_periods(
 
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
+    constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
 
     for iterFlag in range(TotalIter):
 
@@ -321,6 +322,7 @@ def search_multi_periods(
         flattened_residuals = valid_lowest_residuals.reshape(valid_range, -1)
         min_indices = cp.argmin(flattened_residuals, axis=-1)
         min_values = cp.min(flattened_residuals, axis=-1)
+        min_values = cp.where(cp.isfinite(min_values), min_values, constant_residual)
         
         locationGPU[start_idx:start_idx + valid_range] = min_indices
         LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
@@ -499,6 +501,7 @@ def search_multi_periods_again(
 
     yGPU = cp.asarray(y).astype(cp.float32)
     dyGPU = cp.asarray(dy).astype(cp.float32)
+    constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
 
     for iterFlag in range(TotalIter):
 
@@ -645,6 +648,7 @@ def search_multi_periods_again(
         flattened_residuals = valid_lowest_residuals.reshape(valid_range, -1)
         min_indices = cp.argmin(flattened_residuals, axis=-1)
         min_values = cp.min(flattened_residuals, axis=-1)
+        min_values = cp.where(cp.isfinite(min_values), min_values, constant_residual)
         locationGPU[start_idx:start_idx + valid_range] = min_indices
         LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
 
