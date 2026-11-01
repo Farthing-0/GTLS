@@ -81,6 +81,28 @@ def test_kepler_custom_periods():
     assert np.isfinite(result.SDE)
 
 
+def test_multi_gpu_matches_single_gpu():
+    """Splitting the search across GPUs must not change the result."""
+    import cupy as cp
+
+    if cp.cuda.runtime.getDeviceCount() < 2:
+        print("SKIPPED test_multi_gpu_matches_single_gpu - needs 2 GPUs")
+        return
+    t, y = synthetic_light_curve()
+    single = gtls(t, y, verbose=False).power(GPUDeviceID=0)
+    multi = gtls(t, y, verbose=False).power(GPUDeviceIDs=[0, 1])
+
+    np.testing.assert_array_equal(single.raw_chi2, multi.raw_chi2)
+    np.testing.assert_array_equal(single.chi2, multi.chi2)
+    assert single.period == multi.period
+    assert single.T0 == multi.T0
+    assert single.SDE == multi.SDE
+
+    _, power_single = gtls(t, y, verbose=False).power(GPUDeviceID=0, fast=True)
+    _, power_multi = gtls(t, y, verbose=False).power(GPUDeviceIDs=[0, 1], fast=True)
+    np.testing.assert_array_equal(power_single, power_multi)
+
+
 if __name__ == "__main__":
     tests = [obj for name, obj in sorted(globals().items()) if name.startswith("test_")]
     failed = 0

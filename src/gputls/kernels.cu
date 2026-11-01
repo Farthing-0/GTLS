@@ -169,36 +169,29 @@ extern "C"{
     }
 
     /**
-     * Optimized full sum calculation with better memory access patterns
+     * Out-of-transit residual of the first window of each (period, duration):
+     * sum of the squared errors outside [0, window), read in O(1) from the
+     * error prefix sum (cumsum of calculate_base_error).
      */
-    __global__ void calcAllFullSum(float* fullsums, float *in_patched_data,
-                                  float *in_inverse_squared_patched_dy, int *patched_data_size,
-                                  int *in_duration, int *duration_size) {
+    __global__ void calcAllFullSum(float* fullsums,
+                                   const float *error_prefix_sum,
+                                   int patched_data_size,
+                                   const int *in_duration,
+                                   int duration_size,
+                                   int num_periods) {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    // duration index
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      // period index
+        int z = blockIdx.y;                                  // period index
 
-        float *patched_data = in_patched_data + y * (*patched_data_size);
-        float *inverse_squared_patched_dy = in_inverse_squared_patched_dy + y * (*patched_data_size);
-
-        // Calculate full sum once
-        float fullsum = 0.0f;
-        for (int i = 0; i < *patched_data_size; i++) {
-            float diff = 1.0f - patched_data[i];
-            fullsum += diff * diff * inverse_squared_patched_dy[i];
+        if (tid >= duration_size || z >= num_periods) {
+            return;
         }
 
-        if (tid < (*duration_size)) {
-            int window = in_duration[tid];
-            float window_sum = 0.0f;
-            
-            // Calculate window sum efficiently
-            for (int i = 0; i < window; i++) {
-                float diff = 1.0f - patched_data[i];
-                window_sum += diff * diff * inverse_squared_patched_dy[i];
-            }
-            
-            fullsums[tid + y * (*duration_size)] = fullsum - window_sum;
-        }
+        const float *prefix_sum = error_prefix_sum + (long long)z * patched_data_size;
+        float fullsum = prefix_sum[patched_data_size - 1];
+        int window = in_duration[tid];
+        float window_sum = (window > 0) ? prefix_sum[window - 1] : 0.0f;
+
+        fullsums[tid + z * duration_size] = fullsum - window_sum;
     }
     
     /**
@@ -257,7 +250,7 @@ extern "C"{
 
     /**
      * Out-of-transit residuals, stage 1: per-point squared error (1 - flux)^2 / dy^2.
-     * Its prefix sum (computed on the host with cupy.cumsum) feeds calculate_final_ootr.
+     * Its prefix sum (computed on the host with cupy.cumsum) feeds calcAllFullSum and calculate_final_ootr.
      */
     __global__ void calculate_base_error(
         float* out_base_error, // Shape: (num_periods, patched_data_size)

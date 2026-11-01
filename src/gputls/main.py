@@ -29,7 +29,8 @@ class gtls(object):
 
         Accepts the TLS keyword arguments (``period_min``, ``period_max``, ``periods``,
         ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``GPUDeviceID``,
-        ``bar_location`` and ``fast`` (return only ``(periods, power)``).
+        ``GPUDeviceIDs`` (list of devices to split the search across), ``bar_location``
+        and ``fast`` (return only ``(periods, power)``).
         """
         self, kwargs = validate_args(self, kwargs)
 
@@ -95,7 +96,7 @@ class gtls(object):
             T0_fit_margin=self.T0_fit_margin,
             oversampling_factor=self.oversampling_factor,
             verbose=self.verbose,
-            GPUDeviceID=self.GPUDeviceID,
+            GPUDeviceIDs=self.GPUDeviceIDs,
             fast=self.fast,
             bar_location=self.bar_location,
         )
