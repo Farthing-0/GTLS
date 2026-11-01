@@ -1,7 +1,6 @@
-from __future__ import division, print_function
-import numpy
-import numba
 from math import floor
+
+import numba
 
 
 @numba.jit(nopython=True)

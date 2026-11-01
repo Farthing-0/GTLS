@@ -1,58 +1,155 @@
-# GTLS (GPU Transit Least Squares)
-A GPU algorithm for speeding up periodic transit detection based on [TLS](https://github.com/hippke/tls).
+# GTLS: GPU Transit Least Squares
+
+[![PyPI](https://img.shields.io/pypi/v/gputls.svg)](https://pypi.org/project/gputls/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+GTLS is a CUDA implementation of the [Transit Least Squares (TLS)](https://github.com/hippke/tls)
+algorithm for detecting periodic exoplanet transits in light curves. It keeps the TLS
+interface and transit model, and evaluates all trial periods, durations and epochs
+in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
+
+![GTLS periodogram and phase-folded transit](docs/images/example.png)
+
+## Features
+
+- Drop-in replacement for the `transitleastsquares` search API
+- Limb-darkened transit templates (default, grazing and box-shaped)
+- Batches trial periods automatically to fit the free GPU memory
+- Refines the strongest peaks and their period aliases (P/2, 2P, 2P/3, 3P/2) with a full search at every cadence
+- Supports multi-GPU machines (`GPUDeviceID`)
+
+## Requirements
+
+- An NVIDIA GPU with CUDA
+- Python >= 3.8
+- [CuPy](https://cupy.dev/) matching your CUDA version
 
 ## Installation
-### Requirements
-A CUDA-capable GPU is required. 
 
-### Install
-This program is based on cupy. Due to there are many versions of cupy, we cannot specify the version of cupy in the package.
-So, you need to install cupy manually first.
- 
-Please refer to [the official document](https://docs.cupy.dev/en/stable/install.html#installing-cupy), and install the version of cupy that is suitable for your environment.
+CuPy wheels depend on the local CUDA version, so CuPy is not a hard dependency.
+Install CuPy following the [official guide](https://docs.cupy.dev/en/stable/install.html),
+then install GTLS:
 
-After installing cupy, you can install this program by running the following command:
 ```bash
-pip3 install gputls
+pip install gputls
 ```
 
-## Usage
+Or let pip pick a CuPy build for you:
+
+```bash
+pip install "gputls[cuda12]"   # CUDA 12.x
+pip install "gputls[cuda11]"   # CUDA 11.x
+```
+
+To install from source:
+
+```bash
+git clone https://github.com/Farthing-0/GTLS.git
+cd GTLS
+pip install .
+```
+
+## Quick start
+
 ```python
-#Assume that you have a time series data: time, flux
-from gtls import gtls
-model = gtls(time, flux)
-period, duration, depth, T0, SDE = model.power()
+from gputls import gtls
+
+# time in days, flux normalized to 1, optional flux uncertainties dy
+model = gtls(time, flux, dy)
+result = model.power()
+
+print(result.period, result.T0, result.duration, result.depth, result.SDE)
 ```
 
-You can also use the test script in the repository:
+`power()` accepts the same keyword arguments as TLS. Commonly used ones:
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `period_min`, `period_max` | `0`, `inf` | Limits of the automatic period grid (days) |
+| `periods` | `[]` | Custom array of trial periods; overrides the automatic grid |
+| `R_star`, `M_star` | `1.0`, `1.0` | Stellar radius and mass (solar units) used for the period grid |
+| `oversampling_factor` | `3` | Period grid oversampling |
+| `duration_grid_step` | `1.1` | Multiplicative step of the duration grid |
+| `transit_depth_min` | `1e-5` | Minimum depth of a trial transit |
+| `transit_template` | `"default"` | `"default"`, `"grazing"` or `"box"` |
+| `T0_fit_margin` | `0.125` | Epoch step of the coarse search as a fraction of the duration (0 to 0.125; 0 tests every cadence) |
+| `GPUDeviceID` | `0` | CUDA device to run on |
+| `bar_location` | `0` | Position of the progress bar, useful when running several searches in parallel |
+| `fast` | `False` | Return only `(periods, power)`, skipping the refinement and transit statistics |
+
+### Results
+
+`power()` returns a `gtlsResult` object with the following attributes:
+
+| Attribute | Description |
+| --- | --- |
+| `period` | Best period (days) |
+| `T0` | Mid-transit time of the first transit (days) |
+| `duration` | Transit duration (days) |
+| `depth` | Fractional transit depth (`1 - in-transit flux`). Note: TLS reports the in-transit flux level instead |
+| `SDE` | Signal Detection Efficiency of the best period |
+| `snr`, `snrPink` | Signal-to-noise ratio with white and pink (correlated) noise |
+| `snrFit`, `snrFitPink` | Signal-to-noise ratio from the fitted transit depth |
+| `transitTimes` | Mid-transit times within the light curve |
+| `periods`, `power` | Periodogram: trial periods and SDE power |
+| `chi2` | Minimum chi² of each period after refinement |
+| `raw_chi2`, `raw_power` | Minimum chi² and power of the coarse search, before refinement |
+| `possiblePeriods`, `possiblePeriodsIndices` | Periods that were refined, and their indices in `periods` |
+| `rawDuration`, `rawDurations`, `durationPoints` | Best duration as a fraction of the period, the duration grid, and the best duration in data points |
+
+## Examples
+
+The [`examples/`](examples/) folder contains Jupyter notebooks comparing GTLS with TLS:
+
+- [`tess_tutorial.ipynb`](examples/tess_tutorial.ipynb): a TESS target
+- [`kepler_tutorial.ipynb`](examples/kepler_tutorial.ipynb): a Kepler target downloaded with `lightkurve`
+
+The notebooks also need `matplotlib`, `astropy`, `transitleastsquares`, `lightkurve` and `wotan`.
+
+## Testing
+
+The test suite runs end-to-end searches on the GPU: injection-recovery on a synthetic
+light curve, the `fast` mode, and a real Kepler light curve stored in
+[`tests/data/`](tests/data/). It needs `astropy` in addition to the runtime dependencies.
+
+One-click build, install and test (inside an environment where CuPy is installed):
+
 ```bash
-python3 generatedTest.py
+./run_tests.sh            # GPU 0
+./run_tests.sh 1          # GPU 1
+PYTHON=/path/to/python ./run_tests.sh
 ```
 
-### Local debugging
-With your virtual environment activated and the runtime dependencies installed, run:
-```bash
-./debug.sh
+The script reinstalls only `gputls` itself (`--no-deps`) and then runs
+`tests/test_gtls.py`. The tests can also be run with `pytest tests`; select the GPU with
+the `GTLS_GPU_DEVICE` environment variable.
+
+## Project structure
+
 ```
-This builds a wheel with `python3 -m pip wheel` (no separate `build` package
-needed), reinstalls only the local package without changing its dependencies,
-and runs `KeplerLongCurveSingleTest.py`. A failed build stops the script before
-replacing the installed package.
+GTLS/
+├── src/gputls/          # Python package
+│   ├── main.py          # gtls class (public API)
+│   ├── core.py          # GPU search driver
+│   ├── kernels.cu       # CUDA kernels, compiled at runtime by CuPy
+│   ├── grid.py          # period and duration grids
+│   ├── transit.py       # transit templates (batman)
+│   ├── stats.py         # periodogram and SNR statistics
+│   ├── validate.py      # input and argument validation
+│   ├── constants.py     # default parameters
+│   └── ...
+├── tests/               # GPU test suite and test data
+├── examples/            # Jupyter notebooks
+├── docs/images/         # Figures used in the documentation
+├── run_tests.sh         # One-click build and test
+└── pyproject.toml
+```
 
-The Kepler test also needs `matplotlib`, `pandas`, `astropy`,
-`transitleastsquares`, `lightkurve`, and `wotan`. Its single-curve test data is
-stored in `test_data/public_Q3_long_5/` and is read relative to the script
-location, so it does not depend on `/mnt/HDD0/Kepler/lightcurves` or other
-files referenced by `allKoi2lcResult_update.csv`. It reads FITS data directly
-and uses `gputls.helpers.cleaned_array`; no external
-`GTLSTest/precision/lcFuns.py` is required. Flux and its uncertainty are divided
-by the same mean flux before detrending. The test currently selects GPU device 1.
+## Acknowledgements and license
 
-For now, There are no detailed documents. Please refer to the [TLS](https://github.com/hippke/tls) first, since the usage of this program is almost the same as TLS.
+GTLS is adapted from [TLS](https://github.com/hippke/tls) by Michael Hippke and René Heller.
+If you use GTLS, please also cite the TLS paper:
+Hippke, M. & Heller, R. (2019), *Optimized transit detection algorithm to search for periodic transits of small planets*,
+[A&A 623, A39](https://doi.org/10.1051/0004-6361/201834672).
 
-## License
-The GTLS(GPU Transit Least Squares) algorithm is adapted from the TLS(Transit Least Squares) algorithm by Michael Hippke & René Heller (2019).
-
-The TLS is an open source software with MIT license. The copyright of the TLS algorithm is held by its authors.
-
-The GTLS is also an open source software with MIT license.
+Both TLS and GTLS are released under the [MIT License](LICENSE).

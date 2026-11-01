@@ -1,14 +1,13 @@
-from __future__ import division, print_function
 import batman  # https://www.cfa.harvard.edu/~lkreidberg/batman/
 import numpy as np
-from . import constants as constants
+
+from . import constants
 from .interpolation import interp1d
 
 
 def reference_transit(samples, per, rp, a, inc, ecc, w, u, limb_dark):
     """Returns an Earth-like transit of width 1 and depth 1"""
 
-    f = np.ones(constants.SUPERSAMPLE_SIZE)
     duration = 1  # transit duration in days. Increase for exotic cases
     t = np.linspace(-duration * 0.5, duration * 0.5, constants.SUPERSAMPLE_SIZE)
     ma = batman.TransitParams()
@@ -95,14 +94,11 @@ def fractional_transit(
     return result
 
 
-def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
-              limb_dark, verbose=True):
+def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u, limb_dark):
     """Fetches (size(durations)*size(depths)) light curves of length 
         maxwidth_in_samples and returns these LCs in a 2D array, together with 
         their metadata in a separate array."""
 
-    # if verbose:
-    #     print("Creating model cache for", str(len(durations)), "durations")
     lc_arr = []
     rows = np.size(durations)
     lc_cache_overview = np.zeros(
@@ -158,47 +154,3 @@ def get_cache(durations, maxwidth_in_samples, per, rp, a, inc, ecc, w, u,
 
     lc_arr = np.array(lc_arr, dtype=object)
     return lc_cache_overview, lc_arr
-
-def mutipleTransitFit(pointSize,depth):
-
-    params = batman.TransitParams()       #object to store transit parameters
-    params.t0 = 0.                        #time of inferior conjunction
-    params.per = 1.                       #orbital period
-    params.rp = 0.1                       #planet radius (in units of stellar radii)
-    params.a = 15.                        #semi-major axis (in units of stellar radii)
-    params.inc = 87.                      #orbital inclination (in degrees)
-    params.ecc = 0.                       #eccentricity
-    params.w = 90.                        #longitude of periastron (in degrees)
-    params.limb_dark = "quadratic"        #limb darkening model
-    params.u = [0.4804, 0.1867]      #limb darkening coefficients [u1, u2, u3, u4]
-
-    t = np.linspace(-0.025, 0.025, 1000)  #times at which to calculate light curve
-    m = batman.TransitModel(params, t)    #initializes model
-
-    TargetIncMin = 86.2
-    TargetIncMax = 90
-    baseInc = 86
-    incsLog = np.linspace(np.log(TargetIncMin - baseInc),np.log(TargetIncMax - baseInc),100)
-    incs = np.exp(incsLog)+baseInc
-
-    transitArr = []
-    overshootArr = []
-    params.rp  = 0.025
-    for inc in incs:
-        params.inc = inc
-        m = batman.TransitModel(params,t)
-        flux = m.light_curve(params)                    #calculates light curveradii = np.linspace(0.09, 0.11, 20)
-
-        idx_first = np.argmax(flux < 1)
-        intransit_time = t[idx_first : -idx_first + 1]
-
-        tStart = intransit_time[0]
-        tEnd = intransit_time[-1]
-        tNew = np.linspace(tStart, tEnd, pointSize)
-        m = batman.TransitModel(params,tNew)
-        new_flux = m.light_curve(params)
-        # rescaled = (np.min(new_flux) - new_flux) / (np.min(new_flux) - 1) * 0.5 + 0.5
-        rescaled = (np.min(new_flux) - new_flux) / (np.min(new_flux) - 1) * depth + 1 - depth
-        transitArr.append(rescaled)
-        # overshootArr.append(np.mean(rescaled)/0.5)
-    return np.array(transitArr)#, np.array(overshootArr)

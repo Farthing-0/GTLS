@@ -1,5 +1,3 @@
-def getGPUCode():
-    GPUCode = """
 extern "C"{
     // Configuration constants
     #define SKIP_POINT 8
@@ -19,7 +17,6 @@ extern "C"{
     #define RS_MAX (R_SUN * R_STAR_MAX)        // Maximum stellar radius in meters
 
     // Transit fitting constants
-    #define SIGNAL_DEPTH 0.5                   // Standard signal depth for fitting
     #define FLOAT_INFINITY __int_as_float(0x7f800000) // IEEE-754 float infinity
     #define SCALE_FACTOR 1000000000000000.0    // Scale factor for duration calculations
 
@@ -27,8 +24,7 @@ extern "C"{
      * Fast phase folding kernel with optimized memory access
      * Calculates phase = (time / period) - floor(time / period) for each time point
      */
-    __global__ void foldFast(const double* time, const double* periods, double* phase, 
-                             int* periodSize, int* timeSize) {
+    __global__ void foldFast(const double* time, const double* periods, double* phase, int* timeSize) {
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
         int y = blockDim.y * blockIdx.y + threadIdx.y;
 
@@ -177,7 +173,7 @@ extern "C"{
      */
     __global__ void calcAllFullSum(float* fullsums, float *in_patched_data,
                                   float *in_inverse_squared_patched_dy, int *patched_data_size,
-                                  int *in_duration, int *duration_size, int *period_size_gpu) {
+                                  int *in_duration, int *duration_size) {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    // duration index
         int y = blockIdx.y * blockDim.y + threadIdx.y;      // period index
 
@@ -243,8 +239,7 @@ extern "C"{
     /**
      * Optimized out-of-transit residuals calculation - Step 2
      */
-    __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr,
-                                                            int *duration_size, int *patched_data_size, int *in_duration,
+    __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr, int *duration_size,
                                                             int *resultArrayXAxisSize, float *in_fullsum) {
         int i = blockIdx.x * blockDim.x + threadIdx.x;      // point index
         int tid = blockIdx.y * blockDim.y + threadIdx.y;    // duration index
@@ -261,12 +256,9 @@ extern "C"{
     }
 
     /**
-    * STAGE 1 KERNEL (REPLACEMENT FOR block_scan_and_sum)
-    * This kernel pre-computes the prefix sum of the base error term for each period.
-    * It's a 2D problem now: (periods, points).
-    * It uses the same two-stage scan logic internally but is shown here as a single conceptual function.
-    * We will reuse the robust 'block_scan_and_sum' and 'add_offsets_and_finalize' logic for this.
-    */
+     * Out-of-transit residuals, stage 1: per-point squared error (1 - flux)^2 / dy^2.
+     * Its prefix sum (computed on the host with cupy.cumsum) feeds calculate_final_ootr.
+     */
     __global__ void calculate_base_error(
         float* out_base_error, // Shape: (num_periods, patched_data_size)
         const float* in_patched_data,
@@ -287,11 +279,12 @@ extern "C"{
         float diff = 1.0f - patched_data_period[tid];
         out_base_error[tid + z * patched_data_size] = diff * diff * inverse_squared_patched_period[tid];
     }
+
     /**
-    * STAGE 2 KERNEL (FINAL, CORRECTED VERSION)
-    * Faithfully reproduces the original algorithm's logic, including boundary conditions.
-    */
-    __global__ void calculate_final_ootr_v3(
+     * Out-of-transit residuals, stage 2: out-of-transit residual for every
+     * (period, duration, start point) from the error prefix sum.
+     */
+    __global__ void calculate_final_ootr(
         float* out_ootr,
         const float* error_prefix_sum, // PRE-COMPUTED. Shape: (num_periods, patchedDatasSize)
         const float* in_fullsum,
@@ -335,8 +328,6 @@ extern "C"{
         out_ootr[final_idx] = fullsum_val + cumsum_weight;
     }
 
-
-
     /**
      * Optimized device function for cumsum average calculation
      */
@@ -351,27 +342,18 @@ extern "C"{
         }
     }
 
-    #define TILE_WIDTH 256
-
     /**
-    * FINAL CORRECTED VERSION: calcAllLowestResidualsGPUB_SignalTiled_v2
-    * This version corrects the 'actualLossFraction' calculation to be
-    * bit-for-bit identical to the original kernel, while retaining the
-    * performance optimization for the 'signal' array.
-    */
-    __global__ void calcAllLowestResidualsGPUB_SignalTiled_v2(
-        /* ... 参数列表与原版完全相同 ... */
+     * Coarse search: chi2 for every (period, duration, start point), evaluating
+     * only every SKIP_POINT-th start point (the others are set to infinity).
+     */
+    __global__ void calcAllLowestResidualsSkip(
         float *out, int *resultArrayXAxisSize,
         float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
         float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
         float *in_overshoot, float *in_ootr, float *in_fullsum,
-        float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
+        float *in_summed_edge_effect_correction, float *cumsumGPU,
         float *in_transit_depth_min
     ) {
-        // 仅为 signal 定义共享内存
-        __shared__ float s_signal[TILE_WIDTH];
-
-        // 线程索引和初始设置 (与原版完全相同)
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
         int y = blockIdx.y;
         int z = blockIdx.z;
@@ -381,11 +363,8 @@ extern "C"{
         }
 
         int duration = in_duration[y];
-        
-        // (所有前置计算逻辑与原版完全相同)
         int skipPoint = (duration > SKIP_POINT) ? (duration / SKIP_POINT) : 1;
         float transit_depth_min = *in_transit_depth_min;
-        int datapoints = *in_datapoints;
         float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, z);
 
         float current_stat = FLOAT_INFINITY;
@@ -394,8 +373,7 @@ extern "C"{
             float ootr = (tid == 0) ? 
                 in_fullsum[(long long)z * (*in_duration_size) + y] :
                 in_ootr[(long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
-            
-            // 指针设置 (与原版完全相同)
+
             float *data = in_patched_datas + (long long)z * (*in_patched_datas_size) + tid;
             float *dy = in_inverse_squared_patched_dys + (long long)z * (*in_patched_datas_size) + tid;
             float *signal = in_signal + (long long)y * (*in_max_signal_x_size);
@@ -403,298 +381,27 @@ extern "C"{
             float reverse_scale = calc_mean * in_overshoot[y] * 2.0f;
             float summed_edge_effect_correction = in_summed_edge_effect_correction[z];
             float intransit_residual = 0.0f;
-            int skipSearchPoint = 1;
-
-            // --- 核心优化循环 (分块缓存signal) ---
-            for (int tile_start = 0; tile_start < duration; tile_start += TILE_WIDTH) {
-                
-                int load_idx = tile_start + threadIdx.x;
-                if (load_idx < duration) {
-                    s_signal[threadIdx.x] = signal[load_idx];
-                }
-                __syncthreads();
-
-                int current_tile_width = min(TILE_WIDTH, duration - tile_start);
-                for (int i = 0; i < current_tile_width; i += skipSearchPoint) {
-                    float sigi = s_signal[i] * reverse_scale;
-                    int global_i = tile_start + i;
-                    float loss = data[global_i] - (1.0f - sigi);
-                    intransit_residual += loss * loss * dy[global_i];
-                }
-                __syncthreads();
-            }
-            
-            // *** 关键修正点 ***
-            // 使用与原始内核完全相同的公式来计算 actualLossFraction
-            float actualLossFraction = (float)duration / (((duration - 1) / skipSearchPoint) + 1);
-            
-            current_stat = intransit_residual * actualLossFraction + ootr - summed_edge_effect_correction;
-        }
-
-        out[(long long)tid + (long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
-    }
-
-    /**
-     * Optimized trapezoid fit kernel
-     */
-    __global__ void trapezoidFit(float *results, float *inData, float *inInverseSquaredDys,
-                                int duration, int inT0Index, float *transitMean, int tidMax) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        
-        if (tid < tidMax) {
-            float *result = results + tid * duration;
-            float TrapezoidDepth = ((float)tidMax * (*transitMean) - 0.5f * (float)tid) / 
-                                  ((float)tidMax - 0.5f * (float)tid);
-            
-            float trapezoidQ = ((float)tid / (float)tidMax) * ((float)duration / 2.0f);
-            float *data = inData + inT0Index;
-            float *dy = inInverseSquaredDys + inT0Index;
-
-            for (int i = 0; i < duration; i++) {
-                float signal;
-                
-                if (i == 0 && tid != 0) {
-                    signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ);
-                } else if (i < trapezoidQ) {
-                    signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ) * i;
-                } else if (i >= trapezoidQ && i < duration - trapezoidQ) {
-                    signal = TrapezoidDepth;
-                } else {
-                    signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ) * (duration - i);
-                }
-                
-                float diff = data[i] - signal;
-                result[i] = diff * diff * dy[i];
-            }
-        }
-    }
-
-    /**
-     * Optimized trapezoid fit generation
-     */
-    __global__ void generateTrapezoidFit(float *results, int bestFitTid, int duration, 
-                                        int trapezoidFitSize, float TrapezoidDepth) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        
-        if (tid < duration) {
-            float trapezoidQ = ((float)bestFitTid / (float)trapezoidFitSize) * ((float)duration / 2.0f);
-            float signal;
-
-            if (tid == 0 && bestFitTid != 0) {
-                signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ);
-            } else if (tid < trapezoidQ) {
-                signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ) * tid;
-            } else if (tid >= trapezoidQ && tid < duration - trapezoidQ) {
-                signal = TrapezoidDepth;
-            } else {
-                signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ) * (duration - tid);
-            }
-            
-            results[tid] = signal;
-        }
-    }
-
-    /**
-     * Optimized trapezoid SNR loss calculation
-     */
-    __global__ void trapezoidSNRloss(float *results, int resultSize, float *inData, 
-                                     float *inInverseSquaredDys, int duration, float* trapezoidFit) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        
-        if (tid < resultSize) {
-            float *data = inData + tid;
-            float *dy = inInverseSquaredDys + tid;
-            
-            float tempResidual = 0.0f;
-            for (int i = 0; i < duration; i++) {
-                float diff = data[i] - trapezoidFit[i];
-                tempResidual += diff * diff * dy[i];
-            }
-            results[tid] = tempResidual;
-        }
-    }
-
-    /**
-     * Optimized NoSkip version for high precision calculations
-     */
-    __global__ void calcAllLowestResidualsGPUBNoSkip(float *out, int *resultArrayXAxisSize,
-                                                     float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
-                                                     float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
-                                                     float *in_overshoot, float *in_ootr, float *in_fullsum,
-                                                     float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
-                                                     int *durationsMax, int *durationsMin, float *in_transit_depth_min) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // point index
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      // duration index
-
-        int durationIndex = y;
-        int duration = in_duration[durationIndex];
-
-        if (tid >= *resultArrayXAxisSize) {
-            return;
-        }
-
-        int durationMax = durationsMax[y];
-        int durationMin = durationsMin[y];
-        float transit_depth_min = *in_transit_depth_min;
-        int datapoints = *in_datapoints;
-
-        float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, 0);
-        float overshoot = in_overshoot[durationIndex];
-
-        if (calc_mean > transit_depth_min) {
-            float ootr = (tid == 0) ? 
-                in_fullsum[durationIndex] :
-                in_ootr[durationIndex * (*resultArrayXAxisSize) + tid - 1];
-
-            float *data = in_patched_datas + tid;
-            float *signal = in_signal + durationIndex * (*in_max_signal_x_size);
-            float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys;
-            float summed_edge_effect_correction = in_summed_edge_effect_correction[0];
-            float *dy = inverse_squared_patched_dy_arr + tid;
-            
-            float reverse_scale = calc_mean * overshoot * 2.0f;
-            float intransit_residual = 0.0f;
 
             for (int i = 0; i < duration; i++) {
                 float sigi = signal[i] * reverse_scale;
                 float loss = data[i] - (1.0f - sigi);
                 intransit_residual += loss * loss * dy[i];
             }
-            
-            float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-            out[tid + durationIndex * (*resultArrayXAxisSize)] = current_stat;
-        } else {
-            out[tid + durationIndex * (*resultArrayXAxisSize)] = FLOAT_INFINITY;
+
+            current_stat = intransit_residual + ootr - summed_edge_effect_correction;
         }
+
+        out[(long long)tid + (long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
     }
 
     /**
-     * Compatible GPU version with iterator flag support
+     * Refinement search: chi2 for every (period, duration, start point) without skipping.
      */
-    __global__ void calcAllLowestResidualsCompatibleGPU(float *out, int *in_mean_size, int *resultArrayXAxisSize,
-                                                        float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
-                                                        float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
-                                                        float *in_overshoot, float *in_ootr, float *in_fullsum,
-                                                        float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
-                                                        int *durationsMax, int *durationsMin, float *in_transit_depth_min,
-                                                        int *iter_flag_gpu, int *single_calc_periods_arr_gpu, int *period_size_gpu) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // point index
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      // period index
-
-        int y_input = y + (*iter_flag_gpu) * (*single_calc_periods_arr_gpu);
-        float transit_depth_min = *in_transit_depth_min;
-        int datapoints = *in_datapoints;
-        
-        if (y_input < (*period_size_gpu)) {
-            int durationMax = durationsMax[y_input];
-            int durationMin = durationsMin[y_input];
-
-            for (int durationIndex = 0; durationIndex < *in_duration_size; durationIndex++) {
-                int mean_size = in_mean_size[durationIndex];
-                int duration = in_duration[durationIndex];
-
-                int skipGap = (duration > 100) ? (duration / 100) : 1;
-                
-                if (duration >= durationMin && duration <= durationMax && tid % skipGap == 0) {
-                    float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, y);
-                    float overshoot = in_overshoot[durationIndex];
-                    
-                    if (tid < *resultArrayXAxisSize) {
-                        out[tid + durationIndex * (*resultArrayXAxisSize) + y * (*resultArrayXAxisSize) * (*in_duration_size)] = FLOAT_INFINITY;
-                    }
-                    
-                    if (tid < mean_size && calc_mean > transit_depth_min) {
-                        float ootr = (tid == 0) ? 
-                            in_fullsum[y * (*in_duration_size) + durationIndex] :
-                            in_ootr[durationIndex * (*resultArrayXAxisSize) + y * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
-
-                        float *data = in_patched_datas + y_input * (*in_patched_datas_size) + tid;
-                        float *signal = in_signal + durationIndex * (*in_max_signal_x_size);
-                        float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + y_input * (*in_patched_datas_size);
-                        float summed_edge_effect_correction = in_summed_edge_effect_correction[y_input];
-                        float *dy = inverse_squared_patched_dy_arr + tid;
-                        
-                        float reverse_scale = calc_mean * overshoot * 2.0f;
-                        float intransit_residual = 0.0f;
-                        
-                        for (int i = 0; i < duration; i++) {
-                            float sigi = signal[i] * reverse_scale;
-                            float loss = data[i] - (1.0f - sigi);
-                            intransit_residual += loss * loss * dy[i];
-                        }
-
-                        float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-                        out[tid + durationIndex * (*resultArrayXAxisSize) + y * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
-                    }
-                } else {
-                    if (tid < *resultArrayXAxisSize) {
-                        out[tid + durationIndex * (*resultArrayXAxisSize) + y * (*resultArrayXAxisSize) * (*in_duration_size)] = FLOAT_INFINITY;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Optimized trapezoid fit with atomic operations
-     */
-    __global__ void trapezoidFitAtom(float *results, float *inData, float *inInverseSquaredDys,
-                                    int duration, int inT0Index, float *transitMean, int trapezoidFitSize) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x; // point index in trapezoid
-        int y = blockIdx.y * blockDim.y + threadIdx.y;   // trapezoid type index
-
-        if (y < trapezoidFitSize && tid < duration) {
-            float *result = results + y * duration + tid;
-            float TrapezoidDepth = ((float)trapezoidFitSize * (*transitMean) - 0.5f * (float)y) / 
-                                  ((float)trapezoidFitSize - 0.5f * (float)y);
-            
-            float trapezoidQ = ((float)y / (float)trapezoidFitSize) * ((float)duration / 2.0f);
-            float *data = inData + inT0Index + tid;
-            float *dy = inInverseSquaredDys + inT0Index + tid;
-
-            float signal;
-            if (tid == 0 && y != 0) {
-                signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ);
-            } else if (tid < trapezoidQ) {
-                signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ) * tid;
-            } else if (tid >= trapezoidQ && tid < duration - trapezoidQ) {
-                signal = TrapezoidDepth;
-            } else {
-                signal = 1.0f - ((1.0f - TrapezoidDepth) / trapezoidQ) * (duration - tid);
-            }
-            
-            float diff = (*data) - signal;
-            *result = diff * diff;
-        }
-    }
-
-    /**
-     * Optimized trapezoid SNR loss with atomic operations
-     */
-    __global__ void trapezoidSNRlossAtom(float *results, int resultSize, float *inData, 
-                                        float *inInverseSquaredDys, int duration, float* trapezoidFit) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x; // point in duration
-        int y = blockIdx.y * blockDim.y + threadIdx.y;   // first point index
-
-        if (y < resultSize && tid < duration) {
-            float *data = inData + y + tid;
-            float *dy = inInverseSquaredDys + y + tid;
-            float *result = results + y * duration + tid;
-
-            float diff = (*data) - trapezoidFit[tid];
-            *result = diff * diff * (*dy);
-        }
-    }
-
-
-    /**
-     * Optimized NoSkipTemp version - high precision calculations without skipping
-     */
-    __global__ void calcAllLowestResidualsGPUBNoSkipTemp(float *out, int *resultArrayXAxisSize,
+    __global__ void calcAllLowestResidualsNoSkip(float *out, int *resultArrayXAxisSize,
                                                          float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
                                                          float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
                                                          float *in_overshoot, float *in_ootr, float *in_fullsum,
-                                                         float *in_summed_edge_effect_correction, int *in_datapoints, float *cumsumGPU,
+                                                         float *in_summed_edge_effect_correction, float *cumsumGPU,
                                                          float *in_transit_depth_min) {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;    // point index
         int y = blockIdx.y * blockDim.y + threadIdx.y;      // duration index
@@ -709,7 +416,6 @@ extern "C"{
         }
 
         float transit_depth_min = *in_transit_depth_min;
-        int datapoints = *in_datapoints;
 
         float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, periodIndex);
         float overshoot = in_overshoot[durationIndex];
@@ -747,5 +453,3 @@ extern "C"{
     }
 
 }
-"""
-    return GPUCode

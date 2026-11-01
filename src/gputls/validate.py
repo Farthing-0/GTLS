@@ -1,9 +1,9 @@
-from __future__ import division, print_function
-import numpy
 import warnings
-import multiprocessing
+
+import numpy
+
+from . import constants
 from .helpers import cleaned_array, impact_to_inclination
-from . import constants as constants
 
 
 def validate_inputs(t, y, dy):
@@ -47,24 +47,17 @@ def validate_inputs(t, y, dy):
 
 
 def validate_args(self, kwargs):
-
-    self.useLocalPTXCUBIN = kwargs.get("useLocalPTXCUBIN", constants.USE_LOCAL_PTXCUBIN)
-
-    self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
-
-    self.legacy = kwargs.get("legacy", constants.LEGACY)
-    self.fast = kwargs.get("fast", constants.FAST)
-
-    self.bar_location = kwargs.get("bar_location", constants.BAR_LOCATION)
+    """Validate **kwargs and set to defaults where missing"""
 
     # Warn user if unknown parameters
-    for key, value in kwargs.items():
+    for key in kwargs:
         if key not in constants.VALID_PARAMETERS:
-            text = "Ignoring unknown parameter: " + str(key)
-            warnings.warn(text)
+            warnings.warn("Ignoring unknown parameter: " + str(key))
 
-    """Validate **kwargs and set to defaults where missing"""
-    self.show_progress_bar = kwargs.get("show_progress_bar", True)
+    self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
+    self.fast = kwargs.get("fast", constants.FAST)
+    self.bar_location = kwargs.get("bar_location", constants.BAR_LOCATION)
+
     self.transit_depth_min = kwargs.get(
         "transit_depth_min", constants.TRANSIT_DEPTH_MIN
     )
@@ -85,8 +78,6 @@ def validate_args(self, kwargs):
     self.duration_grid_step = kwargs.get(
         "duration_grid_step", constants.DURATION_GRID_STEP
     )
-
-    self.use_threads = kwargs.get("use_threads", multiprocessing.cpu_count())
 
     self.per = kwargs.get("per", constants.DEFAULT_PERIOD)
     self.rp = kwargs.get("rp", constants.DEFAULT_RP)
@@ -112,17 +103,6 @@ def validate_args(self, kwargs):
         self.rp = constants.DEFAULT_RP
         self.a = constants.DEFAULT_A
         self.inc = constants.DEFAULT_INC
-
-        self.grazing_b = constants.GRAZING_B
-        self.grazing_inc = impact_to_inclination(b=self.grazing_b, semimajor_axis=self.a)
-
-        self.box_per = constants.BOX_PERIOD
-        self.box_rp = constants.BOX_RP
-        self.box_a = constants.BOX_A
-        self.box_b = constants.BOX_B
-        self.box_inc = constants.BOX_INC
-        self.box_u = constants.BOX_U
-        self.box_limb_dark = constants.BOX_LIMB_DARK
 
     elif self.transit_template == "grazing":
         self.b = constants.GRAZING_B
@@ -188,9 +168,6 @@ def validate_args(self, kwargs):
         raise ValueError("n_transits_min must be an integer value")
     if self.n_transits_min < 1:
         raise ValueError("n_transits_min must be an integer value >= 1")
-
-    if not isinstance(self.use_threads, int) or self.use_threads < 1:
-        raise ValueError("use_threads must be an integer value >= 1")
 
     # Assert 0 < T0_fit_margin < 0.1
     if self.T0_fit_margin < 0:

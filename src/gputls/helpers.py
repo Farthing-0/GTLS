@@ -1,16 +1,5 @@
-from __future__ import division, print_function
 import numpy
 from numpy import arccos, degrees
-from .interpolation import interp1d
-
-def resample(time, flux, factor):
-    # New method without scipy
-    time_grid = int(len(flux) / factor)
-    time_resampled = numpy.linspace(min(time), max(time), time_grid)
-    f = interp1d(time_resampled, time)
-    flux_resampled = f(flux)
-
-    return time_resampled, flux_resampled
 
 
 def cleaned_array(t, y, dy=None):
@@ -65,29 +54,6 @@ def transit_mask(t, period, duration, T0):
     return mask
 
 
-def running_mean(data, width_signal):
-    """Returns the running mean in a given window"""
-    cumsum = numpy.cumsum(numpy.insert(data, 0, 0))
-    return (cumsum[width_signal:] - cumsum[:-width_signal]) / float(width_signal)
-
-
-def running_mean_equal_length(data, width_signal):
-    """Returns the running mean in a given window"""
-    cumsum = numpy.cumsum(numpy.insert(data, 0, 0))
-    med = (cumsum[width_signal:] - cumsum[:-width_signal]) / float(width_signal)
-
-    # Append the first/last value at the beginning/end to match the length of
-    # data and returned median
-    first_values = med[0]
-    last_values = med[-1]
-    missing_values = len(data) - len(med)
-    values_front = int(missing_values * 0.5)
-    values_end = missing_values - values_front
-    med = numpy.append(numpy.full(values_front, first_values), med)
-    med = numpy.append(med, numpy.full(values_end, last_values))
-    return med
-
-
 def running_median(data, kernel):
     """Returns sliding median of width 'kernel' and same length as data """
     idx = numpy.arange(kernel) + numpy.arange(len(data) - kernel + 1)[:, None]
@@ -104,6 +70,7 @@ def running_median(data, kernel):
     med = numpy.append(numpy.full(values_front, first_values), med)
     med = numpy.append(med, numpy.full(values_end, last_values))
     return med
+
 
 def impact_to_inclination(b, semimajor_axis):
     """Converts planet impact parameter b = [0..1.x] to inclination [deg]"""
