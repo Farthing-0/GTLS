@@ -158,20 +158,20 @@ class GPUSearch:
         if offsets[-1] >= 2 ** 31:
             raise ValueError("Too many start points per period for the GPU search")
 
-        # Phase fold
+        # Phase fold and sort (bucket sort, equal to a stable argsort of the phases)
         periodsGPU = cp.asarray(periods).astype(cp.float64)
         phasesGPU = cp.empty((nPeriods, tSize), dtype=cp.float64)
-        blockSize, gridSizeX = calcGridBlockSize(tSize)
-        module.get_function("foldFast")(
-            (gridSizeX, nPeriods), (blockSize,), (self.tGPU, periodsGPU, phasesGPU, self.tSizeGPU))
-
-        # Sort in chunks to limit peak GPU memory
+        countsGPU = cp.zeros((nPeriods, tSize), dtype=cp.int32)
+        grid = ((tSize + 255) // 256, nPeriods)
+        module.get_function("foldBuckets")(
+            grid, (256,), (self.tGPU, periodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
+        cursorGPU = cp.cumsum(countsGPU, axis=1, dtype=cp.int32) - countsGPU
         sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
-        chunks = 10
-        for i in range(chunks):
-            lo, hi = i * nPeriods // chunks, (i + 1) * nPeriods // chunks
-            sortIndexGPU[lo:hi] = phasesGPU[lo:hi].argsort()
-        del phasesGPU
+        module.get_function("bucketScatter")(
+            grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
+        module.get_function("sortBuckets")(
+            grid, (256,), (phasesGPU, countsGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
+        del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
         residualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.float32)
