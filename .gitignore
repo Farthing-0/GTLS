@@ -35,3 +35,9 @@ htmlcov/
 pushPypi.sh
 shellrun.sh
 test.ipynb
+
+# Profiler output (Nsight Systems / Nsight Compute)
+*.nsys-rep
+*.qdrep
+*.ncu-rep
+*.sqlite

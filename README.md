@@ -110,8 +110,9 @@ The notebooks also need `matplotlib`, `astropy`, `transitleastsquares`, `lightku
 ## Testing
 
 The test suite runs end-to-end searches on the GPU: injection-recovery on a synthetic
-light curve, the `fast` mode, and a real Kepler light curve stored in
-[`tests/data/`](tests/data/). It needs `astropy` in addition to the runtime dependencies.
+light curve, the `fast` mode, a real Kepler light curve stored in
+[`tests/data/`](tests/data/), release of GPU memory after a search, and (on machines with
+at least two GPUs) bitwise agreement between single- and multi-GPU searches. It needs `astropy` in addition to the runtime dependencies.
 
 One-click build, install and test (inside an environment where CuPy is installed):
 

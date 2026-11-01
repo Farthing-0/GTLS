@@ -53,3 +53,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 gputls = ["kernels.cu"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
