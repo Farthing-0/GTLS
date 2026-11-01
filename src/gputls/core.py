@@ -13,11 +13,9 @@ from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_sta
 KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
 
 
-def load_module(T0_fit_margin):
-    """Compile the CUDA kernels; T0_fit_margin sets the start-point stride of the coarse search."""
-    skip_point = "0x7f800000" if T0_fit_margin == 0 else str(int(1 / T0_fit_margin))
-    code = KERNEL_SOURCE.read_text().replace("#define SKIP_POINT 8", "#define SKIP_POINT " + skip_point)
-    return cp.RawModule(code=code)
+def load_module():
+    """Compile the CUDA kernels."""
+    return cp.RawModule(code=KERNEL_SOURCE.read_text())
 
 
 def foldCPU(time, flux, dy, period):
@@ -58,12 +56,39 @@ def find_nearest_indices(a, b):
     return nearest_indices, nearest_elements
 
 
+EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
+
+
+def start_strides(widths, T0_fit_margin, refine):
+    """Start-point stride of each duration (in samples).
+
+    The coarse search tests start points about T0_fit_margin of a duration apart (every point
+    for T0_fit_margin = 0); the refinement tests every point.
+    """
+    widths = np.asarray(widths)
+    if refine or T0_fit_margin == 0:
+        return np.ones(len(widths), dtype=np.int32)
+    skip = int(1 / T0_fit_margin)
+    return np.where(widths > skip, widths // skip, 1).astype(np.int32)
+
+
+def decode_keys(keys):
+    """Split searchChi2 keys into (chi2, flattened duration/start location).
+
+    chi2 is NaN where no window was searched (key left at EMPTY_KEY).
+    """
+    high = (keys >> 32).astype(cp.uint32)
+    bits = cp.where(high >= 0x80000000, high ^ 0x80000000, ~high).astype(cp.uint32)
+    return bits.view(cp.float32), (keys & 0xFFFFFFFF).astype(cp.int64)
+
+
 class GPUSearch:
     """GPU state shared by all chi2 evaluations of one light curve."""
 
-    def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview):
+    def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin):
         self.module = module
         self.t = t
+        self.T0_fit_margin = T0_fit_margin
 
         durations, indices = np.unique(lc_cache_overview["width_in_samples"], return_index=True)
         self.durations = durations
@@ -78,14 +103,22 @@ class GPUSearch:
         self.patchedDatasSize = int(self.tSize + maxDuration)
 
         self.tGPU = cp.asarray(t).astype(cp.float64)
-        self.yGPU = cp.asarray(y).astype(cp.float32)
+        # 1 - y is formed in float64, so the float32 residuals keep their full precision
+        self.residualGPU = cp.asarray((1.0 - np.asarray(y, dtype=np.float64)).astype(np.float32))
         self.dyGPU = cp.asarray(dy).astype(cp.float32)
         self.tSizeGPU = int_scalar(self.tSize)
         self.tLengthGPU = cp.asarray(np.array([max(t) - min(t)])).astype(cp.float32)
-        self.patchedDatasSizeGPU = int_scalar(self.patchedDatasSize)
-        self.maxDurationGPU = int_scalar(maxDuration)
-        self.transitDepthMinGPU = cp.array([transit_depth_min]).astype(cp.float32)
+        self.transit_depth_min = np.float32(transit_depth_min)
         self.constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
+
+        # Template depth profiles s = 1 - lc, one row per duration
+        self.maxWidth = int(np.max(durations))
+        signal = np.zeros((len(durations), self.maxWidth), dtype=np.float32)
+        for i, row in enumerate(self.lc_arr):
+            signal[i, :len(row)] = 1 - np.asarray(row)
+        self.signalGPU = cp.asarray(signal)
+        self.overshootGPU = cp.asarray(self.lc_cache_overview["overshoot"]).astype(cp.float32)
+        self.widthsGPU = cp.asarray(durations).astype(cp.int32)
 
     def duration_mask(self, periods):
         """Boolean array (periods x durations) of physically plausible durations per period."""
@@ -107,116 +140,60 @@ class GPUSearch:
              cp.asarray(self.durations).astype(cp.int32), durationBoolArrayGPU))
         return durationBoolArrayGPU
 
-    def residuals(self, periods, durationsBool, refine):
-        """chi2 of shape (periods, durations[durationsBool], start points).
+    def best_keys(self, periods, durationsBool, refine):
+        """Packed lowest chi2 and its location of each period (see searchChi2 and decode_keys).
 
-        refine=False skips start points according to SKIP_POINT (coarse search);
-        refine=True evaluates every start point.
+        The location is durationIndex * tSize + start, with durationIndex counting the
+        durations selected by durationsBool. refine=False tests start points with the coarse
+        stride of start_strides; refine=True tests every start point.
         """
         module = self.module
         tSize = self.tSize
-        patchedDatasSize = self.patchedDatasSize
+        patchedSize = self.patchedDatasSize
         nPeriods = len(periods)
 
-        singleDurations = self.durations[durationsBool]
-        single_lc_arr = self.lc_arr[durationsBool]
-        overshootGPU = cp.array(self.lc_cache_overview["overshoot"][durationsBool]).astype(cp.float32)
-        durationsGPU = cp.asarray(singleDurations).astype(cp.int32)
-        durationsSizeGPU = int_scalar(len(singleDurations))
-        periodsGPU = cp.asarray(periods).astype(cp.float64)
-        periodSizeGPU = int_scalar(nPeriods)
+        selected = np.flatnonzero(durationsBool).astype(np.int32)
+        strides = start_strides(self.durations[selected], self.T0_fit_margin, refine)
+        offsets = np.concatenate(([0], np.cumsum(-(-tSize // strides))))
+        if offsets[-1] >= 2 ** 31:
+            raise ValueError("Too many start points per period for the GPU search")
 
         # Phase fold
+        periodsGPU = cp.asarray(periods).astype(cp.float64)
         phasesGPU = cp.empty((nPeriods, tSize), dtype=cp.float64)
-        sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
         blockSize, gridSizeX = calcGridBlockSize(tSize)
         module.get_function("foldFast")(
             (gridSizeX, nPeriods), (blockSize,), (self.tGPU, periodsGPU, phasesGPU, self.tSizeGPU))
 
         # Sort in chunks to limit peak GPU memory
+        sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
         chunks = 10
         for i in range(chunks):
             lo, hi = i * nPeriods // chunks, (i + 1) * nPeriods // chunks
             sortIndexGPU[lo:hi] = phasesGPU[lo:hi].argsort()
+        del phasesGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
-        patchedDatasGPU = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
-        patchedDysGPU = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
-        blockSize, gridSizeX = calcGridBlockSize(patchedDatasSize)
-        module.get_function("patchData")(
-            (gridSizeX, nPeriods), (blockSize,),
-            (patchedDatasGPU, patchedDysGPU, self.patchedDatasSizeGPU, sortIndexGPU,
-             self.maxDurationGPU, self.yGPU, self.dyGPU, self.tSizeGPU))
+        residualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.float32)
+        weightedGPU = cp.empty((nPeriods, patchedSize, 2), dtype=cp.float32)
+        module.get_function("patchWeighted")(
+            ((patchedSize + 255) // 256, nPeriods), (256,),
+            (sortIndexGPU, self.residualGPU, self.dyGPU, residualGPU, weightedGPU,
+             np.int32(tSize), np.int32(patchedSize)))
+        del sortIndexGPU
 
-        inverseSquaredPatchedDysGPU = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
-        module.get_function("calcInverseSquaredPatchedDy")(
-            (gridSizeX, nPeriods, 1), (blockSize, 1, 1),
-            (inverseSquaredPatchedDysGPU, patchedDysGPU, self.patchedDatasSizeGPU))
+        cumResidualGPU = cp.cumsum(residualGPU, axis=1, dtype=cp.float64)
+        baseGPU = cp.sum(weightedGPU[:, :tSize, 0].astype(cp.float64) * residualGPU[:, :tSize], axis=1)
+        del residualGPU
 
-        edgeEffectCorrectionsGPU = cp.empty((nPeriods), dtype=cp.float32)
-        blockSize, gridSizeX = calcGridBlockSize(nPeriods)
-        module.get_function("calcEdgeEffectCorrections")(
-            (gridSizeX, 1, 1), (blockSize, 1, 1),
-            (edgeEffectCorrectionsGPU, patchedDatasGPU, inverseSquaredPatchedDysGPU,
-             self.patchedDatasSizeGPU, self.maxDurationGPU, periodSizeGPU))
-
-        cumsumGPU = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
-        for i in range(nPeriods):
-            cumsumGPU[i] = cp.cumsum(patchedDatasGPU[i])
-
-        # Prefix sum of the per-point squared error, shared by the full sums and the coarse ootr
-        base_error = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
-        module.get_function("calculate_base_error")(
-            ((patchedDatasSize + 255) // 256, nPeriods), (256,),
-            (base_error, patchedDatasGPU, inverseSquaredPatchedDysGPU, np.int32(patchedDatasSize),
-             np.int32(nPeriods)))
-        error_prefix_sum = cp.cumsum(base_error, axis=1)
-        del base_error
-
-        fullSumGPU = cp.empty((nPeriods, len(singleDurations)), dtype=cp.float32)
-        blockSize, gridSizeX = calcGridBlockSize(len(singleDurations))
-        module.get_function("calcAllFullSum")(
-            (gridSizeX, nPeriods, 1), (blockSize, 1, 1),
-            (fullSumGPU, error_prefix_sum, np.int32(patchedDatasSize), durationsGPU,
-             np.int32(len(singleDurations)), np.int32(nPeriods)))
-
-        # Out-of-transit residuals for every (period, duration, start point)
-        blockSize, gridSizeX = calcGridBlockSize(tSize)
-        if refine:
-            ootrGPU = cp.empty((nPeriods, len(singleDurations), tSize), dtype=cp.float32)
-            module.get_function("calcAllOutOfTransitResiduals_step1_2GPU")(
-                (gridSizeX, len(singleDurations), nPeriods), (blockSize, 1, 1),
-                (ootrGPU, patchedDatasGPU, durationsGPU, durationsSizeGPU,
-                 inverseSquaredPatchedDysGPU, self.patchedDatasSizeGPU, self.tSizeGPU))
-            ootrGPU = cp.cumsum(ootrGPU, axis=-1)
-            module.get_function("calcAllOutOfTransitResiduals_step2_2GPU")(
-                (gridSizeX, len(singleDurations), nPeriods), (blockSize, 1, 1),
-                (ootrGPU, durationsSizeGPU, self.tSizeGPU, fullSumGPU))
-            residualKernel = "calcAllLowestResidualsNoSkip"
-        else:
-            ootrGPU = cp.empty((nPeriods, len(singleDurations), tSize), dtype=cp.float32)
-            module.get_function("calculate_final_ootr")(
-                ((tSize + 255) // 256, len(singleDurations), nPeriods), (256, 1, 1),
-                (ootrGPU, error_prefix_sum, fullSumGPU, durationsGPU,
-                 tSize, patchedDatasSize, len(singleDurations), nPeriods))
-            residualKernel = "calcAllLowestResidualsSkip"
-
-        lc_arr_max_len = np.array([np.max(singleDurations)]).astype(np.int32)
-        lc_arr_full_length = 1 - np.array(
-            [np.pad(x, (0, lc_arr_max_len[0] - len(x)), "constant") for x in single_lc_arr])
-        lcArrMaxLenGPU = cp.asarray(lc_arr_max_len).astype(cp.int32)
-        lcArrFullLengthGPU = cp.asarray(lc_arr_full_length).astype(cp.float32)
-
-        lowestResidualsGPU = cp.empty((nPeriods, len(singleDurations), tSize), dtype=cp.float32)
-        module.get_function(residualKernel)(
-            (gridSizeX, len(singleDurations), nPeriods), (blockSize, 1, 1),
-            (lowestResidualsGPU, self.tSizeGPU,
-             patchedDatasGPU, self.patchedDatasSizeGPU,
-             durationsGPU, durationsSizeGPU,
-             lcArrFullLengthGPU, lcArrMaxLenGPU, inverseSquaredPatchedDysGPU,
-             overshootGPU, ootrGPU, fullSumGPU, edgeEffectCorrectionsGPU, cumsumGPU,
-             self.transitDepthMinGPU))
-        return lowestResidualsGPU
+        bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
+        module.get_function("searchChi2")(
+            ((int(offsets[-1]) + 255) // 256, nPeriods), (256,),
+            (bestGPU, cumResidualGPU, weightedGPU, baseGPU, self.signalGPU, self.overshootGPU,
+             self.widthsGPU, cp.asarray(selected), cp.asarray(offsets.astype(np.int32)),
+             cp.asarray(strides), np.int32(len(selected)), np.int32(tSize), np.int32(patchedSize),
+             np.int32(self.maxWidth), self.transit_depth_min))
+        return bestGPU
 
     def chi2_batch(self, periods, size, refine):
         """Lowest chi2 of each period of one batch, padded to size periods.
@@ -230,15 +207,13 @@ class GPUSearch:
         if not durationsBool.any():
             return np.full(valid_range, self.constant_residual, dtype=np.float32)
 
-        # Pad the last batch with its last period to avoid division by zero
+        # Pad the last batch with its last period, so all batches have the same shape
         if valid_range < size:
             periods = np.append(periods, np.full(size - valid_range, periods[-1]))
 
-        lowestResidualsGPU = self.residuals(periods, durationsBool, refine)
-        flattened_residuals = lowestResidualsGPU[:valid_range].reshape(valid_range, -1)
-        min_values = cp.min(flattened_residuals, axis=-1)
-        min_values = cp.where(cp.isfinite(min_values), min_values, self.constant_residual)
-        return min_values.astype(cp.float32).get()
+        chi2, _ = decode_keys(self.best_keys(periods, durationsBool, refine)[:valid_range])
+        chi2 = cp.where(cp.isfinite(chi2), chi2, self.constant_residual)
+        return chi2.astype(cp.float32).get()
 
 
 class MultiGPUSearch:
@@ -249,7 +224,7 @@ class MultiGPUSearch:
         self.searches = []
         for device_id in self.device_ids:
             with cp.cuda.Device(device_id):
-                self.searches.append(GPUSearch(load_module(T0_fit_margin), *args))
+                self.searches.append(GPUSearch(load_module(), *args, T0_fit_margin=T0_fit_margin))
 
     @property
     def primary(self):
@@ -402,8 +377,8 @@ def search_single_period(search, period, t, y, dy):
     durations = search.durations[durationsBool]
     single_lc_cache_overview = search.lc_cache_overview[durationsBool]
 
-    lowestResidualsGPU = search.residuals(np.array([period]), durationsBool, refine=True)
-    bestLocation = lowestResidualsGPU.argmin().get()
+    chi2, location = decode_keys(search.best_keys(np.array([period]), durationsBool, refine=True))
+    bestLocation = int(location[0]) if bool(cp.isfinite(chi2[0])) else 0
 
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)
     durationPointsNum = durations[durationIndex]
