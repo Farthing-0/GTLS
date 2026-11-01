@@ -6,8 +6,10 @@ Select the GPU with the ``GTLS_GPU_DEVICE`` environment variable (default: 0).
 import os
 import sys
 from pathlib import Path
+from unittest import SkipTest
 
 import batman
+import cupy as cp
 import numpy as np
 
 from gputls import gtls
@@ -81,13 +83,19 @@ def test_kepler_custom_periods():
     assert np.isfinite(result.SDE)
 
 
+def test_gpu_memory_released():
+    """Repeated searches must not leave GPU memory allocated."""
+    t, y = synthetic_light_curve()
+    for _ in range(2):
+        gtls(t, y, verbose=False).power(GPUDeviceID=GPU_DEVICE)
+        with cp.cuda.Device(GPU_DEVICE):
+            assert cp.get_default_memory_pool().total_bytes() == 0
+
+
 def test_multi_gpu_matches_single_gpu():
     """Splitting the search across GPUs must not change the result."""
-    import cupy as cp
-
     if cp.cuda.runtime.getDeviceCount() < 2:
-        print("SKIPPED test_multi_gpu_matches_single_gpu - needs 2 GPUs")
-        return
+        raise SkipTest("needs 2 GPUs")
     t, y = synthetic_light_curve()
     single = gtls(t, y, verbose=False).power(GPUDeviceID=0)
     multi = gtls(t, y, verbose=False).power(GPUDeviceIDs=[0, 1])
@@ -105,13 +113,16 @@ def test_multi_gpu_matches_single_gpu():
 
 if __name__ == "__main__":
     tests = [obj for name, obj in sorted(globals().items()) if name.startswith("test_")]
-    failed = 0
+    failed = skipped = 0
     for test in tests:
         try:
             test()
             print("PASSED", test.__name__)
+        except SkipTest as reason:
+            skipped += 1
+            print("SKIPPED", test.__name__, "-", reason)
         except Exception as error:
             failed += 1
             print("FAILED", test.__name__, "-", repr(error))
-    print("%d passed, %d failed" % (len(tests) - failed, failed))
+    print("%d passed, %d skipped, %d failed" % (len(tests) - failed - skipped, skipped, failed))
     sys.exit(1 if failed else 0)
