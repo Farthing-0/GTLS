@@ -57,6 +57,7 @@ def find_nearest_indices(a, b):
 
 
 EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
+SCAN_THREADS = 512  # threads per row of the scan kernels
 
 
 def start_strides(widths, T0_fit_margin, refine):
@@ -165,7 +166,8 @@ class GPUSearch:
         grid = ((tSize + 255) // 256, nPeriods)
         module.get_function("foldBuckets")(
             grid, (256,), (self.tGPU, periodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
-        cursorGPU = cp.cumsum(countsGPU, axis=1, dtype=cp.int32) - countsGPU
+        cursorGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
+        module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(tSize)))
         sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
         module.get_function("bucketScatter")(
             grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
@@ -182,8 +184,12 @@ class GPUSearch:
              np.int32(tSize), np.int32(patchedSize)))
         del sortIndexGPU
 
-        cumResidualGPU = cp.cumsum(residualGPU, axis=1, dtype=cp.float64)
-        baseGPU = cp.sum(weightedGPU[:, :tSize, 0].astype(cp.float64) * residualGPU[:, :tSize], axis=1)
+        # Prefix sums of the residuals and the chi2 of the light curve without transit
+        cumResidualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.float64)
+        baseGPU = cp.empty(nPeriods, dtype=cp.float64)
+        module.get_function("scanResidual")(
+            (nPeriods,), (SCAN_THREADS,),
+            (residualGPU, weightedGPU, cumResidualGPU, baseGPU, np.int32(tSize), np.int32(patchedSize)))
         del residualGPU
 
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
