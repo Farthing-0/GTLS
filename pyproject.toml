@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 authors = [
-  {name = "Quanquan Hu", email = "huquanquan22@mails.ucas.ac.cn"},
+  {name = "Quanquan Hu", email = "huqq1917@outlook.com"},
 ]
 maintainers = [
-  {name = "Quanquan Hu", email = "huquanquan22@mails.ucas.ac.cn"},
+  {name = "Quanquan Hu", email = "huqq1917@outlook.com"},
 ]
 keywords = ["astronomy", "exoplanet", "transit", "TLS", "GPU", "CUDA"]
 classifiers = [
