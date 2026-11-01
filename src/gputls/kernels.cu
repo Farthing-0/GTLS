@@ -17,18 +17,66 @@ extern "C"{
     #define SCALE_FACTOR 1000000000000000.0    // Scale factor for duration calculations
 
     /**
-     * Fast phase folding kernel with optimized memory access
-     * Calculates phase = (time / period) - floor(time / period) for each time point
+     * Phase sort, stage 1: fold and count the points of each bucket floor(phase * tSize)
+     * (about one point per bucket). phase = time / period - floor(time / period).
      */
-    __global__ void foldFast(const double* time, const double* periods, double* phase, int* timeSize) {
-        int tid = blockDim.x * blockIdx.x + threadIdx.x;
-        int y = blockDim.y * blockIdx.y + threadIdx.y;
+    __global__ void foldBuckets(const double* time, const double* periods, double* phase,
+                                int* counts, int tSize) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;  // point index
+        int z = blockIdx.y;                             // period index
+        if (i >= tSize) {
+            return;
+        }
+        double phaseRaw = time[i] / periods[z];
+        double p = phaseRaw - (int)(phaseRaw);
+        long long o = (long long)z * tSize;
+        phase[o + i] = p;
+        int bucket = min((int)(p * tSize), tSize - 1);
+        atomicAdd(counts + o + bucket, 1);
+    }
 
-        if (tid < (*timeSize)) {
-            double time_val = time[tid];
-            double period = periods[y];
-            double phase_raw = time_val / period;
-            phase[tid + y * (*timeSize)] = phase_raw - (int)(phase_raw);
+    /**
+     * Phase sort, stage 2: scatter the point indices into their buckets. cursor holds the
+     * first position of each bucket on entry and one past its last position on exit.
+     */
+    __global__ void bucketScatter(const double* phase, int* cursor, int* sortIndex, int tSize) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        int z = blockIdx.y;
+        if (i >= tSize) {
+            return;
+        }
+        long long o = (long long)z * tSize;
+        int bucket = min((int)(phase[o + i] * tSize), tSize - 1);
+        sortIndex[o + atomicAdd(cursor + o + bucket, 1)] = i;
+    }
+
+    /**
+     * Phase sort, stage 3: insertion sort of each bucket by (phase, index). Buckets increase
+     * with phase, so the result equals a stable argsort of the phases.
+     */
+    __global__ void sortBuckets(const double* phase, const int* counts, const int* ends,
+                                int* sortIndex, int tSize) {
+        int b = blockIdx.x * blockDim.x + threadIdx.x;  // bucket index
+        int z = blockIdx.y;
+        if (b >= tSize) {
+            return;
+        }
+        long long o = (long long)z * tSize;
+        int n = counts[o + b];
+        if (n < 2) {
+            return;
+        }
+        int* seg = sortIndex + o + ends[o + b] - n;
+        const double* ph = phase + o;
+        for (int a = 1; a < n; a++) {
+            int v = seg[a];
+            double pv = ph[v];
+            int c = a - 1;
+            while (c >= 0 && (ph[seg[c]] > pv || (ph[seg[c]] == pv && seg[c] > v))) {
+                seg[c + 1] = seg[c];
+                c--;
+            }
+            seg[c + 1] = v;
         }
     }
 
