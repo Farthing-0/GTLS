@@ -1,3 +1,40 @@
+// Block-wide inclusive prefix sum of one value per thread (blockDim.x a multiple of 32).
+// Returns the thread's inclusive sum and stores the block total in *total.
+template <typename T>
+__device__ __forceinline__ T blockInclusiveScan(T v, T* total) {
+    __shared__ T warpSums[32];
+    int lane = threadIdx.x & 31;
+    int warp = threadIdx.x >> 5;
+    int nWarps = blockDim.x >> 5;
+    for (int o = 1; o < 32; o <<= 1) {
+        T other = __shfl_up_sync(0xffffffff, v, o);
+        if (lane >= o) {
+            v += other;
+        }
+    }
+    if (lane == 31) {
+        warpSums[warp] = v;
+    }
+    __syncthreads();
+    if (warp == 0) {
+        T w = lane < nWarps ? warpSums[lane] : (T)0;
+        for (int o = 1; o < 32; o <<= 1) {
+            T other = __shfl_up_sync(0xffffffff, w, o);
+            if (lane >= o) {
+                w += other;
+            }
+        }
+        warpSums[lane] = w;
+    }
+    __syncthreads();
+    if (warp > 0) {
+        v += warpSums[warp - 1];
+    }
+    *total = warpSums[nWarps - 1];
+    __syncthreads();  // warpSums is reused by the next call
+    return v;
+}
+
 extern "C"{
     // Physical constants - optimized with appropriate values
     #define R_STAR_MIN 0.05                    // Minimum stellar radius (solar radii) - updated boundary
@@ -33,6 +70,25 @@ extern "C"{
         phase[o + i] = p;
         int bucket = min((int)(p * tSize), tSize - 1);
         atomicAdd(counts + o + bucket, 1);
+    }
+
+    /**
+     * Exclusive prefix sum of each row of counts (one block per row): the first position of
+     * every bucket in the sorted order.
+     */
+    __global__ void scanCounts(const int* counts, int* cursor, int tSize) {
+        long long o = (long long)blockIdx.x * tSize;
+        int carry = 0;
+        for (int tile = 0; tile < tSize; tile += blockDim.x) {
+            int q = tile + threadIdx.x;
+            int c = q < tSize ? counts[o + q] : 0;
+            int total;
+            int inclusive = blockInclusiveScan(c, &total);
+            if (q < tSize) {
+                cursor[o + q] = carry + inclusive - c;
+            }
+            carry += total;
+        }
     }
 
     /**
@@ -168,6 +224,35 @@ extern "C"{
         long long o = (long long)z * patchedSize + q;
         patchedResidual[o] = r;
         patchedWeighted[o] = make_float2(w * r, w);
+    }
+
+    /**
+     * Inclusive float64 prefix sum of each row of the patched residuals (one block per row),
+     * and base = sum of w r^2 over the first tSize (not patched) points of the row.
+     */
+    __global__ void scanResidual(const float* patchedResidual, const float2* patchedWeighted,
+                                 double* cumResidual, double* base, int tSize, int patchedSize) {
+        long long o = (long long)blockIdx.x * patchedSize;
+        double carry = 0.0;
+        double chi2 = 0.0;
+        for (int tile = 0; tile < patchedSize; tile += blockDim.x) {
+            int q = tile + threadIdx.x;
+            double r = q < patchedSize ? (double)patchedResidual[o + q] : 0.0;
+            if (q < tSize) {
+                chi2 += (double)patchedWeighted[o + q].x * r;
+            }
+            double total;
+            double inclusive = blockInclusiveScan(r, &total);
+            if (q < patchedSize) {
+                cumResidual[o + q] = carry + inclusive;
+            }
+            carry += total;
+        }
+        double total;
+        blockInclusiveScan(chi2, &total);
+        if (threadIdx.x == 0) {
+            base[blockIdx.x] = total;
+        }
     }
 
     // Order-preserving map of a float onto an unsigned int: a < b <=> key(a) < key(b)
