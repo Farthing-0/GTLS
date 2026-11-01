@@ -28,7 +28,7 @@ class gtls(object):
         """Run the search and return a :class:`gtlsResult`.
 
         Accepts the TLS keyword arguments (``period_min``, ``period_max``, ``periods``,
-        ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``GPUDeviceID``,
+        ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``T0_refine_margin``, ``GPUDeviceID``,
         ``GPUDeviceIDs`` (list of devices to split the search across), ``bar_location``
         and ``fast`` (return only ``(periods, power)``).
         """
@@ -94,6 +94,7 @@ class gtls(object):
             lc_arr=self.lc_arr,
             lc_cache_overview=self.lc_cache_overview,
             T0_fit_margin=self.T0_fit_margin,
+            T0_refine_margin=self.T0_refine_margin,
             oversampling_factor=self.oversampling_factor,
             verbose=self.verbose,
             GPUDeviceIDs=self.GPUDeviceIDs,
