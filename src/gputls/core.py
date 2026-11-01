@@ -5,7 +5,6 @@ from pathlib import Path
 import cupy as cp
 import numpy as np
 import numpy.ma as ma
-import pynvml
 import tqdm
 
 from .helpers import transit_mask
@@ -258,9 +257,7 @@ class MultiGPUSearch:
 
     def batch_size(self, n_periods):
         """Periods per batch, limited by the free memory of the fullest device."""
-        pynvml.nvmlInit()
-        free = min(pynvml.nvmlDeviceGetMemoryInfo(pynvml.nvmlDeviceGetHandleByIndex(device_id)).free
-                   for device_id in self.device_ids)
+        free = min(cp.cuda.Device(device_id).mem_info[0] for device_id in self.device_ids)
         patchedDatasSize = self.primary.patchedDatasSize
         nDurations = len(self.primary.durations)
         singleCalcPeriods_max = free / (

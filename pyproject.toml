@@ -32,7 +32,6 @@ dependencies = [
   "numba",
   "tqdm",
   "batman-package",
-  "nvidia-ml-py",
 ]
 
 [project.optional-dependencies]
