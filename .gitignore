@@ -21,6 +21,8 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/.tls_envs/
+tests/.tls_compare_results/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
@@ -41,3 +43,5 @@ test.ipynb
 *.qdrep
 *.ncu-rep
 *.sqlite
+
+todo.md

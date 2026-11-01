@@ -37,7 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 cuda11 = ["cupy-cuda11x"]
 cuda12 = ["cupy-cuda12x"]
-test = ["pytest", "astropy"]
+test = ["pytest", "astropy", "lightkurve"]
 
 [project.urls]
 Homepage = "https://github.com/Farthing-0/GTLS"
