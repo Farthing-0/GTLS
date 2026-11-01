@@ -326,20 +326,13 @@ def _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbos
     if fast:
         return periods, power
 
-    # Refine the 100 strongest peaks, plus the 100 strongest peaks with period > 1 day,
-    # without skipping start points
-    combined = list(enumerate(zip(periods, -power)))
-    sorted_combined = sorted(combined, key=lambda x: x[1][1])
-    top_100_indices = [item[0] for item in sorted_combined[:100]]
-    top_100_periods = [item[1][0] for item in sorted_combined[:100]]
-    remaining_combined = [item for item in sorted_combined if item[0] not in top_100_indices]
-    remaining_combined_greater_than_1 = [item for item in remaining_combined if item[1][0] > 1]
-    sorted_remaining_combined_greater_than_1 = sorted(remaining_combined_greater_than_1, key=lambda x: x[1][1])
-    next_100_indices = [item[0] for item in sorted_remaining_combined_greater_than_1[:100]]
-    next_100_periods = [item[1][0] for item in sorted_remaining_combined_greater_than_1[:100]]
-
-    possiblePeriodsIndices = top_100_indices + next_100_indices
-    possiblePeriods = top_100_periods + next_100_periods
+    # Refine the 100 strongest peaks, plus the 100 strongest remaining peaks with period > 1 day,
+    # without skipping start points. Ties keep the period order; masked power sorts last.
+    order = np.argsort(-ma.filled(power, -np.inf), kind="stable")
+    remaining = order[100:]
+    remaining = remaining[ma.filled(periods, 0)[remaining] > 1]
+    possiblePeriodsIndices = order[:100].tolist() + remaining[:100].tolist()
+    possiblePeriods = list(ma.getdata(periods)[possiblePeriodsIndices])
 
     chi2[possiblePeriodsIndices] = search.chi2(possiblePeriods, singleCalcPeriods, refine=True)
 

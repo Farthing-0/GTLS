@@ -1,4 +1,6 @@
+import cupy
 import numpy
+from cupyx.scipy.ndimage import median_filter
 from numpy import arccos, degrees
 
 
@@ -26,15 +28,15 @@ def transit_mask(t, period, duration, T0):
 
 def running_median(data, kernel):
     """Returns sliding median of width 'kernel' and same length as data """
-    if numpy.ma.is_masked(data):
+    width = len(numpy.arange(kernel))  # kernel may be a float
+    if not numpy.ma.is_masked(data) and width % 2 == 1 and len(data) >= width:
+        # Same medians as the sliding windows below, computed on the GPU
+        med = median_filter(cupy.asarray(numpy.ma.getdata(data)), size=width, mode="nearest").get()
+        med = med[width // 2:len(data) - width // 2]
+    else:
         idx = numpy.arange(kernel) + numpy.arange(len(data) - kernel + 1)[:, None]
         idx = idx.astype(int)  # needed if oversampling_factor is not int
         med = numpy.ma.median(data[idx], axis=1)
-    else:
-        # Same medians as above without the masked-array overhead
-        windows = numpy.lib.stride_tricks.sliding_window_view(
-            numpy.ma.getdata(data), len(numpy.arange(kernel)))
-        med = numpy.median(windows, axis=1)
 
     # Append the first/last value at the beginning/end to match the length of
     # data and returned median
