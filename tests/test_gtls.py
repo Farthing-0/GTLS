@@ -80,7 +80,10 @@ def test_kepler_custom_periods():
     assert len(result.raw_chi2) == len(periods)
     assert np.all(np.isfinite(result.raw_chi2))
     assert periods.min() <= result.period <= periods.max()
-    assert np.isfinite(result.SDE)
+    # Every period exceeds the 89 d baseline, so each fold holds every event once and the
+    # deepest single event gives the same lowest chi2 at all periods: the periodogram is flat
+    # (to float32 rounding) and the SDE is undefined.
+    np.testing.assert_allclose(result.raw_chi2, result.raw_chi2[0], rtol=1e-6)
 
 
 def test_gpu_memory_released():
