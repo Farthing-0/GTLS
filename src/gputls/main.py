@@ -1,22 +1,36 @@
-from __future__ import division, print_function
 import numpy as np
 
-from . import constants as constants
+from . import constants, core
 from .grid import duration_grid, period_grid
-from .transit import get_cache
-from .validate import validate_inputs, validate_args
-from . import core as core
 from .results import gtlsResult
+from .transit import get_cache
+from .validate import validate_args, validate_inputs
+
 
 class gtls(object):
-    """Compute the transit least squares of limb-darkened transit models"""
+    """GPU transit least squares search of a light curve.
+
+    Parameters
+    ----------
+    t, y : array_like
+        Time (days) and normalized flux.
+    dy : array_like, optional
+        Flux uncertainties; the flux standard deviation is used if omitted.
+    verbose : bool
+        Print status information and a progress bar.
+    """
 
     def __init__(self, t, y, dy=None, verbose=True):
         self.t, self.y, self.dy = validate_inputs(t, y, dy)
         self.verbose = verbose
 
     def power(self, **kwargs):
-        """Compute the periodogram for a set of user-defined parameters"""
+        """Run the search and return a :class:`gtlsResult`.
+
+        Accepts the TLS keyword arguments (``period_min``, ``period_max``, ``periods``,
+        ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``GPUDeviceID``,
+        ``bar_location`` and ``fast`` (return only ``(periods, power)``).
+        """
         self, kwargs = validate_args(self, kwargs)
 
         if self.verbose:
@@ -37,14 +51,11 @@ class gtls(object):
             periods = self.periods
 
         # Generate possible durations
-        durations = duration_grid(
-            periods, shortest=1 / len(self.t), log_step=self.duration_grid_step
-        )
+        durations = duration_grid(periods, log_step=self.duration_grid_step)
 
         maxwidth_in_samples = int(np.max(durations) * np.size(self.y))
         if maxwidth_in_samples % 2 != 0:
             maxwidth_in_samples = maxwidth_in_samples + 1
-        self.maxwidth_in_samples = maxwidth_in_samples
         self.lc_cache_overview, self.lc_arr = get_cache(
             durations=durations,
             maxwidth_in_samples=maxwidth_in_samples,
@@ -56,7 +67,6 @@ class gtls(object):
             w=self.w,
             u=self.u,
             limb_dark=self.limb_dark,
-            verbose=self.verbose
         )
 
         if self.verbose:
@@ -74,56 +84,32 @@ class gtls(object):
 
         periods = np.sort(periods)
 
-        if self.fast == False:
-            self.periods,self.period,self.rawDuration,durationPoints,self.duration,self.Depth,self.bestT0,\
-                SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods\
-                = core.search_multi_periods(
-                periods=periods,
-                t=self.t,
-                y=self.y,
-                dy=self.dy,
-                transit_depth_min=self.transit_depth_min,
-                R_star_min=self.R_star_min,
-                R_star_max=self.R_star_max,
-                M_star_min=self.M_star_min,
-                M_star_max=self.M_star_max,
-                lc_arr=self.lc_arr,
-                lc_cache_overview=self.lc_cache_overview,
-                T0_fit_margin=self.T0_fit_margin,
-                oversampling_factor = self.oversampling_factor,
-                verbose=self.verbose,
-                useLocalPTXCUBIN=self.useLocalPTXCUBIN,
-                GPUDeviceID=self.GPUDeviceID,
-                legacy=self.legacy,
-                bar_location=self.bar_location
-            )
-        else:
-            periods,power = core.search_multi_periods(
-                periods=periods,
-                t=self.t,
-                y=self.y,
-                dy=self.dy,
-                transit_depth_min=self.transit_depth_min,
-                R_star_min=self.R_star_min,
-                R_star_max=self.R_star_max,
-                M_star_min=self.M_star_min,
-                M_star_max=self.M_star_max,
-                lc_arr=self.lc_arr,
-                lc_cache_overview=self.lc_cache_overview,
-                T0_fit_margin=self.T0_fit_margin,
-                oversampling_factor = self.oversampling_factor,
-                verbose=self.verbose,
-                useLocalPTXCUBIN=self.useLocalPTXCUBIN,
-                GPUDeviceID=self.GPUDeviceID,
-                legacy=self.legacy,
-                fast=True,
-                bar_location=self.bar_location
-            )
-            return periods,power
+        result = core.search_multi_periods(
+            periods=periods,
+            t=self.t,
+            y=self.y,
+            dy=self.dy,
+            transit_depth_min=self.transit_depth_min,
+            lc_arr=self.lc_arr,
+            lc_cache_overview=self.lc_cache_overview,
+            T0_fit_margin=self.T0_fit_margin,
+            oversampling_factor=self.oversampling_factor,
+            verbose=self.verbose,
+            GPUDeviceID=self.GPUDeviceID,
+            fast=self.fast,
+            bar_location=self.bar_location,
+        )
+        if self.fast:
+            return result
+
+        self.periods, self.period, self.rawDuration, durationPoints, self.duration, self.Depth, self.bestT0, \
+            SDE, chi2, self.transitTimes, power, snr, snrPink, snrFit, snrFitPink, raw_power, raw_chi2, \
+            possiblePeriodsIndices, possiblePeriods = result
         self.rawDurations = durations
-        return gtlsResult(self.periods,self.period,self.rawDuration,durationPoints,durations,self.duration,self.Depth,self.bestT0,\
-                          SDE,chi2,self.transitTimes,power,snr,snrPink,snrFit,snrFitPink,raw_power,raw_chi2,possiblePeriodsIndices,possiblePeriods)
-    
+        return gtlsResult(self.periods, self.period, self.rawDuration, durationPoints, durations, self.duration,
+                          self.Depth, self.bestT0, SDE, chi2, self.transitTimes, power, snr, snrPink, snrFit,
+                          snrFitPink, raw_power, raw_chi2, possiblePeriodsIndices, possiblePeriods)
+
     # Useful tools
 
     def showFit(self):

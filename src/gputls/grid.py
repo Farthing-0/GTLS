@@ -1,8 +1,10 @@
-from __future__ import division, print_function
-from . import constants as constants
-import numpy
-from numpy import pi, sqrt, arccos, degrees, floor, ceil
 import warnings
+
+import numpy
+from numpy import pi, sqrt
+
+from . import constants
+
 
 def T14(
     R_s, M_s, P, upper_limit=constants.FRACTIONAL_TRANSIT_DURATION_MAX, small=False
@@ -29,8 +31,7 @@ def T14(
     return result
 
 
-def duration_grid(periods, shortest, log_step=constants.DURATION_GRID_STEP):
-    
+def duration_grid(periods, log_step=constants.DURATION_GRID_STEP):
     duration_max = T14(
         R_s=constants.R_STAR_MAX,
         M_s=constants.M_STAR_MIN,
@@ -119,9 +120,6 @@ def period_grid(
     )
     C = f_min ** (1.0 / 3) - A / 3.0
     N_opt = (f_max ** (1.0 / 3) - f_min ** (1.0 / 3) + A / 3) * 3 / A
-    
-    #add more points to the grid
-    # N_opt = N_opt * 5
 
     X = numpy.arange(N_opt) + 1
 

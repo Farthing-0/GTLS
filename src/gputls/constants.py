@@ -1,30 +1,10 @@
-from __future__ import division, print_function
-from os import path
-from . import version as version
-
 """Magic constants"""
-resources_dir = path.join(path.dirname(__file__))
-TLS_VERSION = (
-    "GPU Transit Least Squares GTLS "
-    + version.GTLS_VERSION
-    + " ("
-    + version.GTLS_DATE
-    + ")"
-)
+from .version import __date__, __version__
 
-# In the default, print status information during search
-VERBOSE = True
-
-# Use the local PTX/CUBIN file instead of the code in the package, usually can be faster.
-# But you need to compile the PTX/CUBIN file first.
-# The PTX/CUBIN file should be "./GTLS.PTX" or "./GTLS.CUBIN"
-USE_LOCAL_PTXCUBIN = False
+TLS_VERSION = "GPU Transit Least Squares GTLS " + __version__ + " (" + __date__ + ")"
 
 # The GPU device ID to use
 GPU_DEVICE_ID = 0
-
-# skip points when search, which is the original feature of TLS
-LEGACY = False
 
 # fast: just return periods and power, ignore all other parameter.
 FAST = False
@@ -32,7 +12,6 @@ FAST = False
 # astrophysical constants
 G = 6.673e-11  # gravitational constant [m^3 / kg / s^2]
 R_sun = 695508000  # radius of the Sun [m]
-R_earth = 6371000  # radius of the Earth [m]
 R_jup = 69911000  # radius of Jupiter [m]
 M_sun = 1.989 * 10 ** 30  # mass of the Sun [kg]
 SECONDS_PER_DAY = 86400
@@ -100,11 +79,6 @@ FRACTIONAL_TRANSIT_DURATION_MAX = 0.12
 # To work for all periods correctly, it has to be re-done at each period
 # This feature is currently not implemented
 SUPERSAMPLE_SIZE = 10000
-OVERSAMPLE_MODEL_LIGHT_CURVE = 5
-
-# Order in which the periods are searched: "shuffled"", "descending", "ascending"
-# Shuffled has the advantage of the best estimate for the remaining time
-PERIODS_SEARCH_ORDER = "shuffled"
 
 # When converting power_raw to power, a median of a certain window size is subtracted.
 # For periodograms of smaller width, no smoothing is applied. The kernel size is
@@ -112,29 +86,20 @@ PERIODS_SEARCH_ORDER = "shuffled"
 # This value has proven to yield numerically stable results.
 SDE_MEDIAN_KERNEL_SIZE = 30
 
-# AFFECTS ONLY THE FINAL T0 FIT, NOT THE SDE
-# We can give user the option to not scan the phase space for T0 at every cadence
-# For speed reasons, it may be acceptable to approximate T0 to within X %
-# Useful in large datasets. 100k points: Extra runtime of order 2 minutes
-# While individual transits often are only a few cadences long, in the stacked
-# phase space it is (N transits * transit duration) [cadences] long
-# T0_FIT_MARGIN = 0.01  # of transit duration e.g., 0.01 (=1%)
+# Step between trial transit start points in the coarse period search, as a fraction
+# of the transit duration (clipped to [0, 0.125]); 0 tests every cadence (slowest).
+# The best candidate periods are always re-searched at every cadence.
 T0_FIT_MARGIN = 0.125
-# T0_FIT_MARGIN = 0
-
-# The secondary fit for T0 can take negligible or significant time, depending on the
-# number of data points and on T0_FIT_MARGIN. Set an empirical threshold to avoid
-# displaying a progress bar when the estimated runtime is low (<~1 sec)
-# To display the progress bar in more cases, use a lower number
-PROGRESSBAR_THRESHOLD = 5000
 
 # Some cases yield empty period grids. Example: R_star=5, M_star=1
 # Then: Warn and return the default grid
 MINIMUM_PERIOD_GRID_SIZE = 100
 
+# Position of the tqdm progress bar, useful when running several searches in parallel
 BAR_LOCATION = 0
 
-# Warn the user if unknown **kwargs are given as parameters
+# Warn the user if unknown **kwargs are given as parameters.
+# "use_threads", "show_progress_bar" and "verbose" are accepted for TLS compatibility but ignored.
 VALID_PARAMETERS = [
     "R_star",
     "R_star_min",
@@ -147,7 +112,6 @@ VALID_PARAMETERS = [
     "periods",
     "n_transits_min",
     "GPUDeviceID",
-    "legacy",
     "fast",
     "per",
     "rp",
