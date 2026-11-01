@@ -1,5 +1,6 @@
 """Benchmark scenarios and suites."""
-from .simulate import KEPLER_LC, TESS_2MIN, Planet, Scenario, Star
+from .simulate import (KEPLER_LC, KEPLER_MISSION_LC, KEPLER_QUARTER_DAYS, KEPLER_SC, TESS_2MIN,
+                       TESS_20S, Planet, Scenario, Star)
 
 SUN_KEPLER = Star(radius=1.0, mass=1.0, teff=5800, u=(0.45, 0.20))
 SUN_TESS = Star(radius=1.0, mass=1.0, teff=5800, u=(0.35, 0.25))
@@ -81,13 +82,75 @@ SCENARIOS = {
             rotation_period=6.5,
             flatten_window_days=0.75,
         ),
+        # Long baselines and dense cadences
+        Scenario(
+            name="kepler_lc_17q",
+            description="The whole simulated Kepler mission (Q1-Q17, ~1460 d) at long cadence, "
+                        "long-period sub-Neptune",
+            mission=KEPLER_MISSION_LC,
+            star=SUN_KEPLER,
+            planet=Planet(period=122.4, epoch_offset=61.7, rp_rs=0.02, b=0.3),
+            seed=31,
+            n_segments=17,
+            segment_days=KEPLER_QUARTER_DAYS,
+            noise_ppm=150,
+            variability_ppm=2000,
+            rotation_period=17.0,
+            flatten_window_days=2.5,
+        ),
+        Scenario(
+            name="kepler_sc_1q",
+            description="One simulated Kepler quarter at short cadence (1 min, three monthly "
+                        "files), short-period small planet",
+            mission=KEPLER_SC,
+            star=SUN_KEPLER,
+            planet=Planet(period=2.73, epoch_offset=1.1, rp_rs=0.018, b=0.2),
+            seed=32,
+            noise_ppm=1400,  # per 1-min cadence, = 255 ppm per 30 min
+            variability_ppm=3000,
+            rotation_period=11.0,
+            flatten_window_days=0.75,
+        ),
+        Scenario(
+            name="kepler_mixed_17q",
+            description="The whole simulated Kepler mission at long cadence, with short cadence "
+                        "instead in Q10-Q12 (stitched LC + SC), long-period sub-Neptune",
+            mission=KEPLER_MISSION_LC,
+            star=SUN_KEPLER,
+            planet=Planet(period=122.4, epoch_offset=61.7, rp_rs=0.02, b=0.3),
+            seed=33,
+            n_segments=17,
+            segment_days=KEPLER_QUARTER_DAYS,
+            dense_mission=KEPLER_SC,
+            dense_segments=(9, 10, 11),
+            noise_ppm=150,
+            variability_ppm=2000,
+            rotation_period=17.0,
+            flatten_window_days=2.5,
+        ),
+        Scenario(
+            name="tess_20s_1s",
+            description="Simulated TESS-SPOC 20-s sector, short-period sub-Neptune",
+            mission=TESS_20S,
+            star=SUN_TESS,
+            planet=Planet(period=3.27, epoch_offset=1.1, rp_rs=0.03, b=0.3),
+            seed=34,
+            noise_ppm=2450,  # per 20-s cadence, = 1000 ppm per 2 min
+            variability_ppm=4000,
+            rotation_period=6.5,
+            flatten_window_days=0.75,
+        ),
     ]
 }
 
 SUITES = {
     "quick": ["kepler_q3_real", "tess_2min_1s"],
     "standard": ["kepler_q3_real", "kepler_lc_1q", "tess_2min_1s", "tess_2min_null"],
-    "full": list(SCENARIOS),
+    "full": ["kepler_q3_real", "kepler_lc_1q", "kepler_lc_4q", "tess_2min_1s", "tess_2min_2s",
+             "tess_2min_null"],
+    # Whole Kepler mission and dense cadences; TLS 1.x needs hours here, so run with --timeout
+    "long": ["kepler_lc_17q", "kepler_sc_1q", "kepler_mixed_17q", "tess_20s_1s"],
+    "all": list(SCENARIOS),
 }
 
 

@@ -36,7 +36,10 @@ def _load_engine(cfg):
     import gputls
     from gputls import gtls as Model
 
-    return Model, gputls.__version__, os.path.dirname(os.path.abspath(gputls.__file__))
+    module_dir = os.path.dirname(os.path.abspath(gputls.__file__))
+    if cfg.get("gtls_src") and not module_dir.startswith(os.path.abspath(cfg["gtls_src"])):
+        raise ImportError("gputls was imported from %s, not %s" % (module_dir, cfg["gtls_src"]))
+    return Model, gputls.__version__, module_dir
 
 
 def _float(value):
@@ -84,6 +87,10 @@ def main(path):
             result = Model(t, y, dy, verbose=False).power(**cfg["power_kwargs"])
             timings.append(time.perf_counter() - start)
             summaries.append(_summary(result, cfg["kind"]))
+            # Slow runs are not repeated: their start-up cost is negligible
+            limit = cfg.get("repeat_limit")
+            if limit is not None and timings[-1] > limit:
+                break
 
         periods = np.ma.filled(np.ma.asarray(result.periods, dtype=float), np.nan)
         power = np.ma.filled(np.ma.asarray(result.power, dtype=float), np.nan)

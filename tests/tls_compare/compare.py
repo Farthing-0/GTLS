@@ -117,6 +117,18 @@ def environment(threads):
     }
 
 
+def product_name(scenario):
+    mission = scenario.mission
+    if scenario.real_kepler:
+        return "Real " + mission.product
+    name = "%d x %s" % (scenario.n_segments, mission.product) if scenario.n_segments > 1 else mission.product
+    if scenario.dense_segments:
+        segments = [mission.first_segment + i for i in scenario.dense_segments]
+        name += ", %s in segments %s" % (scenario.dense_mission.product,
+                                         ",".join(str(n) for n in segments))
+    return name
+
+
 def _warmup_data(path):
     """Tiny light curve used once per engine to fill numba / CuPy compilation caches."""
     rng = np.random.default_rng(0)
@@ -128,7 +140,8 @@ def _warmup_data(path):
 
 
 def run_comparison(scenario_names, engine_names=engines_mod.DEFAULT_ENGINES, outdir=None,
-                   repeats=1, threads=None, gpu=0, gpus=None, timeout=None, baseline="tls1",
+                   repeats=1, threads=None, gpu=0, gpus=None, timeout=None, repeat_limit=None,
+                   baseline="tls1",
                    tls1_version=engines_mod.TLS1_VERSION, tls2_version=engines_mod.TLS2_VERSION,
                    warmup=True, log=print):
     """Build the datasets, run every engine on every scenario and collect the metrics."""
@@ -147,7 +160,8 @@ def run_comparison(scenario_names, engine_names=engines_mod.DEFAULT_ENGINES, out
 
     report = {
         "environment": environment(threads),
-        "settings": {"repeats": repeats, "gpu": gpus or gpu, "baseline": baseline,
+        "settings": {"repeats": repeats, "gpu": gpus or gpu, "baseline": baseline, "timeout": timeout,
+                     "repeat_limit": repeat_limit,
                      "engines": {e.name: {"label": e.label, "kind": e.kind,
                                           "tls_version": e.tls_version or None,
                                           "options": e.options} for e in selected}},
@@ -177,8 +191,7 @@ def run_comparison(scenario_names, engine_names=engines_mod.DEFAULT_ENGINES, out
             "name": name,
             "description": scenario.description,
             "mission": scenario.mission.name,
-            "product": "Real " + scenario.mission.product if scenario.real_kepler
-            else scenario.mission.product,
+            "product": product_name(scenario),
             "lightkurve_class": dataset.lightkurve_class,
             "files": dataset.files,
             "n_raw": dataset.n_raw,
@@ -193,21 +206,30 @@ def run_comparison(scenario_names, engine_names=engines_mod.DEFAULT_ENGINES, out
         log("\n[%s] %d points over %.1f d (%s)" % (name, dataset.t.size, dataset.span,
                                                    dataset.lightkurve_class))
         for engine in selected:
-            res = engines_mod.run(engine, data_path, workdir, search, repeats=repeats, **run_kwargs)
+            res = engines_mod.run(engine, data_path, workdir, search, repeats=repeats,
+                                  repeat_limit=repeat_limit, **run_kwargs)
             if res["ok"]:
                 res["cold_s"], res["warm_s"] = cold_warm(res["timings"])
                 res["recovery"] = recovery(res, dataset.truth)
                 log("  %-12s P=%.5f SDE=%5.1f cold %7.2f s, warm %7.2f s  %s" % (
                     engine.name, res["period"], res["SDE"] or float("nan"), res["cold_s"],
                     res["warm_s"], res["recovery"]["status"]))
+            elif res.get("timeout"):
+                log("  %-12s TIMEOUT after %g s" % (engine.name, res["timeout"]))
             else:
                 log("  %-12s FAILED: %s" % (engine.name, res.get("error")))
             entry["engines"][engine.name] = res
         base = entry["engines"].get(baseline)
         for res in entry["engines"].values():
-            if base and base["ok"] and res["ok"]:
+            if not base:
+                continue
+            if base["ok"] and res["ok"]:
                 res["speedup"] = base["warm_s"] / res["warm_s"]
                 res["speedup_cold"] = base["cold_s"] / res["cold_s"]
+            elif base.get("timeout") and res["ok"]:
+                # The baseline took longer than its time limit: lower bounds
+                res["speedup_min"] = base["timeout"] / res["warm_s"]
+                res["speedup_cold_min"] = base["timeout"] / res["cold_s"]
         ok = [r for r in entry["engines"].values() if r["ok"]]
         entry["agreement"] = [agreement(a, b) for i, a in enumerate(ok) for b in ok[i + 1:]]
         report["scenarios"].append(entry)
@@ -225,9 +247,13 @@ def summarize(report):
     summary = {}
     for entry in report["scenarios"]:
         for name, res in entry["engines"].items():
-            s = summary.setdefault(name, {"runs": 0, "failed": 0, "recovered": 0, "injected": 0,
-                                          "speedups": [], "warm_s": []})
+            s = summary.setdefault(name, {"runs": 0, "failed": 0, "timeouts": 0, "recovered": 0,
+                                          "injected": 0, "speedups": [], "warm_s": []})
             s["runs"] += 1
+            if res.get("timeout"):
+                s["timeouts"] += 1
+                s["warm_s"].append(res["timeout"])
+                continue
             if not res["ok"]:
                 s["failed"] += 1
                 continue
@@ -246,6 +272,15 @@ def summarize(report):
 
 def _fmt(value, spec, scale=1.0):
     return "-" if value is None else format(value * scale, spec)
+
+
+def _speedup(result, key):
+    """Speedup vs the baseline, or its lower bound when the baseline timed out."""
+    if key in result:
+        return "%.1fx" % result[key]
+    if key + "_min" in result:
+        return "> %.0fx" % result[key + "_min"]
+    return "-"
 
 
 def render_markdown(report):
@@ -267,7 +302,12 @@ def render_markdown(report):
             ("Python / NumPy / numba", "%s / %s / %s" % (env["python"], env["numpy"], env["numba"])),
             ("CuPy / lightkurve / astropy", "%s / %s / %s" % (env["cupy"], env["lightkurve"], env["astropy"])),
             ("Engines", ", ".join("%s = %s (v%s)" % (k, labels[k], versions.get(k, "?")) for k in labels)),
-            ("Timed repeats", "1 cold + %d warm" % settings["repeats"])]
+            ("Timed repeats", "1 cold + %d warm%s" % (
+                settings["repeats"],
+                ", no repeats for runs > %g s" % settings["repeat_limit"]
+                if settings.get("repeat_limit") is not None else "")),
+            ("Time limit per engine and scenario",
+             "%g s" % settings["timeout"] if settings.get("timeout") else "none")]
     lines += ["| %s | %s |" % row for row in rows] + [""]
 
     lines += ["## Datasets (lightkurve-prepared)", "",
@@ -284,19 +324,24 @@ def render_markdown(report):
 
     lines += ["## Speed", "",
               "Cold = first `power()` call in a fresh process (imports done; includes JIT cache "
-              "loading, CUDA context / worker-pool start-up). Warm = median of later calls. "
+              "loading, CUDA context / worker-pool start-up). Warm = median of later calls; "
+              "(parentheses) = not repeated, the cold time is used. "
               "Speedup = %s warm time / engine warm time." % baseline, "",
               "| Scenario | Engine | Periods | Cold (s) | Warm (s) | Speedup (warm) | Speedup (cold) |",
               "| --- | --- | --- | --- | --- | --- | --- |"]
     for e in report["scenarios"]:
         for name, r in e["engines"].items():
+            if r.get("timeout"):
+                lines.append("| %s | %s | - | > %g | > %g | timeout | timeout |" % (
+                    e["name"], name, r["timeout"], r["timeout"]))
+                continue
             if not r["ok"]:
                 lines.append("| %s | %s | FAILED: %s | | | | |" % (e["name"], name, r.get("error", "")[:80]))
                 continue
-            lines.append("| %s | %s | %d | %.2f | %.2f | %s | %s |" % (
-                e["name"], name, r["n_periods"], r["cold_s"], r["warm_s"],
-                _fmt(r.get("speedup"), ".1f") + ("x" if "speedup" in r else ""),
-                _fmt(r.get("speedup_cold"), ".1f") + ("x" if "speedup_cold" in r else "")))
+            lines.append("| %s | %s | %d | %.2f | %s | %s | %s |" % (
+                e["name"], name, r["n_periods"], r["cold_s"],
+                "%.2f" % r["warm_s"] if len(r["timings"]) > 1 else "(%.2f)" % r["warm_s"],
+                _speedup(r, "speedup"), _speedup(r, "speedup_cold")))
     lines.append("")
 
     lines += ["## Search results", "",
@@ -331,14 +376,16 @@ def render_markdown(report):
     lines.append("")
 
     lines += ["## Summary", "",
-              "| Engine | Runs | Failed | Recovered / injected | Total warm time (s) | "
+              "| Engine | Runs | Failed | Timeouts | Recovered / injected | Total warm time (s) | "
               "Geometric-mean speedup vs %s |" % baseline,
-              "| --- | --- | --- | --- | --- | --- |"]
+              "| --- | --- | --- | --- | --- | --- | --- |"]
     for name, s in report["summary"].items():
-        lines.append("| %s | %d | %d | %d / %d | %.2f | %s |" % (
-            name, s["runs"], s["failed"], s["recovered"], s["injected"], s["total_warm_s"],
+        lines.append("| %s | %d | %d | %d | %d / %d | %s%.2f | %s |" % (
+            name, s["runs"], s["failed"], s["timeouts"], s["recovered"], s["injected"],
+            "> " if s["timeouts"] else "", s["total_warm_s"],
             _fmt(s["geomean_speedup"], ".1f") + ("x" if s["geomean_speedup"] else "")))
-    lines.append("")
+    lines += ["", "Timed-out runs count with their time limit in the total time; the geometric "
+              "mean only uses scenarios where both the engine and %s finished." % baseline, ""]
     return "\n".join(lines)
 
 
