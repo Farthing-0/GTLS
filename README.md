@@ -126,6 +126,21 @@ The script reinstalls only `gputls` itself (`--no-deps`) and then runs
 `tests/test_gtls.py`. The tests can also be run with `pytest tests`; select the GPU with
 the `GTLS_GPU_DEVICE` environment variable.
 
+### Comparison with TLS 1.x and TLS 2.x
+
+[`tests/tls_compare/`](https://github.com/Farthing-0/GTLS/tree/main/tests/tls_compare) benchmarks GTLS against the last TLS 1.x
+release (1.32) and TLS 2.x (2.0.4). All engines search the same mock Kepler and
+TESS-SPOC pipeline products, which are read and detrended with `lightkurve`. The
+benchmark reports runtimes, recovery of the injected transits and cross-engine agreement.
+Both TLS versions are installed automatically into isolated directories. The benchmark
+needs `lightkurve` (`pip install "gputls[test]"`):
+
+```bash
+python tests/compare_tls.py                  # standard suite: report.md + report.json
+python tests/compare_tls.py --suite full --plot
+pytest tests/test_tls_compare.py             # injection recovery and agreement checks
+```
+
 ## Project structure
 
 ```
@@ -140,7 +155,7 @@ GTLS/
 │   ├── validate.py      # input and argument validation
 │   ├── constants.py     # default parameters
 │   └── ...
-├── tests/               # GPU test suite and test data
+├── tests/               # GPU test suite, TLS comparison framework (tls_compare/) and test data
 ├── examples/            # Jupyter notebooks
 ├── docs/images/         # Figures used in the documentation
 ├── run_tests.sh         # One-click build and test
