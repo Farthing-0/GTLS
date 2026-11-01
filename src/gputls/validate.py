@@ -55,6 +55,14 @@ def validate_args(self, kwargs):
             warnings.warn("Ignoring unknown parameter: " + str(key))
 
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
+    # Multi-GPU: GPUDeviceIDs overrides GPUDeviceID; the first device does the final fit
+    device_ids = kwargs.get("GPUDeviceIDs")
+    if device_ids is None:
+        self.GPUDeviceIDs = [self.GPUDeviceID]
+    else:
+        self.GPUDeviceIDs = list(dict.fromkeys(int(d) for d in numpy.atleast_1d(device_ids)))
+        if len(self.GPUDeviceIDs) == 0:
+            raise ValueError("GPUDeviceIDs must contain at least one device")
     self.fast = kwargs.get("fast", constants.FAST)
     self.bar_location = kwargs.get("bar_location", constants.BAR_LOCATION)
 

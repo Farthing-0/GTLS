@@ -16,7 +16,7 @@ in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 - Limb-darkened transit templates (default, grazing and box-shaped)
 - Batches trial periods automatically to fit the free GPU memory
 - Refines the strongest peaks and their period aliases (P/2, 2P, 2P/3, 3P/2) with a full search at every cadence
-- Supports multi-GPU machines (`GPUDeviceID`)
+- Supports multi-GPU machines: pick a device with `GPUDeviceID` or split one search across several with `GPUDeviceIDs`
 
 ## Requirements
 
@@ -74,6 +74,7 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `transit_template` | `"default"` | `"default"`, `"grazing"` or `"box"` |
 | `T0_fit_margin` | `0.125` | Epoch step of the coarse search as a fraction of the duration (0 to 0.125; 0 tests every cadence) |
 | `GPUDeviceID` | `0` | CUDA device to run on |
+| `GPUDeviceIDs` | `None` | List of CUDA devices to split the search across (e.g. `[0, 1]`); overrides `GPUDeviceID`. Results are identical to a single-GPU run |
 | `bar_location` | `0` | Position of the progress bar, useful when running several searches in parallel |
 | `fast` | `False` | Return only `(periods, power)`, skipping the refinement and transit statistics |
 

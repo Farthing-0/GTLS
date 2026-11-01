@@ -1,3 +1,5 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cupy as cp
@@ -163,12 +165,21 @@ class GPUSearch:
         for i in range(nPeriods):
             cumsumGPU[i] = cp.cumsum(patchedDatasGPU[i])
 
+        # Prefix sum of the per-point squared error, shared by the full sums and the coarse ootr
+        base_error = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
+        module.get_function("calculate_base_error")(
+            ((patchedDatasSize + 255) // 256, nPeriods), (256,),
+            (base_error, patchedDatasGPU, inverseSquaredPatchedDysGPU, np.int32(patchedDatasSize),
+             np.int32(nPeriods)))
+        error_prefix_sum = cp.cumsum(base_error, axis=1)
+        del base_error
+
         fullSumGPU = cp.empty((nPeriods, len(singleDurations)), dtype=cp.float32)
         blockSize, gridSizeX = calcGridBlockSize(len(singleDurations))
         module.get_function("calcAllFullSum")(
             (gridSizeX, nPeriods, 1), (blockSize, 1, 1),
-            (fullSumGPU, patchedDatasGPU, inverseSquaredPatchedDysGPU,
-             self.patchedDatasSizeGPU, durationsGPU, durationsSizeGPU))
+            (fullSumGPU, error_prefix_sum, np.int32(patchedDatasSize), durationsGPU,
+             np.int32(len(singleDurations)), np.int32(nPeriods)))
 
         # Out-of-transit residuals for every (period, duration, start point)
         blockSize, gridSizeX = calcGridBlockSize(tSize)
@@ -184,14 +195,6 @@ class GPUSearch:
                 (ootrGPU, durationsSizeGPU, self.tSizeGPU, fullSumGPU))
             residualKernel = "calcAllLowestResidualsNoSkip"
         else:
-            base_error = cp.empty((nPeriods, patchedDatasSize), dtype=cp.float32)
-            block_dim_1d = (256,)
-            grid_dim_2d = ((patchedDatasSize + block_dim_1d[0] - 1) // block_dim_1d[0], nPeriods)
-            module.get_function("calculate_base_error")(
-                grid_dim_2d, block_dim_1d,
-                (base_error, patchedDatasGPU, inverseSquaredPatchedDysGPU, patchedDatasSize, nPeriods))
-            error_prefix_sum = cp.cumsum(base_error, axis=1)
-
             ootrGPU = cp.empty((nPeriods, len(singleDurations), tSize), dtype=cp.float32)
             module.get_function("calculate_final_ootr")(
                 ((tSize + 255) // 256, len(singleDurations), nPeriods), (256, 1, 1),
@@ -216,32 +219,94 @@ class GPUSearch:
              self.transitDepthMinGPU))
         return lowestResidualsGPU
 
+    def chi2_batch(self, periods, size, refine):
+        """Lowest chi2 of each period of one batch, padded to size periods.
+
+        All periods of a batch are searched over the union of their plausible durations,
+        so results depend on the batching, not on the device evaluating each batch.
+        """
+        valid_range = len(periods)
+        # Durations needed by any period of this batch
+        durationsBool = cp.any(self.duration_mask(periods), axis=0).get()
+        if not durationsBool.any():
+            return np.full(valid_range, self.constant_residual, dtype=np.float32)
+
+        # Pad the last batch with its last period to avoid division by zero
+        if valid_range < size:
+            periods = np.append(periods, np.full(size - valid_range, periods[-1]))
+
+        lowestResidualsGPU = self.residuals(periods, durationsBool, refine)
+        flattened_residuals = lowestResidualsGPU[:valid_range].reshape(valid_range, -1)
+        min_values = cp.min(flattened_residuals, axis=-1)
+        min_values = cp.where(cp.isfinite(min_values), min_values, self.constant_residual)
+        return min_values.astype(cp.float32).get()
+
+
+class MultiGPUSearch:
+    """One GPUSearch per device; batches of periods are distributed among the devices."""
+
+    def __init__(self, device_ids, T0_fit_margin, *args):
+        self.device_ids = list(device_ids)
+        self.searches = []
+        for device_id in self.device_ids:
+            with cp.cuda.Device(device_id):
+                self.searches.append(GPUSearch(load_module(T0_fit_margin), *args))
+
+    @property
+    def primary(self):
+        return self.searches[0]
+
+    def batch_size(self, n_periods):
+        """Periods per batch, limited by the free memory of the fullest device."""
+        pynvml.nvmlInit()
+        free = min(pynvml.nvmlDeviceGetMemoryInfo(pynvml.nvmlDeviceGetHandleByIndex(device_id)).free
+                   for device_id in self.device_ids)
+        patchedDatasSize = self.primary.patchedDatasSize
+        nDurations = len(self.primary.durations)
+        singleCalcPeriods_max = free / (
+            5 * (patchedDatasSize * 2 + 2 + nDurations * patchedDatasSize * 4 + 2 * nDurations))
+        singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max), n_periods / 30]))
+        if singleCalcPeriods < 15:
+            singleCalcPeriods = int(singleCalcPeriods / 1.1)
+        return max(singleCalcPeriods, 1)
+
     def chi2(self, periods, singleCalcPeriods, refine, pbar=None):
         """Lowest chi2 of each period, evaluated in batches of singleCalcPeriods periods."""
-        durationBoolArrayGPU = self.duration_mask(periods)
-        LowestResidualsEachPeriodGPU = cp.empty(len(periods), dtype=cp.float32)
+        periods = np.asarray(periods)
+        chi2 = np.empty(len(periods), dtype=np.float32)
+        batches = iter(range(0, len(periods), singleCalcPeriods))
+        lock = threading.Lock()
 
-        for start_idx in range(0, len(periods), singleCalcPeriods):
-            SinglePeriods = periods[start_idx:start_idx + singleCalcPeriods]
-            valid_range = len(SinglePeriods)
-            # Pad the last batch with its last period to avoid division by zero
-            if valid_range < singleCalcPeriods:
-                SinglePeriods = np.append(
-                    SinglePeriods, np.full(singleCalcPeriods - valid_range, SinglePeriods[-1]))
+        def worker(device_id, search):
+            with cp.cuda.Device(device_id):
+                while True:
+                    with lock:
+                        start_idx = next(batches, None)
+                    if start_idx is None:
+                        return
+                    end_idx = start_idx + singleCalcPeriods
+                    chi2[start_idx:end_idx] = search.chi2_batch(periods[start_idx:end_idx], singleCalcPeriods, refine)
+                    if pbar is not None:
+                        with lock:
+                            pbar.update(1)
 
-            # Durations needed by any period of this batch
-            durationsBool = cp.any(durationBoolArrayGPU[start_idx:start_idx + valid_range], axis=0).get()
+        if len(self.searches) == 1:
+            worker(self.device_ids[0], self.primary)
+        else:
+            with ThreadPoolExecutor(max_workers=len(self.searches)) as executor:
+                futures = [executor.submit(worker, device_id, search)
+                           for device_id, search in zip(self.device_ids, self.searches)]
+                for future in futures:
+                    future.result()
+        return chi2
 
-            lowestResidualsGPU = self.residuals(SinglePeriods, durationsBool, refine)
-            flattened_residuals = lowestResidualsGPU[:valid_range].reshape(valid_range, -1)
-            min_values = cp.min(flattened_residuals, axis=-1)
-            min_values = cp.where(cp.isfinite(min_values), min_values, self.constant_residual)
-            LowestResidualsEachPeriodGPU[start_idx:start_idx + valid_range] = min_values
-
-            if pbar is not None:
-                pbar.update(1)
-
-        return LowestResidualsEachPeriodGPU.get()
+    def close(self):
+        """Release the GPU arrays and return the cached memory to the driver."""
+        self.searches = []
+        for device_id in self.device_ids:
+            with cp.cuda.Device(device_id):
+                cp.get_default_memory_pool().free_all_blocks()
+        cp.get_default_pinned_memory_pool().free_all_blocks()
 
 
 def search_multi_periods(
@@ -255,25 +320,22 @@ def search_multi_periods(
     T0_fit_margin,
     oversampling_factor,
     verbose,
-    GPUDeviceID=0,
+    GPUDeviceIDs=(0,),
     # fast: just return periods and power, not the full result
     fast=False,
     bar_location=0,
 ):
-    set_cuda_device(GPUDeviceID)
-    search = GPUSearch(load_module(T0_fit_margin), t, y, dy, transit_depth_min, lc_arr, lc_cache_overview)
+    set_cuda_device(GPUDeviceIDs[0])
+    search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview)
+    try:
+        return _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location)
+    finally:
+        search.close()
 
+
+def _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location):
     # Due to GPU memory size limitation, GPU can only do several periods at a time.
-    pynvml.nvmlInit()
-    handle = pynvml.nvmlDeviceGetHandleByIndex(cp.cuda.Device().id)
-    nvmlinfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    patchedDatasSize = search.patchedDatasSize
-    nDurations = len(search.durations)
-    singleCalcPeriods_max = nvmlinfo.free / (
-        5 * (patchedDatasSize * 2 + 2 + nDurations * patchedDatasSize * 4 + 2 * nDurations))
-    singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max), len(periods) / 30]))
-    if singleCalcPeriods < 15:
-        singleCalcPeriods = int(singleCalcPeriods / 1.1)
+    singleCalcPeriods = search.batch_size(len(periods))
     TotalIter = int(np.ceil(len(periods) / singleCalcPeriods))
 
     pbar = tqdm.tqdm(total=TotalIter, position=bar_location) if verbose else None
@@ -327,7 +389,7 @@ def search_multi_periods(
     period = periods[periodIndex]
 
     rawDuration, durationPointsNum, transit_duration_in_days, transitDepth, T0, transit_times, \
-        snr, snr_pink, snrFit, snrFitPink = search_single_period(search, period, t, y, dy)
+        snr, snr_pink, snrFit, snrFitPink = search_single_period(search.primary, period, t, y, dy)
 
     return periods, period, rawDuration, durationPointsNum, transit_duration_in_days, transitDepth, T0, \
         SDE, chi2, transit_times, power, snr, snr_pink, snrFit, snrFitPink, raw_power, raw_chi2, \
