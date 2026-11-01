@@ -1,14 +1,14 @@
 # GTLS: GPU Transit Least Squares
 
 [![PyPI](https://img.shields.io/pypi/v/gputls.svg)](https://pypi.org/project/gputls/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Farthing-0/GTLS/blob/main/LICENSE)
 
 GTLS is a CUDA implementation of the [Transit Least Squares (TLS)](https://github.com/hippke/tls)
 algorithm for detecting periodic exoplanet transits in light curves. It keeps the TLS
 interface and transit model, and evaluates all trial periods, durations and epochs
 in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 
-![GTLS periodogram and phase-folded transit](docs/images/example.png)
+![GTLS periodogram and phase-folded transit](https://raw.githubusercontent.com/Farthing-0/GTLS/main/docs/images/example.png)
 
 ## Features
 
@@ -100,10 +100,10 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 
 ## Examples
 
-The [`examples/`](examples/) folder contains Jupyter notebooks comparing GTLS with TLS:
+The [`examples/`](https://github.com/Farthing-0/GTLS/tree/main/examples) folder contains Jupyter notebooks comparing GTLS with TLS:
 
-- [`tess_tutorial.ipynb`](examples/tess_tutorial.ipynb): a TESS target
-- [`kepler_tutorial.ipynb`](examples/kepler_tutorial.ipynb): a Kepler target downloaded with `lightkurve`
+- [`tess_tutorial.ipynb`](https://github.com/Farthing-0/GTLS/blob/main/examples/tess_tutorial.ipynb): a TESS target
+- [`kepler_tutorial.ipynb`](https://github.com/Farthing-0/GTLS/blob/main/examples/kepler_tutorial.ipynb): a Kepler target downloaded with `lightkurve`
 
 The notebooks also need `matplotlib`, `astropy`, `transitleastsquares`, `lightkurve` and `wotan`.
 
@@ -111,7 +111,7 @@ The notebooks also need `matplotlib`, `astropy`, `transitleastsquares`, `lightku
 
 The test suite runs end-to-end searches on the GPU: injection-recovery on a synthetic
 light curve, the `fast` mode, a real Kepler light curve stored in
-[`tests/data/`](tests/data/), release of GPU memory after a search, and (on machines with
+[`tests/data/`](https://github.com/Farthing-0/GTLS/tree/main/tests/data), release of GPU memory after a search, and (on machines with
 at least two GPUs) bitwise agreement between single- and multi-GPU searches. It needs `astropy` in addition to the runtime dependencies.
 
 One-click build, install and test (inside an environment where CuPy is installed):
@@ -154,4 +154,4 @@ If you use GTLS, please also cite the TLS paper:
 Hippke, M. & Heller, R. (2019), *Optimized transit detection algorithm to search for periodic transits of small planets*,
 [A&A 623, A39](https://doi.org/10.1051/0004-6361/201834672).
 
-Both TLS and GTLS are released under the [MIT License](LICENSE).
+Both TLS and GTLS are released under the [MIT License](https://github.com/Farthing-0/GTLS/blob/main/LICENSE).
