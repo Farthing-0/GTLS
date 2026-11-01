@@ -60,16 +60,13 @@ EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
 SCAN_THREADS = 512  # threads per row of the scan kernels
 
 
-def start_strides(widths, T0_fit_margin, refine):
-    """Start-point stride of each duration (in samples).
-
-    The coarse search tests start points about T0_fit_margin of a duration apart (every point
-    for T0_fit_margin = 0); the refinement tests every point.
-    """
+def start_strides(widths, margin):
+    """Start-point stride of each duration (in samples): about margin of the duration,
+    every point for margin = 0."""
     widths = np.asarray(widths)
-    if refine or T0_fit_margin == 0:
+    if margin == 0:
         return np.ones(len(widths), dtype=np.int32)
-    skip = int(1 / T0_fit_margin)
+    skip = int(1 / margin)
     return np.where(widths > skip, widths // skip, 1).astype(np.int32)
 
 
@@ -86,10 +83,12 @@ def decode_keys(keys):
 class GPUSearch:
     """GPU state shared by all chi2 evaluations of one light curve."""
 
-    def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin):
+    def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
+                 T0_refine_margin):
         self.module = module
         self.t = t
         self.T0_fit_margin = T0_fit_margin
+        self.T0_refine_margin = T0_refine_margin
 
         durations, indices = np.unique(lc_cache_overview["width_in_samples"], return_index=True)
         self.durations = durations
@@ -141,12 +140,12 @@ class GPUSearch:
              cp.asarray(self.durations).astype(cp.int32), durationBoolArrayGPU))
         return durationBoolArrayGPU
 
-    def best_keys(self, periods, durationsBool, refine):
+    def best_keys(self, periods, durationsBool, margin):
         """Packed lowest chi2 and its location of each period (see searchChi2 and decode_keys).
 
         The location is durationIndex * tSize + start, with durationIndex counting the
-        durations selected by durationsBool. refine=False tests start points with the coarse
-        stride of start_strides; refine=True tests every start point.
+        durations selected by durationsBool. Start points are tested about margin of a
+        duration apart (every point for margin = 0).
         """
         module = self.module
         tSize = self.tSize
@@ -154,7 +153,7 @@ class GPUSearch:
         nPeriods = len(periods)
 
         selected = np.flatnonzero(durationsBool).astype(np.int32)
-        strides = start_strides(self.durations[selected], self.T0_fit_margin, refine)
+        strides = start_strides(self.durations[selected], margin)
         offsets = np.concatenate(([0], np.cumsum(-(-tSize // strides))))
         if offsets[-1] >= 2 ** 31:
             raise ValueError("Too many start points per period for the GPU search")
@@ -217,7 +216,8 @@ class GPUSearch:
         if valid_range < size:
             periods = np.append(periods, np.full(size - valid_range, periods[-1]))
 
-        chi2, _ = decode_keys(self.best_keys(periods, durationsBool, refine)[:valid_range])
+        margin = self.T0_refine_margin if refine else self.T0_fit_margin
+        chi2, _ = decode_keys(self.best_keys(periods, durationsBool, margin)[:valid_range])
         chi2 = cp.where(cp.isfinite(chi2), chi2, self.constant_residual)
         return chi2.astype(cp.float32).get()
 
@@ -225,12 +225,13 @@ class GPUSearch:
 class MultiGPUSearch:
     """One GPUSearch per device; batches of periods are distributed among the devices."""
 
-    def __init__(self, device_ids, T0_fit_margin, *args):
+    def __init__(self, device_ids, T0_fit_margin, T0_refine_margin, *args):
         self.device_ids = list(device_ids)
         self.searches = []
         for device_id in self.device_ids:
             with cp.cuda.Device(device_id):
-                self.searches.append(GPUSearch(load_module(), *args, T0_fit_margin=T0_fit_margin))
+                self.searches.append(GPUSearch(
+                    load_module(), *args, T0_fit_margin=T0_fit_margin, T0_refine_margin=T0_refine_margin))
 
     @property
     def primary(self):
@@ -296,6 +297,7 @@ def search_multi_periods(
     lc_arr,
     lc_cache_overview,
     T0_fit_margin,
+    T0_refine_margin,
     oversampling_factor,
     verbose,
     GPUDeviceIDs=(0,),
@@ -304,7 +306,8 @@ def search_multi_periods(
     bar_location=0,
 ):
     set_cuda_device(GPUDeviceIDs[0])
-    search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview)
+    search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, T0_refine_margin, t, y, dy, transit_depth_min,
+                            lc_arr, lc_cache_overview)
     try:
         return _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location)
     finally:
@@ -333,7 +336,7 @@ def _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbos
         return periods, power
 
     # Refine the 100 strongest peaks, plus the 100 strongest remaining peaks with period > 1 day,
-    # without skipping start points. Ties keep the period order; masked power sorts last.
+    # with the finer T0 step T0_refine_margin. Ties keep the period order; masked power sorts last.
     order = np.argsort(-ma.filled(power, -np.inf), kind="stable")
     remaining = order[100:]
     remaining = remaining[ma.filled(periods, 0)[remaining] > 1]
@@ -376,7 +379,7 @@ def search_single_period(search, period, t, y, dy):
     durations = search.durations[durationsBool]
     single_lc_cache_overview = search.lc_cache_overview[durationsBool]
 
-    chi2, location = decode_keys(search.best_keys(np.array([period]), durationsBool, refine=True))
+    chi2, location = decode_keys(search.best_keys(np.array([period]), durationsBool, margin=0))
     bestLocation = int(location[0]) if bool(cp.isfinite(chi2[0])) else 0
 
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)
