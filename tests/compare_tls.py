@@ -5,6 +5,8 @@ Examples::
     python tests/compare_tls.py                       # standard suite, gtls/tls1/tls2
     python tests/compare_tls.py --suite full --plot
     python tests/compare_tls.py --scenarios tess_2min_1s --engines gtls,tls2,tls2-fused
+    python tests/compare_tls.py --suite long --engines gtls,gtls-main,tls1,tls2,tls2-fused \
+        --timeout 3600 --repeat-limit 60      # whole Kepler mission, short cadence
     python tests/compare_tls.py --list
 
 TLS releases are installed on first use into tests/.tls_envs (one directory per version),
@@ -40,7 +42,10 @@ def main(argv=None):
     parser.add_argument("--tls1-version", default=TLS1_VERSION)
     parser.add_argument("--tls2-version", default=TLS2_VERSION)
     parser.add_argument("--baseline", default="tls1", help="engine used for speedups (default: tls1)")
-    parser.add_argument("--timeout", type=float, help="seconds per engine and scenario")
+    parser.add_argument("--timeout", type=float, help="seconds per engine and scenario; "
+                        "slower runs are reported as lower bounds")
+    parser.add_argument("--repeat-limit", type=float,
+                        help="do not repeat runs that take longer than this (seconds)")
     parser.add_argument("--output", help="output directory")
     parser.add_argument("--no-warmup", action="store_true",
                         help="skip filling the JIT/kernel caches before timing")
@@ -63,7 +68,7 @@ def main(argv=None):
     report = run_comparison(
         args.scenarios or SUITES[args.suite], args.engines, outdir=args.output,
         repeats=args.repeats, threads=args.threads, gpu=args.gpu, gpus=args.gpus,
-        timeout=args.timeout, baseline=args.baseline, tls1_version=args.tls1_version,
+        timeout=args.timeout, repeat_limit=args.repeat_limit, baseline=args.baseline, tls1_version=args.tls1_version,
         tls2_version=args.tls2_version, warmup=not args.no_warmup,
         log=lambda *a: print(*a, flush=True))
     if args.plot:
