@@ -1,10 +1,12 @@
 # GTLS vs TLS 1.x vs TLS 2.x comparison framework
 
-Benchmarks the speed and the search results of three engines on the same light curves:
+Benchmarks the speed and the search results of GTLS, TLS 1.x and TLS 2.x on the same
+light curves:
 
 | Engine | What it runs |
 | --- | --- |
 | `gtls` | GTLS from this repository (`src/`), on the GPU |
+| `gtls-main` | GTLS from the `main` branch, exported with `git archive` into `tests/.tls_envs/` (opt-in) |
 | `tls1` | `transitleastsquares` 1.32, the last 1.x release |
 | `tls2` | `transitleastsquares` 2.0.4 with its default `fused-pl` backend |
 | `tls2-fused`, `tls2-numba` | TLS 2 with the exact `fused` backend / the legacy 1.x-style `numba` backend (opt-in) |
@@ -19,10 +21,13 @@ the `TLS1_VERSION`/`TLS2_VERSION` environment variables.
 ## Data: mock pipeline products prepared with lightkurve
 
 `simulate.py` writes FITS files with the layout of the official products: Kepler
-`llc.fits` (`SAP_QUALITY`, BKJD) and TESS-SPOC `lc.fits` (`QUALITY`, BTJD), including
+long-cadence `llc.fits` and short-cadence `slc.fits` (one file per month; `SAP_QUALITY`,
+BKJD), and TESS-SPOC 2-min `lc.fits` and 20-s `fast-lc.fits` (`QUALITY`, BTJD), including
 `SAP_FLUX`/`PDCSAP_FLUX` columns with errors. The simulated light curves contain:
 
-- the mission cadence, quarter/sector length, data-downlink gaps and multi-segment spacing
+- the mission cadence, quarter/sector length, data-downlink gaps and multi-segment spacing;
+  the whole Kepler mission uses the approximate lengths of Q1-Q17, and some quarters can be
+  observed at short cadence instead of long cadence (with the same precision per unit time)
 - reaction-wheel desaturations, manual-exclude and coarse-point cadences, flagged with the
   quality bits of lightkurve's default bitmask, which carry corrupted or NaN flux
 - quasi-periodic stellar spot modulation, correlated granulation-like noise, residual
@@ -31,7 +36,8 @@ the `TLS1_VERSION`/`TLS2_VERSION` environment variables.
 
 Each product is read with `lightkurve.read(quality_bitmask="default")`. The segments are
 then stitched, flattened with a Savitzky-Golay filter and clipped of upward outliers,
-exactly as archive data would be. All engines receive the same `t`, `flux` and `flux_err`
+exactly as archive data would be. The flatten window is counted in cadences, so light curves
+that mix cadences are flattened file by file before stitching. All engines receive the same `t`, `flux` and `flux_err`
 arrays. The `kepler_q3_real` scenario instead injects a transit into the real Kepler Q3
 light curve in `tests/data`; that star's own 4.125 d signal stays in the data as a
 competing signal.
@@ -44,8 +50,13 @@ competing signal.
 | `tess_2min_1s` | 1 simulated TESS sector, 2-min, 3.27 d sub-Neptune |
 | `tess_2min_2s` | 2 simulated TESS sectors, 2-min, 11.4 d planet |
 | `tess_2min_null` | 1 simulated TESS sector without a planet (false-alarm level) |
+| `kepler_lc_17q` | The whole Kepler mission (Q1-Q17, ~1450 d, ~66k points), 30-min, 122.4 d sub-Neptune |
+| `kepler_sc_1q` | 1 Kepler quarter at 1-min short cadence (~133k points), 2.73 d small planet |
+| `kepler_mixed_17q` | Q1-Q17 at 30-min with 1-min short cadence in Q10-Q12 (~444k points), 122.4 d sub-Neptune |
+| `tess_20s_1s` | 1 TESS sector at 20-s cadence (~114k points), 3.27 d sub-Neptune |
 
-Suites: `quick` (used by pytest), `standard` (default) and `full` (all scenarios).
+Suites: `quick` (used by pytest), `standard` (default), `full` (the six short scenarios),
+`long` (the four long or dense scenarios) and `all`.
 Run `python tests/compare_tls.py --list` to show them.
 
 ## Usage
@@ -55,6 +66,8 @@ python tests/compare_tls.py                                  # standard suite
 python tests/compare_tls.py --suite full --plot              # everything, plus periodogram plots
 python tests/compare_tls.py --scenarios tess_2min_2s --engines gtls,tls2,tls2-fused
 python tests/compare_tls.py --gpus 0,1 --threads 16 --repeats 3
+python tests/compare_tls.py --suite long --engines gtls,gtls-main,tls1,tls2,tls2-fused \
+    --timeout 3600 --repeat-limit 60                         # whole Kepler mission, dense cadences
 pytest tests/test_tls_compare.py                             # correctness checks (quick suite)
 ```
 
@@ -68,7 +81,11 @@ Before timing, every engine runs once on a tiny light curve to fill the numba an
 compilation caches. For each scenario, the first `power()` call in a fresh process is
 reported as **cold**; it includes JIT cache loading, CUDA context creation and TLS 2
 worker-pool start-up. The median of the `--repeats` later calls is reported as **warm**.
-Speedups are relative to `--baseline` (default `tls1`).
+Speedups are relative to `--baseline` (default `tls1`). With `--repeat-limit`, runs slower
+than the limit are not repeated (their start-up cost is negligible), and the cold time is
+shown in parentheses as the warm time. With `--timeout`, a run that exceeds the limit is
+stopped together with its worker processes and reported as `> limit`; speedups against a
+timed-out baseline are lower bounds (`> N x`). TLS 1.x needs hours on the `long` suite.
 
 Results are written to `tests/.tls_compare_results/<timestamp>/`:
 

@@ -139,6 +139,7 @@ needs `lightkurve` (`pip install "gputls[test]"`):
 ```bash
 python tests/compare_tls.py                  # standard suite: report.md + report.json
 python tests/compare_tls.py --suite full --plot
+python tests/compare_tls.py --suite long --timeout 3600 --repeat-limit 60   # whole Kepler mission, short cadence
 pytest tests/test_tls_compare.py             # injection recovery and agreement checks
 ```
 
