@@ -2,23 +2,10 @@ extern "C"{
     // Configuration constants
     #define SKIP_POINT 8
     
-    // Physical constants - optimized with appropriate values
-    #define R_STAR_MIN 0.05                    // Minimum stellar radius (solar radii) - updated boundary
-    #define R_STAR_MAX 4.0                     // Maximum stellar radius (solar radii) - updated boundary
     #define SECONDS_PER_DAY 86400              // Seconds in a day
-    #define R_SUN 695508000                    // Radius of the Sun [m]
-    #define R_JUP 69911000                     // Radius of Jupiter [m]
-    #define FRACTIONAL_TRANSIT_DURATION_MAX 0.15  // Maximum fractional transit duration - updated value
-
-    // Derived constants for duration calculations - optimized values
-    #define PI_GM_MAX 416970                   // Simplified pi*G*M_max for duration calc
-    #define PI_GM_MIN 20848                    // Simplified pi*G*M_min for duration calc - updated boundary
-    #define RS_MIN (R_SUN * R_STAR_MIN)        // Minimum stellar radius in meters
-    #define RS_MAX (R_SUN * R_STAR_MAX)        // Maximum stellar radius in meters
 
     // Transit fitting constants
     #define FLOAT_INFINITY __int_as_float(0x7f800000) // IEEE-754 float infinity
-    #define SCALE_FACTOR 1000000000000000.0    // Scale factor for duration calculations
 
     /**
      * Fast phase folding kernel with optimized memory access
@@ -37,42 +24,34 @@ extern "C"{
     }
 
     /**
-     * Optimized duration grid calculation kernel
-     * Based on stellar and planetary parameters with improved performance
+     * Range (in samples) of physically plausible durations of each period, as TLS 2:
+     * T14 / P = r * (4 P / (pi G M))^(1/3) / P, capped at upperLimit. The shortest duration
+     * uses rShort = R_sun * R_star_min (small planet) with gmShort = pi G M_sun m_short, the
+     * longest rLong = R_sun * R_star_max + 2 R_jup with gmLong = pi G M_sun m_long (see
+     * grid.T14 and grid.duration_limit_masses).
      */
     __global__ void durationsGrid(const double* periods, int* durationsMax, int* durationsMin,
-                                 const float* tLength, const int* tSize, const int* periodSize) {
+                                 const double* tLength, const int* tSize, const int* periodSize,
+                                 double rShort, double gmShort, double rLong, double gmLong,
+                                 double upperLimit) {
         int tid = blockDim.x * blockIdx.x + threadIdx.x;
-        
+
         if (tid < (*periodSize)) {
-            float length = *tLength;
+            double length = *tLength;
             int size = *tSize;
-            
-            // Calculate transit statistics with optimized operations
+
+            // A transit can be split over the start and end of the data, so the window of
+            // the longest duration is widened by (transits + 1) / transits
             double period_days = periods[tid];
             double no_of_transits_naive = length / period_days;
             double correction_factor = (no_of_transits_naive + 1.0) / no_of_transits_naive;
 
             double period_seconds = period_days * SECONDS_PER_DAY;
-            
-            // Pre-calculate common factors for efficiency
-            double period_factor_min = (4.0 * period_seconds) / (PI_GM_MIN * SCALE_FACTOR);
-            double period_factor_max = (4.0 * period_seconds) / (PI_GM_MAX * SCALE_FACTOR);
-            
-            // Calculate minimum and maximum transit durations
-            double T14Min = RS_MIN * pow(period_factor_min, 1.0 / 3.0);
-            double T14Max = (RS_MAX + R_JUP * 2.0) * pow(period_factor_max, 1.0 / 3.0);
-            
-            double durationMin = T14Min / period_seconds;
-            double durationMax = T14Max / period_seconds;
-            
-            // Apply maximum duration constraints efficiently
-            durationMin = (durationMin > FRACTIONAL_TRANSIT_DURATION_MAX) ? 
-                         FRACTIONAL_TRANSIT_DURATION_MAX : durationMin;
-            durationMax = (durationMax > FRACTIONAL_TRANSIT_DURATION_MAX) ? 
-                         FRACTIONAL_TRANSIT_DURATION_MAX : durationMax;
-            
-            // Convert to sample indices with optimized rounding
+            double durationMin = rShort * pow((4.0 * period_seconds) / gmShort, 1.0 / 3.0) / period_seconds;
+            double durationMax = rLong * pow((4.0 * period_seconds) / gmLong, 1.0 / 3.0) / period_seconds;
+            durationMin = (durationMin > upperLimit) ? upperLimit : durationMin;
+            durationMax = (durationMax > upperLimit) ? upperLimit : durationMax;
+
             int duration_min_in_samples = floor(durationMin * size);
             int duration_max_in_samples = ceil(durationMax * size * correction_factor);
             
