@@ -7,6 +7,8 @@ import numpy as np
 import numpy.ma as ma
 import tqdm
 
+from . import constants
+from .grid import duration_limit_masses
 from .helpers import transit_mask
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
 
@@ -70,6 +72,23 @@ def start_strides(widths, margin):
     return np.where(widths > skip, widths // skip, 1).astype(np.int32)
 
 
+def duration_limit_args(R_star_min, R_star_max, M_star_min, M_star_max):
+    """Scalar arguments (rShort, gmShort, rLong, gmLong, upperLimit) of the durationsGrid kernel.
+
+    Same terms as grid.T14: the shortest duration pairs R_star_min (small planet) with the
+    mass m_short, the longest R_star_max (planet of 2 R_jup) with m_long, as TLS 2.
+    """
+    m_short, m_long = duration_limit_masses(R_star_min, R_star_max, M_star_min, M_star_max)
+    pi_G = np.pi * constants.G
+    return (
+        np.float64(constants.R_sun * R_star_min),
+        np.float64(pi_G * (constants.M_sun * m_short)),
+        np.float64(constants.R_sun * R_star_max + 2 * constants.R_jup),
+        np.float64(pi_G * (constants.M_sun * m_long)),
+        np.float64(constants.FRACTIONAL_TRANSIT_DURATION_MAX),
+    )
+
+
 def decode_keys(keys):
     """Split searchChi2 keys into (chi2, flattened duration/start location).
 
@@ -84,11 +103,13 @@ class GPUSearch:
     """GPU state shared by all chi2 evaluations of one light curve."""
 
     def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
-                 T0_refine_margin):
+                 T0_refine_margin, R_star_min=constants.R_STAR_MIN, R_star_max=constants.R_STAR_MAX,
+                 M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX):
         self.module = module
         self.t = t
         self.T0_fit_margin = T0_fit_margin
         self.T0_refine_margin = T0_refine_margin
+        self.duration_limits = duration_limit_args(R_star_min, R_star_max, M_star_min, M_star_max)
 
         durations, indices = np.unique(lc_cache_overview["width_in_samples"], return_index=True)
         self.durations = durations
@@ -107,7 +128,7 @@ class GPUSearch:
         self.residualGPU = cp.asarray((1.0 - np.asarray(y, dtype=np.float64)).astype(np.float32))
         self.dyGPU = cp.asarray(dy).astype(cp.float32)
         self.tSizeGPU = int_scalar(self.tSize)
-        self.tLengthGPU = cp.asarray(np.array([max(t) - min(t)])).astype(cp.float32)
+        self.tLengthGPU = cp.asarray(np.array([np.max(t) - np.min(t)], dtype=np.float64))
         self.transit_depth_min = np.float32(transit_depth_min)
         self.constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
 
@@ -131,7 +152,8 @@ class GPUSearch:
         blockSize, gridSizeX = calcGridBlockSize(len(periods))
         module.get_function("durationsGrid")(
             (gridSizeX, 1, 1), (blockSize,),
-            (periodsGPU, durationsMaxGPU, durationsMinGPU, self.tLengthGPU, self.tSizeGPU, periodsSizeGPU))
+            (periodsGPU, durationsMaxGPU, durationsMinGPU, self.tLengthGPU, self.tSizeGPU, periodsSizeGPU)
+            + self.duration_limits)
 
         durationBoolArrayGPU = cp.empty((len(periods), len(self.durations)), dtype=cp.bool_)
         module.get_function("durationBool")(
@@ -225,13 +247,14 @@ class GPUSearch:
 class MultiGPUSearch:
     """One GPUSearch per device; batches of periods are distributed among the devices."""
 
-    def __init__(self, device_ids, T0_fit_margin, T0_refine_margin, *args):
+    def __init__(self, device_ids, T0_fit_margin, T0_refine_margin, *args, **star_limits):
         self.device_ids = list(device_ids)
         self.searches = []
         for device_id in self.device_ids:
             with cp.cuda.Device(device_id):
                 self.searches.append(GPUSearch(
-                    load_module(), *args, T0_fit_margin=T0_fit_margin, T0_refine_margin=T0_refine_margin))
+                    load_module(), *args, T0_fit_margin=T0_fit_margin, T0_refine_margin=T0_refine_margin,
+                    **star_limits))
 
     @property
     def primary(self):
@@ -304,10 +327,15 @@ def search_multi_periods(
     # fast: just return periods and power, not the full result
     fast=False,
     bar_location=0,
+    R_star_min=constants.R_STAR_MIN,
+    R_star_max=constants.R_STAR_MAX,
+    M_star_min=constants.M_STAR_MIN,
+    M_star_max=constants.M_STAR_MAX,
 ):
     set_cuda_device(GPUDeviceIDs[0])
     search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, T0_refine_margin, t, y, dy, transit_depth_min,
-                            lc_arr, lc_cache_overview)
+                            lc_arr, lc_cache_overview, R_star_min=R_star_min, R_star_max=R_star_max,
+                            M_star_min=M_star_min, M_star_max=M_star_max)
     try:
         return _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location)
     finally:
