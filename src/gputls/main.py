@@ -52,7 +52,14 @@ class gtls(object):
             periods = self.periods
 
         # Generate possible durations
-        durations = duration_grid(periods, log_step=self.duration_grid_step)
+        durations = duration_grid(
+            periods,
+            log_step=self.duration_grid_step,
+            R_star_min=self.R_star_min,
+            R_star_max=self.R_star_max,
+            M_star_min=self.M_star_min,
+            M_star_max=self.M_star_max,
+        )
 
         maxwidth_in_samples = int(np.max(durations) * np.size(self.y))
         if maxwidth_in_samples % 2 != 0:
@@ -100,6 +107,10 @@ class gtls(object):
             GPUDeviceIDs=self.GPUDeviceIDs,
             fast=self.fast,
             bar_location=self.bar_location,
+            R_star_min=self.R_star_min,
+            R_star_max=self.R_star_max,
+            M_star_min=self.M_star_min,
+            M_star_max=self.M_star_max,
         )
         if self.fast:
             return result
