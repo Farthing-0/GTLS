@@ -68,6 +68,8 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `period_min`, `period_max` | `0`, `inf` | Limits of the automatic period grid (days) |
 | `periods` | `[]` | Custom array of trial periods; overrides the automatic grid |
 | `R_star`, `M_star` | `1.0`, `1.0` | Stellar radius and mass (solar units) used for the period grid |
+| `R_star_min`, `R_star_max` | `0.13`, `3.5` | Stellar radius limits (solar units) of the plausible transit durations |
+| `M_star_min`, `M_star_max` | `0.1`, `1.0` | Stellar mass limits (solar units) of the plausible transit durations. Paired with the radius limits as in TLS 2: (R_star_min, high mass) for the shortest and (R_star_max, low mass) for the longest duration |
 | `oversampling_factor` | `3` | Period grid oversampling |
 | `duration_grid_step` | `1.1` | Multiplicative step of the duration grid |
 | `transit_depth_min` | `1e-5` | Minimum depth of a trial transit |
