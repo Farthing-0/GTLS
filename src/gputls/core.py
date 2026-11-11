@@ -114,14 +114,17 @@ def duration_limit_args(R_star_min, R_star_max, M_star_min, M_star_max):
     )
 
 
-def decode_keys(keys):
+def decode_keys(keys, base):
     """Split searchChi2 keys into (chi2, flattened duration/start location).
 
-    chi2 is NaN where no window was searched (key left at EMPTY_KEY).
+    The keys hold delta = chi2 - base in float32; chi2 = float32(base + delta), base being the
+    chi2 without transit (GPUSearch.base). chi2 is NaN where no window was searched (key left
+    at EMPTY_KEY).
     """
     high = (keys >> 32).astype(cp.uint32)
     bits = cp.where(high >= 0x80000000, high ^ 0x80000000, ~high).astype(cp.uint32)
-    return bits.view(cp.float32), (keys & 0xFFFFFFFF).astype(cp.int64)
+    chi2 = (base + bits.view(cp.float32).astype(cp.float64)).astype(cp.float32)
+    return chi2, (keys & 0xFFFFFFFF).astype(cp.int64)
 
 
 class GPUSearch:
@@ -169,7 +172,7 @@ class GPUSearch:
         exponent = 62 - int(np.ceil(np.log2(bound))) if bound > 0 else 62
         exponent = int(np.clip(exponent, -100, 100))
         self.fixedScale = np.float32(2.0 ** exponent)
-        self.fixedInvScale = np.float64(2.0 ** -exponent)
+        self.fixedInvScale = np.float32(2.0 ** -exponent)
 
         # Template depth profiles s = 1 - lc, one row per duration
         self.maxWidth = int(np.max(durations))
@@ -269,8 +272,7 @@ class GPUSearch:
             nWindows = int(offsets[yEnd] - offsets[yBegin])
             module.get_function(f"searchChi2_G{G}")(
                 ((nWindows * G + 255) // 256, nPeriods), (256,),
-                (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, np.float64(self.base),
-                 self.signalGPU, self.overshootGPU,
+                (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
                  self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
                  np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
                  np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min))
@@ -294,7 +296,7 @@ class GPUSearch:
             return np.full(valid_range, self.constant_residual, dtype=np.float32)
 
         margin = self.T0_refine_margin if refine else self.T0_fit_margin
-        chi2, _ = decode_keys(self.best_keys(periods, periodMaskGPU, margin)[:valid_range])
+        chi2, _ = decode_keys(self.best_keys(periods, periodMaskGPU, margin)[:valid_range], self.base)
         chi2 = cp.where(cp.isfinite(chi2), chi2, self.constant_residual)
         return chi2.astype(cp.float32).get()
 
@@ -484,7 +486,7 @@ def search_single_period(search, period, t, y, dy):
     durations = search.durations[durationsBool]
     single_lc_cache_overview = search.lc_cache_overview[durationsBool]
 
-    chi2, location = decode_keys(search.best_keys(np.array([period]), periodMaskGPU, margin=0))
+    chi2, location = decode_keys(search.best_keys(np.array([period]), periodMaskGPU, margin=0), search.base)
     bestLocation = int(location[0]) if bool(cp.isfinite(chi2[0])) else 0
 
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)

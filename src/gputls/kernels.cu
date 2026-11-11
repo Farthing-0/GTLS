@@ -241,15 +241,17 @@ __device__ __forceinline__ unsigned int orderedKey(float f) {
  * `start` with template depth profile s_i and amplitude k = mean_depth * overshoot / SIGNAL_DEPTH,
  * the chi2
  *     sum_{all points} w r^2 - sum_{window} w r^2 + sum_{window} w (r - k s)^2
- * is evaluated as base - 2 k A_R + k^2 A_2 with A_R = sum s_i (w r)_i, A_2 = sum s_i^2 w_i
- * (the algebraic expansion of TLS 2.0); base = sum_{all points} w r^2 does not depend on the
- * period. The mean depth comes from the fixed-point prefix sums of r (see scanResidual).
+ * is evaluated as base + delta, delta = k^2 A_2 - 2 k A_R with A_R = sum s_i (w r)_i,
+ * A_2 = sum s_i^2 w_i (the algebraic expansion of TLS 2.0). base = sum_{all points} w r^2 is
+ * the same for every window and period, so the windows are ranked by delta alone, in float32
+ * (decode_keys adds base). The mean depth is the exact fixed-point window sum of r (see
+ * scanResidual), converted and divided by L with float32 rounding: no float64 per window.
  *
  * Work items of a period are the start points of all searched durations, laid out by
  * `offsets`; start points of duration y are multiples of strides[y]. The searched durations
  * are the union over the batch; a period only tests those of its own row of periodMask
  * (physically plausible durations, see durationBool), so results do not depend on the batch.
- * best[z] receives min over work items of (orderedKey(chi2) << 32 | y * tSize + start), so
+ * best[z] receives min over work items of (orderedKey(delta) << 32 | y * tSize + start), so
  * ties resolve to the first duration, then the first start point.
  *
  * G consecutive threads share one window (G divides 32): they read G consecutive points per
@@ -262,9 +264,8 @@ template <int G>
 __device__ __forceinline__ void searchChi2Lanes(
         unsigned long long* best,
         const long long* cumResidual,  // (periods, patchedSize), inclusive, fixed point
-        double invScale,               // 1 / scale of cumResidual
+        float invScale,                // 1 / scale of cumResidual (a power of 2)
         const float2* patchedWeighted, // (periods, patchedSize)
-        double base,                   // sum of w r^2 over all points
         const float* signal,           // (durations, maxWidth)
         const float* overshoot,        // (durations)
         const int* widths,             // (durations)
@@ -295,8 +296,8 @@ __device__ __forceinline__ void searchChi2Lanes(
         int L = widths[d];
         if (periodMask[(long long)z * nDurations + d]) {
             const long long* C = cumResidual + (long long)z * patchedSize;
-            double windowSum = (double)(C[start + L - 1] - (start > 0 ? C[start - 1] : 0)) * invScale;
-            meanDepth = (float)(windowSum / L);
+            long long windowSum = C[start + L - 1] - (start > 0 ? C[start - 1] : 0);
+            meanDepth = __fdiv_rn(__ll2float_rn(windowSum) * invScale, (float)L);
             active = meanDepth > transitDepthMin;  // the same for all G lanes of the window
         }
         if (active) {
@@ -319,8 +320,8 @@ __device__ __forceinline__ void searchChi2Lanes(
     }
     if (active && sub == 0) {
         float k = meanDepth * overshoot[d] * 2.0f;  // 2 = 1 / SIGNAL_DEPTH
-        float chi2 = (float)(base + (double)(k * (k * a2 - 2.0f * ar)));
-        key = ((unsigned long long)orderedKey(chi2) << 32) | (unsigned int)(y * tSize + start);
+        float delta = k * (k * a2 - 2.0f * ar);
+        key = ((unsigned long long)orderedKey(delta) << 32) | (unsigned int)(y * tSize + start);
     }
 
     // Block-wide minimum, then one atomic per block
@@ -351,12 +352,12 @@ __device__ __forceinline__ void searchChi2Lanes(
 // searchChi2_G1 ... searchChi2_G32: G threads per window
 #define SEARCH_CHI2(G)                                                                            \
     extern "C" __global__ void searchChi2_G##G(                                                   \
-            unsigned long long* best, const long long* cumResidual, double invScale,              \
-            const float2* patchedWeighted, double base, const float* signal, const float* overshoot, const int* widths,   \
+            unsigned long long* best, const long long* cumResidual, float invScale,               \
+            const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths,   \
             const int* selected, const int* offsets, const int* strides, const bool* periodMask,  \
             int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth,       \
             float transitDepthMin) {                                                              \
-        searchChi2Lanes<G>(best, cumResidual, invScale, patchedWeighted, base, signal, overshoot, widths,   \
+        searchChi2Lanes<G>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths,   \
                            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations,      \
                            tSize, patchedSize, maxWidth, transitDepthMin);                        \
     }
