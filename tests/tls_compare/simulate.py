@@ -7,7 +7,7 @@ columns, time systems and quality bits. They are then loaded with ``lightkurve.r
 one would process archive data, so every engine searches the same realistic input.
 """
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
@@ -43,6 +43,8 @@ class Mission:
     first_segment: int  # first quarter / sector number
     manual_exclude_bit: int  # "Manual exclude" quality bit (differs between Kepler and TESS)
     exposure_fraction: float = 0.9  # exposure time / cadence, for transit supersampling
+    files_per_segment: int = 1  # e.g. 3 monthly files per quarter for Kepler short cadence
+    file_tag: str = "lc"
 
 
 KEPLER_LC = Mission(
@@ -81,6 +83,29 @@ TESS_2MIN = Mission(
     manual_exclude_bit=128,
 )
 
+# Kepler short cadence: one file per month, written alongside the long-cadence quarters
+KEPLER_SC = replace(
+    KEPLER_LC,
+    product="Kepler short cadence (PDCSAP, slc.fits)",
+    cadence=58.84876 / 86400,
+    obsmode="short cadence",
+    files_per_segment=3,
+    file_tag="slc",
+)
+
+# The whole Kepler mission, Q1-Q17, with the approximate length of every quarter (days)
+KEPLER_QUARTER_DAYS = (33.5, 88.9, 89.3, 93.5, 95.5, 91.7, 90.4, 67.3, 96.8, 93.4, 97.4, 82.1,
+                       92.0, 96.9, 91.0, 87.5, 31.8)
+KEPLER_MISSION_LC = replace(KEPLER_LC, t_start=131.51, segment_gap=2.0, first_segment=1)
+
+TESS_20S = replace(
+    TESS_2MIN,
+    product="TESS-SPOC 20-s (PDCSAP, fast-lc.fits)",
+    cadence=20.0 / 86400,
+    obsmode="20-s cadence",
+    file_tag="fast-lc",
+)
+
 # Quality bits with the same meaning for Kepler and TESS, in lightkurve's default bitmask
 FLAG_COARSE_POINT = 4
 FLAG_DESAT = 32
@@ -111,7 +136,10 @@ class Scenario:
     planet: Optional[Planet]
     seed: int
     n_segments: int = 1
-    noise_ppm: float = 300.0  # white noise per cadence
+    segment_days: tuple = ()  # length of every segment; default: mission.segment_days
+    dense_mission: Optional[Mission] = None  # observing mode of the segments in dense_segments
+    dense_segments: tuple = ()  # segment indices observed with dense_mission (e.g. short cadence)
+    noise_ppm: float = 300.0  # white noise per cadence of `mission` (scaled for dense_mission)
     variability_ppm: float = 3000.0  # stellar rotational modulation amplitude
     rotation_period: float = 11.0  # days
     flatten_window_days: float = 1.0
@@ -185,16 +213,26 @@ def transit_truth(planet, star, t0):
     }
 
 
-def _segment_cadences(mission, index):
+def _segment_starts(scenario):
+    """Start time and length of every segment."""
+    mission = scenario.mission
+    if not scenario.segment_days:
+        return [(mission.t_start + index * (mission.segment_days + mission.segment_gap),
+                 mission.segment_days) for index in range(scenario.n_segments)]
+    starts = mission.t_start + np.concatenate(
+        ([0.0], np.cumsum(np.add(scenario.segment_days, mission.segment_gap))[:-1]))
+    return list(zip(starts, scenario.segment_days))[:scenario.n_segments]
+
+
+def _segment_cadences(mission, start, length, first_cadence):
     """Time stamps and cadence numbers of one quarter / sector, without the downlink gaps."""
-    start = mission.t_start + index * (mission.segment_days + mission.segment_gap)
-    n = int(round(mission.segment_days / mission.cadence))
-    cadenceno = np.arange(n) + index * (n + int(mission.segment_gap / mission.cadence))
+    n = int(round(length / mission.cadence))
+    cadenceno = np.arange(n) + first_cadence
     t = start + np.arange(n) * mission.cadence
     keep = np.ones(n, dtype=bool)
-    for offset, length in mission.downlinks:
-        keep &= ~((t >= start + offset) & (t < start + offset + length))
-    return t[keep], cadenceno[keep] + 1000, start
+    for offset, gap in mission.downlinks:
+        keep &= ~((t >= start + offset) & (t < start + offset + gap))
+    return t[keep], cadenceno[keep] + 1000
 
 
 def _red_noise(n, rng, sigma, corr_cadences):
@@ -230,9 +268,9 @@ def _systematics(t, mission, segment_start, rng):
     return out
 
 
-def _quality_flags(t, mission, segment_start, rng):
+def _quality_flags(t, mission, segment_start, segment_days, rng):
     quality = np.zeros(t.size, dtype=np.int32)
-    dumps = segment_start + np.arange(mission.dump_interval / 2, mission.segment_days,
+    dumps = segment_start + np.arange(mission.dump_interval / 2, segment_days,
                                       mission.dump_interval)
     for dump in dumps:
         quality[np.abs(t - dump) < 1.5 * mission.cadence] |= FLAG_DESAT
@@ -302,30 +340,43 @@ def _simulate_products(scenario, workdir):
     level = float(rng.uniform(1e4, 5e4))  # e-/s
     files = []
     n_raw = 0
-    for index in range(scenario.n_segments):
+    for index, (start, length) in enumerate(_segment_starts(scenario)):
         segment = mission.first_segment + index
-        t, cadenceno, start = _segment_cadences(mission, index)
+        mode = scenario.dense_mission if index in scenario.dense_segments else mission
+        # Same photometric precision per unit time at every cadence
+        white = noise * np.sqrt(mission.cadence / mode.cadence)
+        first_cadence = int(round((start - mission.t_start) / mode.cadence))
+        t, cadenceno = _segment_cadences(mode, start, length, first_cadence)
         n = t.size
         flux = 1.0 + stellar_variability(t, rng, scenario.variability_ppm * 1e-6,
                                          scenario.rotation_period)
-        flux += _systematics(t, mission, start, rng)
-        flux += _red_noise(n, rng, 0.25 * noise, corr_cadences=0.05 / mission.cadence)
+        flux += _systematics(t, mode, start, rng)
+        flux += _red_noise(n, rng, 0.25 * noise, corr_cadences=0.05 / mode.cadence)
         if planet is not None:
-            flux *= transit_model(t, planet, star, t0, mission.cadence, mission.exposure_fraction)
-        err = noise * rng.uniform(0.95, 1.05, n)
+            flux *= transit_model(t, planet, star, t0, mode.cadence, mode.exposure_fraction)
+        err = white * rng.uniform(0.95, 1.05, n)
         flux += rng.normal(0, 1, n) * err
         # Unflagged cosmic rays, to be removed by the upper sigma clip
         hits = rng.random(n) < 5e-4
-        flux[hits] += rng.uniform(5, 20, hits.sum()) * noise
-        quality = _quality_flags(t, mission, start, rng)
+        flux[hits] += rng.uniform(5, 20, hits.sum()) * white
+        quality = _quality_flags(t, mode, start, length, rng)
         # Flagged cadences carry corrupted flux, so ignoring the quality mask hurts
         bad = quality != 0
-        flux[bad] -= rng.uniform(5, 50, bad.sum()) * noise
+        flux[bad] -= rng.uniform(5, 50, bad.sum()) * white
         flux[(quality & FLAG_COARSE_POINT) != 0] = np.nan
-        prefix = "kplr" if mission.name == "Kepler" else "tess"
-        path = Path(workdir) / f"{prefix}{target_id:09d}-s{segment:02d}_sim_lc.fits"
-        files.append(_write_product(path, mission, segment, target_id, star, t,
-                                    flux * level, err * level, quality, cadenceno, rng))
+        prefix = "kplr" if mode.name == "Kepler" else "tess"
+        # Equal-length files within the segment (e.g. the three months of a quarter)
+        part = np.minimum(((t - start) / length * mode.files_per_segment).astype(int),
+                          mode.files_per_segment - 1)
+        for p in range(mode.files_per_segment):
+            sel = part == p
+            if not sel.any():
+                continue
+            suffix = "m%d" % (p + 1) if mode.files_per_segment > 1 else ""
+            path = Path(workdir) / f"{prefix}{target_id:09d}-s{segment:02d}{suffix}_sim_{mode.file_tag}.fits"
+            files.append(_write_product(path, mode, segment, target_id, star, t[sel],
+                                        flux[sel] * level, err[sel] * level, quality[sel],
+                                        cadenceno[sel], rng))
         n_raw += n
     truth = transit_truth(planet, star, t0) if planet is not None else None
     return files, truth, n_raw
@@ -359,10 +410,21 @@ def read_and_detrend(files, flatten_window_days, outlier_sigma=4.0):
         import lightkurve as lk
 
         lcs = [lk.read(str(f), quality_bitmask="default") for f in files]
-        lc = lk.LightCurveCollection(lcs).stitch().remove_nans()
-        cadence = float(np.median(np.diff(lc.time.value)))
-        window = int(round(flatten_window_days / cadence)) | 1
-        flat = lc.flatten(window_length=window, polyorder=2, break_tolerance=10)
+        cadences = [float(np.median(np.diff(lc.time.value))) for lc in lcs]
+
+        def flatten(lc, cadence):
+            window = int(round(flatten_window_days / cadence)) | 1
+            return lc.flatten(window_length=window, polyorder=2, break_tolerance=10)
+
+        if max(cadences) < 1.5 * min(cadences):
+            lc = lk.LightCurveCollection(lcs).stitch().remove_nans()
+            flat = flatten(lc, float(np.median(np.diff(lc.time.value))))
+        else:
+            # The flatten window is counted in cadences, so mixed cadences (e.g. Kepler long
+            # and short cadence) are flattened file by file
+            flat = lk.LightCurveCollection(
+                [flatten(lc.remove_nans(), cadence) for lc, cadence in zip(lcs, cadences)]
+            ).stitch(corrector_func=lambda lc: lc)
         flat = flat.remove_outliers(sigma_lower=float("inf"), sigma_upper=outlier_sigma)
     t = np.asarray(flat.time.value, dtype=float)
     y = np.asarray(flat.flux.value, dtype=float)

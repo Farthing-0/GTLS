@@ -1,4 +1,6 @@
+import cupy
 import numpy
+from cupyx.scipy.ndimage import median_filter
 from numpy import arccos, degrees
 
 
@@ -6,46 +8,16 @@ def cleaned_array(t, y, dy=None):
     """Takes numpy arrays with masks and non-float values.
     Returns unmasked cleaned arrays."""
 
-    def isvalid(value):
-        valid = False
-        if value is not None:
-            if not numpy.isnan(value):
-                if value > 0 and value < numpy.inf:
-                    valid = True
-        return valid
+    def as_float(values):
+        # None and masked entries become NaN
+        return numpy.ma.filled(numpy.ma.asarray(values).astype(float), numpy.nan)
 
-    # Start with empty Python lists and convert to numpy arrays later (reason: speed)
-    clean_t = []
-    clean_y = []
-    if dy is not None:
-        clean_dy = []
-
-    # Cleaning numpy arrays with both NaN and None values is not trivial, as the usual
-    # mask/delete filters do not accept their simultanous ocurrence without warnings.
-    # Instead, we iterate over the array once; this is not Pythonic but works reliably.
-    for i in range(len(y)):
-
-        # Case: t, y, dy
-        if dy is not None:
-            if isvalid(y[i]) and isvalid(t[i]) and isvalid(dy[i]):
-                clean_y.append(y[i])
-                clean_t.append(t[i])
-                clean_dy.append(dy[i])
-
-        # Case: only t, y
-        else:
-            if isvalid(y[i]) and isvalid(t[i]):
-                clean_y.append(y[i])
-                clean_t.append(t[i])
-
-    clean_t = numpy.array(clean_t, dtype=float)
-    clean_y = numpy.array(clean_y, dtype=float)
-
-    if dy is None:
-        return clean_t, clean_y
-    else:
-        clean_dy = numpy.array(clean_dy, dtype=float)
-        return clean_t, clean_y, clean_dy
+    arrays = [as_float(a) for a in ((t, y) if dy is None else (t, y, dy))]
+    valid = numpy.ones(len(arrays[1]), dtype=bool)
+    for values in arrays:
+        with numpy.errstate(invalid="ignore"):
+            valid &= numpy.isfinite(values) & (values > 0)
+    return tuple(values[valid] for values in arrays)
 
 
 def transit_mask(t, period, duration, T0):
@@ -56,9 +28,15 @@ def transit_mask(t, period, duration, T0):
 
 def running_median(data, kernel):
     """Returns sliding median of width 'kernel' and same length as data """
-    idx = numpy.arange(kernel) + numpy.arange(len(data) - kernel + 1)[:, None]
-    idx = idx.astype(int)  # needed if oversampling_factor is not int
-    med = numpy.ma.median(data[idx], axis=1)
+    width = len(numpy.arange(kernel))  # kernel may be a float
+    if not numpy.ma.is_masked(data) and width % 2 == 1 and len(data) >= width:
+        # Same medians as the sliding windows below, computed on the GPU
+        med = median_filter(cupy.asarray(numpy.ma.getdata(data)), size=width, mode="nearest").get()
+        med = med[width // 2:len(data) - width // 2]
+    else:
+        idx = numpy.arange(kernel) + numpy.arange(len(data) - kernel + 1)[:, None]
+        idx = idx.astype(int)  # needed if oversampling_factor is not int
+        med = numpy.ma.median(data[idx], axis=1)
 
     # Append the first/last value at the beginning/end to match the length of
     # data and returned median

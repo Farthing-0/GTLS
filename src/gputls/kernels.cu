@@ -1,25 +1,123 @@
+// Block-wide inclusive prefix sum of one value per thread (blockDim.x a multiple of 32).
+// Returns the thread's inclusive sum and stores the block total in *total.
+template <typename T>
+__device__ __forceinline__ T blockInclusiveScan(T v, T* total) {
+    __shared__ T warpSums[32];
+    int lane = threadIdx.x & 31;
+    int warp = threadIdx.x >> 5;
+    int nWarps = blockDim.x >> 5;
+    for (int o = 1; o < 32; o <<= 1) {
+        T other = __shfl_up_sync(0xffffffff, v, o);
+        if (lane >= o) {
+            v += other;
+        }
+    }
+    if (lane == 31) {
+        warpSums[warp] = v;
+    }
+    __syncthreads();
+    if (warp == 0) {
+        T w = lane < nWarps ? warpSums[lane] : (T)0;
+        for (int o = 1; o < 32; o <<= 1) {
+            T other = __shfl_up_sync(0xffffffff, w, o);
+            if (lane >= o) {
+                w += other;
+            }
+        }
+        warpSums[lane] = w;
+    }
+    __syncthreads();
+    if (warp > 0) {
+        v += warpSums[warp - 1];
+    }
+    *total = warpSums[nWarps - 1];
+    __syncthreads();  // warpSums is reused by the next call
+    return v;
+}
+
 extern "C"{
-    // Configuration constants
-    #define SKIP_POINT 8
-    
     #define SECONDS_PER_DAY 86400              // Seconds in a day
 
-    // Transit fitting constants
-    #define FLOAT_INFINITY __int_as_float(0x7f800000) // IEEE-754 float infinity
+    /**
+     * Phase sort, stage 1: fold and count the points of each bucket floor(phase * tSize)
+     * (about one point per bucket). phase = time / period - floor(time / period).
+     */
+    __global__ void foldBuckets(const double* time, const double* periods, double* phase,
+                                int* counts, int tSize) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;  // point index
+        int z = blockIdx.y;                             // period index
+        if (i >= tSize) {
+            return;
+        }
+        double phaseRaw = time[i] / periods[z];
+        double p = phaseRaw - (int)(phaseRaw);
+        long long o = (long long)z * tSize;
+        phase[o + i] = p;
+        int bucket = min((int)(p * tSize), tSize - 1);
+        atomicAdd(counts + o + bucket, 1);
+    }
 
     /**
-     * Fast phase folding kernel with optimized memory access
-     * Calculates phase = (time / period) - floor(time / period) for each time point
+     * Exclusive prefix sum of each row of counts (one block per row): the first position of
+     * every bucket in the sorted order.
      */
-    __global__ void foldFast(const double* time, const double* periods, double* phase, int* timeSize) {
-        int tid = blockDim.x * blockIdx.x + threadIdx.x;
-        int y = blockDim.y * blockIdx.y + threadIdx.y;
+    __global__ void scanCounts(const int* counts, int* cursor, int tSize) {
+        long long o = (long long)blockIdx.x * tSize;
+        int carry = 0;
+        for (int tile = 0; tile < tSize; tile += blockDim.x) {
+            int q = tile + threadIdx.x;
+            int c = q < tSize ? counts[o + q] : 0;
+            int total;
+            int inclusive = blockInclusiveScan(c, &total);
+            if (q < tSize) {
+                cursor[o + q] = carry + inclusive - c;
+            }
+            carry += total;
+        }
+    }
 
-        if (tid < (*timeSize)) {
-            double time_val = time[tid];
-            double period = periods[y];
-            double phase_raw = time_val / period;
-            phase[tid + y * (*timeSize)] = phase_raw - (int)(phase_raw);
+    /**
+     * Phase sort, stage 2: scatter the point indices into their buckets. cursor holds the
+     * first position of each bucket on entry and one past its last position on exit.
+     */
+    __global__ void bucketScatter(const double* phase, int* cursor, int* sortIndex, int tSize) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        int z = blockIdx.y;
+        if (i >= tSize) {
+            return;
+        }
+        long long o = (long long)z * tSize;
+        int bucket = min((int)(phase[o + i] * tSize), tSize - 1);
+        sortIndex[o + atomicAdd(cursor + o + bucket, 1)] = i;
+    }
+
+    /**
+     * Phase sort, stage 3: insertion sort of each bucket by (phase, index). Buckets increase
+     * with phase, so the result equals a stable argsort of the phases.
+     */
+    __global__ void sortBuckets(const double* phase, const int* counts, const int* ends,
+                                int* sortIndex, int tSize) {
+        int b = blockIdx.x * blockDim.x + threadIdx.x;  // bucket index
+        int z = blockIdx.y;
+        if (b >= tSize) {
+            return;
+        }
+        long long o = (long long)z * tSize;
+        int n = counts[o + b];
+        if (n < 2) {
+            return;
+        }
+        int* seg = sortIndex + o + ends[o + b] - n;
+        const double* ph = phase + o;
+        for (int a = 1; a < n; a++) {
+            int v = seg[a];
+            double pv = ph[v];
+            int c = a - 1;
+            while (c >= 0 && (ph[seg[c]] > pv || (ph[seg[c]] == pv && seg[c] > v))) {
+                seg[c + 1] = seg[c];
+                c--;
+            }
+            seg[c + 1] = v;
         }
     }
 
@@ -80,348 +178,149 @@ extern "C"{
     }
 
     /**
-     * Optimized data patching kernel with improved memory coalescing
+     * Phase-folded light curve, extended by its first points to handle transits at the phase
+     * edge, in the form used by searchChi2: the residual r = 1 - flux and (w * r, w), with
+     * w = 1 / dy^2.
      */
-    __global__ void patchData(float *in_patchedData, float *in_patchedDys,
-                             int *patchedDataSize, int *in_sortIndex, int *maxDuration,
-                             float *flux, float *dy, int *tSize) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x; // patchedData index
-        int y = blockIdx.y * blockDim.y + threadIdx.y;   // period index
-
-        float *patchedData = in_patchedData + y * (*patchedDataSize);
-        float *patchedDys = in_patchedDys + y * (*patchedDataSize);
-        int *sortIndex = in_sortIndex + y * (*tSize);
-
-        if (tid < (*tSize)) {
-            int src_idx = sortIndex[tid];
-            patchedData[tid] = flux[src_idx];
-            patchedDys[tid] = dy[src_idx];
-        } else if (tid < (*tSize + *maxDuration)) {
-            int src_idx = sortIndex[tid - (*tSize)];
-            patchedData[tid] = flux[src_idx];
-            patchedDys[tid] = dy[src_idx];
+    __global__ void patchWeighted(const int* sortIndex, const float* residual, const float* dy,
+                                  float* patchedResidual, float2* patchedWeighted,
+                                  int tSize, int patchedSize) {
+        int q = blockIdx.x * blockDim.x + threadIdx.x;  // patched point index
+        int z = blockIdx.y;                             // period index
+        if (q >= patchedSize) {
+            return;
         }
+        int src = sortIndex[(long long)z * tSize + q % tSize];
+        float r = residual[src];
+        float dy2 = dy[src] * dy[src];
+        // Prevent division by zero
+        if (dy2 < 1e-10f) {
+            dy2 = 1e-10f;
+        }
+        float w = 1.0f / dy2;
+        long long o = (long long)z * patchedSize + q;
+        patchedResidual[o] = r;
+        patchedWeighted[o] = make_float2(w * r, w);
     }
 
     /**
-     * Optimized inverse squared calculation
+     * Inclusive float64 prefix sum of each row of the patched residuals (one block per row),
+     * and base = sum of w r^2 over the first tSize (not patched) points of the row.
      */
-    __global__ void calcInverseSquaredPatchedDy(float *out, float *patched_dys, int *patched_data_size) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-        if (tid < *patched_data_size) {
-            float dy_val = patched_dys[tid + y * (*patched_data_size)];
-            // Prevent division by zero: use minimum threshold
-            float dy_squared = dy_val * dy_val;
-            if (dy_squared < 1e-10f) {
-                dy_squared = 1e-10f;
+    __global__ void scanResidual(const float* patchedResidual, const float2* patchedWeighted,
+                                 double* cumResidual, double* base, int tSize, int patchedSize) {
+        long long o = (long long)blockIdx.x * patchedSize;
+        double carry = 0.0;
+        double chi2 = 0.0;
+        for (int tile = 0; tile < patchedSize; tile += blockDim.x) {
+            int q = tile + threadIdx.x;
+            double r = q < patchedSize ? (double)patchedResidual[o + q] : 0.0;
+            if (q < tSize) {
+                chi2 += (double)patchedWeighted[o + q].x * r;
             }
-            out[tid + y * (*patched_data_size)] = 1.0f / dy_squared;
-        }
-    }
-
-    /**
-     * Optimized edge effect correction calculation
-     */
-    __global__ void calcEdgeEffectCorrections(float *out, float *patch_data,
-                                             float* inverse_squared_patched_dys, int *patched_data_size,
-                                             int* maxDuration, int* period_size) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        
-        if (tid >= *period_size) {
-            return;
-        }
-
-        float* patched_data = patch_data + tid * (*patched_data_size);
-        float* inverse_squared_patched_dy = inverse_squared_patched_dys + tid * (*patched_data_size);
-
-        double edgeEffect = 0.0;
-        int start_idx = (*patched_data_size) - (*maxDuration);
-        
-        for (int j = start_idx; j < (*patched_data_size); j++) {
-            double patchDataJ = (double)(patched_data[j]);
-            double patchDataDyJ = (double)(inverse_squared_patched_dy[j]);
-            edgeEffect += (1.0 + patchDataJ * patchDataJ - 2.0 * patchDataJ) * patchDataDyJ;
-        }
-        out[tid] = edgeEffect;
-    }
-
-    /**
-     * Out-of-transit residual of the first window of each (period, duration):
-     * sum of the squared errors outside [0, window), read in O(1) from the
-     * error prefix sum (cumsum of calculate_base_error).
-     */
-    __global__ void calcAllFullSum(float* fullsums,
-                                   const float *error_prefix_sum,
-                                   int patched_data_size,
-                                   const int *in_duration,
-                                   int duration_size,
-                                   int num_periods) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // duration index
-        int z = blockIdx.y;                                  // period index
-
-        if (tid >= duration_size || z >= num_periods) {
-            return;
-        }
-
-        const float *prefix_sum = error_prefix_sum + (long long)z * patched_data_size;
-        float fullsum = prefix_sum[patched_data_size - 1];
-        int window = in_duration[tid];
-        float window_sum = (window > 0) ? prefix_sum[window - 1] : 0.0f;
-
-        fullsums[tid + z * duration_size] = fullsum - window_sum;
-    }
-    
-    /**
-     * Optimized out-of-transit residuals calculation - Step 1
-     */
-    __global__ void calcAllOutOfTransitResiduals_step1_2GPU(float *temp_ootr,
-                                                            float *in_patched_data, int *in_duration, int *duration_size,
-                                                            float *in_inverse_squared_patched_dy, int *patched_data_size,
-                                                            int *resultArrayXAxisSize) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // point index
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      // duration index
-        int z = blockIdx.z * blockDim.z + threadIdx.z;      // period index
-
-        if (tid >= *resultArrayXAxisSize || y >= *duration_size) {
-            return;
-        }
-
-        float *patched_data = in_patched_data + (long long)z * (*patched_data_size);
-        float *inverse_squared_patched = in_inverse_squared_patched_dy + (long long)z * (*patched_data_size);
-        int window = in_duration[y];
-        
-        int becomes_visible = tid;
-        int becomes_invisible = tid + window;
-        
-        float weight = 0.0f;
-        if (becomes_visible < *patched_data_size && becomes_invisible < *patched_data_size) {
-            float diff_visible = 1.0f - patched_data[becomes_visible];
-            float diff_invisible = 1.0f - patched_data[becomes_invisible];
-            
-            float add_visible_left = diff_visible * diff_visible * inverse_squared_patched[becomes_visible];
-            float remove_invisible_right = diff_invisible * diff_invisible * inverse_squared_patched[becomes_invisible];
-            weight = add_visible_left - remove_invisible_right;
-        }
-        
-        temp_ootr[(long long)tid + (long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*duration_size)] = weight;
-    }
-
-    /**
-     * Optimized out-of-transit residuals calculation - Step 2
-     */
-    __global__ void calcAllOutOfTransitResiduals_step2_2GPU(float *in_ootr, int *duration_size,
-                                                            int *resultArrayXAxisSize, float *in_fullsum) {
-        int i = blockIdx.x * blockDim.x + threadIdx.x;      // point index
-        int tid = blockIdx.y * blockDim.y + threadIdx.y;    // duration index
-        int z = blockIdx.z * blockDim.z + threadIdx.z;      // period index
-
-        if (i >= (*resultArrayXAxisSize) || tid >= (*duration_size)) {
-            return;
-        }
-
-        float *fullsum = in_fullsum + (long long)z * (*duration_size);
-        float *ootr = in_ootr + (long long)z * (*resultArrayXAxisSize) * (*duration_size);
-        
-        ootr[(long long)i + (long long)tid * (*resultArrayXAxisSize)] = fullsum[tid] + ootr[(long long)i + (long long)tid * (*resultArrayXAxisSize)];
-    }
-
-    /**
-     * Out-of-transit residuals, stage 1: per-point squared error (1 - flux)^2 / dy^2.
-     * Its prefix sum (computed on the host with cupy.cumsum) feeds calcAllFullSum and calculate_final_ootr.
-     */
-    __global__ void calculate_base_error(
-        float* out_base_error, // Shape: (num_periods, patched_data_size)
-        const float* in_patched_data,
-        const float* in_inverse_squared_patched_dy,
-        int patched_data_size,
-        int num_periods
-    ) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x; // point index
-        int z = blockIdx.y; // period index
-
-        if (z >= num_periods || tid >= patched_data_size) {
-            return;
-        }
-
-        const float* patched_data_period = in_patched_data + z * patched_data_size;
-        const float* inverse_squared_patched_period = in_inverse_squared_patched_dy + z * patched_data_size;
-
-        float diff = 1.0f - patched_data_period[tid];
-        out_base_error[tid + z * patched_data_size] = diff * diff * inverse_squared_patched_period[tid];
-    }
-
-    /**
-     * Out-of-transit residuals, stage 2: out-of-transit residual for every
-     * (period, duration, start point) from the error prefix sum.
-     */
-    __global__ void calculate_final_ootr(
-        float* out_ootr,
-        const float* error_prefix_sum, // PRE-COMPUTED. Shape: (num_periods, patchedDatasSize)
-        const float* in_fullsum,
-        const int* in_duration,
-        int tSize,                 // The analysis length (<= patchedDatasSize)
-        int patchedDatasSize,      // The full data length
-        int duration_size,
-        int num_periods
-    ) {
-        int p = blockIdx.x * blockDim.x + threadIdx.x; // point index
-        int d = blockIdx.y;                           // duration index
-        int z = blockIdx.z;                           // period index
-
-        // Only compute for the required analysis length 'tSize'
-        if (p >= tSize || d >= duration_size || z >= num_periods) {
-            return;
-        }
-
-        // Pointer to the current period's prefix sum array (length is patchedDatasSize)
-        const float* P_E = error_prefix_sum + (long long)z * patchedDatasSize; 
-
-        int window = in_duration[d];
-
-        // --- Core Telescoping Sum Logic with FAITHFUL BOUNDARY CHECKS ---
-        
-        // P_E[p] is always in bounds due to the check above
-        float p_e_p = P_E[p];
-
-        // Check bounds for P_E[p + window]
-        float p_e_p_plus_window = (p + window < patchedDatasSize) ? P_E[p + window] : 0.0f;
-
-        // Check bounds for P_E[window - 1]
-        float p_e_window_minus_1 = (window > 0 && window - 1 < patchedDatasSize) ? P_E[window - 1] : 0.0f;
-
-        float cumsum_weight = p_e_p - (p_e_p_plus_window - p_e_window_minus_1);
-        
-        // --- Finalization Step ---
-        float fullsum_val = in_fullsum[(long long)d + (long long)z * duration_size];
-
-        long long final_idx = (long long)p + (long long)d * tSize + (long long)z * tSize * duration_size;
-        out_ootr[final_idx] = fullsum_val + cumsum_weight;
-    }
-
-    /**
-     * Optimized device function for cumsum average calculation
-     */
-    __device__ float calcAverageFromCumsum(float *inPatchedDataCumsum, int duration, 
-                                          int *patched_data_size, int tid, int z) {
-        if (tid == 0) {
-            return 1.0f - inPatchedDataCumsum[z * (*patched_data_size) + duration - 1] / duration;
-        } else {
-            float end_val = inPatchedDataCumsum[z * (*patched_data_size) + tid + duration - 1];
-            float start_val = inPatchedDataCumsum[z * (*patched_data_size) + tid - 1];
-            return 1.0f - (end_val - start_val) / duration;
-        }
-    }
-
-    /**
-     * Coarse search: chi2 for every (period, duration, start point), evaluating
-     * only every SKIP_POINT-th start point (the others are set to infinity).
-     */
-    __global__ void calcAllLowestResidualsSkip(
-        float *out, int *resultArrayXAxisSize,
-        float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
-        float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
-        float *in_overshoot, float *in_ootr, float *in_fullsum,
-        float *in_summed_edge_effect_correction, float *cumsumGPU,
-        float *in_transit_depth_min
-    ) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        int y = blockIdx.y;
-        int z = blockIdx.z;
-
-        if (tid >= *resultArrayXAxisSize) {
-            return;
-        }
-
-        int duration = in_duration[y];
-        int skipPoint = (duration > SKIP_POINT) ? (duration / SKIP_POINT) : 1;
-        float transit_depth_min = *in_transit_depth_min;
-        float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, z);
-
-        float current_stat = FLOAT_INFINITY;
-
-        if (calc_mean > transit_depth_min && tid % skipPoint == 0) {
-            float ootr = (tid == 0) ? 
-                in_fullsum[(long long)z * (*in_duration_size) + y] :
-                in_ootr[(long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
-
-            float *data = in_patched_datas + (long long)z * (*in_patched_datas_size) + tid;
-            float *dy = in_inverse_squared_patched_dys + (long long)z * (*in_patched_datas_size) + tid;
-            float *signal = in_signal + (long long)y * (*in_max_signal_x_size);
-            
-            float reverse_scale = calc_mean * in_overshoot[y] * 2.0f;
-            float summed_edge_effect_correction = in_summed_edge_effect_correction[z];
-            float intransit_residual = 0.0f;
-
-            for (int i = 0; i < duration; i++) {
-                float sigi = signal[i] * reverse_scale;
-                float loss = data[i] - (1.0f - sigi);
-                intransit_residual += loss * loss * dy[i];
+            double total;
+            double inclusive = blockInclusiveScan(r, &total);
+            if (q < patchedSize) {
+                cumResidual[o + q] = carry + inclusive;
             }
-
-            current_stat = intransit_residual + ootr - summed_edge_effect_correction;
+            carry += total;
         }
+        double total;
+        blockInclusiveScan(chi2, &total);
+        if (threadIdx.x == 0) {
+            base[blockIdx.x] = total;
+        }
+    }
 
-        out[(long long)tid + (long long)y * (*resultArrayXAxisSize) + (long long)z * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
+    // Order-preserving map of a float onto an unsigned int: a < b <=> key(a) < key(b)
+    __device__ __forceinline__ unsigned int orderedKey(float f) {
+        unsigned int u = __float_as_uint(f);
+        return (u & 0x80000000u) ? ~u : (u | 0x80000000u);
     }
 
     /**
-     * Refinement search: chi2 for every (period, duration, start point) without skipping.
+     * Lowest chi2 of every period over all searched durations and start points, fused into one
+     * pass (no per-start-point arrays). For a window of L points starting at `start` with
+     * template depth profile s_i and amplitude k = mean_depth * overshoot / SIGNAL_DEPTH, the chi2
+     *     sum_{all points} w r^2 - sum_{window} w r^2 + sum_{window} w (r - k s)^2
+     * is evaluated as base - 2 k A_R + k^2 A_2 with A_R = sum s_i (w r)_i, A_2 = sum s_i^2 w_i
+     * (the algebraic expansion of TLS 2.0). The mean depth comes from a float64 prefix sum of r.
+     *
+     * Work items of a period are the start points of all searched durations, laid out by
+     * `offsets`; start points of duration y are multiples of strides[y]. The searched durations
+     * are the union over the batch; a period only tests those of its own row of periodMask
+     * (physically plausible durations, see durationBool), so results do not depend on the batch.
+     * best[z] receives min over work items of (orderedKey(chi2) << 32 | y * tSize + start), so
+     * ties resolve to the first duration, then the first start point.
      */
-    __global__ void calcAllLowestResidualsNoSkip(float *out, int *resultArrayXAxisSize,
-                                                         float *in_patched_datas, int *in_patched_datas_size, int *in_duration, int *in_duration_size,
-                                                         float *in_signal, int *in_max_signal_x_size, float *in_inverse_squared_patched_dys,
-                                                         float *in_overshoot, float *in_ootr, float *in_fullsum,
-                                                         float *in_summed_edge_effect_correction, float *cumsumGPU,
-                                                         float *in_transit_depth_min) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;    // point index
-        int y = blockIdx.y * blockDim.y + threadIdx.y;      // duration index
-        int z = blockIdx.z * blockDim.z + threadIdx.z;      // period index
+    __global__ void searchChi2(unsigned long long* best,
+                               const double* cumResidual,     // (periods, patchedSize), inclusive
+                               const float2* patchedWeighted, // (periods, patchedSize)
+                               const double* base,            // (periods)
+                               const float* signal,           // (durations, maxWidth)
+                               const float* overshoot,        // (durations)
+                               const int* widths,             // (durations)
+                               const int* selected,           // (nSelected) searched durations
+                               const int* offsets,            // (nSelected + 1)
+                               const int* strides,            // (nSelected)
+                               const bool* periodMask,        // (periods, nDurations)
+                               int nSelected, int nDurations, int tSize, int patchedSize,
+                               int maxWidth, float transitDepthMin) {
+        int z = blockIdx.y;
+        int g = blockIdx.x * blockDim.x + threadIdx.x;
+        unsigned long long key = 0xffffffffffffffffull;
 
-        int durationIndex = y;
-        int periodIndex = z;
-        int duration = in_duration[durationIndex];
+        if (g < offsets[nSelected]) {
+            int y = 0;
+            while (offsets[y + 1] <= g) {
+                y++;
+            }
+            int start = (g - offsets[y]) * strides[y];
+            int d = selected[y];
+            int L = widths[d];
+            const double* C = cumResidual + (long long)z * patchedSize;
+            double windowSum = C[start + L - 1] - (start > 0 ? C[start - 1] : 0.0);
+            float meanDepth = (float)(windowSum / L);
 
-        if (tid >= *resultArrayXAxisSize) {
-            return;
+            if (periodMask[(long long)z * nDurations + d] && meanDepth > transitDepthMin) {
+                float k = meanDepth * overshoot[d] * 2.0f;  // 2 = 1 / SIGNAL_DEPTH
+                const float2* x = patchedWeighted + (long long)z * patchedSize + start;
+                const float* s = signal + (long long)d * maxWidth;
+                float ar = 0.0f;
+                float a2 = 0.0f;
+                for (int i = 0; i < L; i++) {
+                    float si = s[i];
+                    float2 v = x[i];
+                    ar = fmaf(si, v.x, ar);
+                    a2 = fmaf(si * si, v.y, a2);
+                }
+                float chi2 = (float)(base[z] + (double)(k * (k * a2 - 2.0f * ar)));
+                key = ((unsigned long long)orderedKey(chi2) << 32) | (unsigned int)(y * tSize + start);
+            }
         }
 
-        float transit_depth_min = *in_transit_depth_min;
-
-        float calc_mean = calcAverageFromCumsum(cumsumGPU, duration, in_patched_datas_size, tid, periodIndex);
-        float overshoot = in_overshoot[durationIndex];
-
-        if (calc_mean > transit_depth_min) {
-            // Optimized OOTR calculation
-            float ootr = (tid == 0) ? 
-                in_fullsum[periodIndex * (*in_duration_size) + durationIndex] :
-                in_ootr[durationIndex * (*resultArrayXAxisSize) + periodIndex * (*resultArrayXAxisSize) * (*in_duration_size) + tid - 1];
-
-            // Pre-calculate pointers for better memory access
-            float *data = in_patched_datas + periodIndex * (*in_patched_datas_size) + tid;
-            float *signal = in_signal + durationIndex * (*in_max_signal_x_size);
-            float *inverse_squared_patched_dy_arr = in_inverse_squared_patched_dys + periodIndex * (*in_patched_datas_size);
-            float summed_edge_effect_correction = in_summed_edge_effect_correction[periodIndex];
-            float *dy = inverse_squared_patched_dy_arr + tid;
-
-            // Optimized scale calculation with proper float type
-            float reverse_scale = calc_mean * overshoot * 2.0f;  // 2.0f for SIGNAL_DEPTH = 0.5
-
-            float intransit_residual = 0.0f;
-
-            // Optimized inner loop with reduced variable declarations
-            for (int i = 0; i < duration; i++) {
-                float sigi = signal[i] * reverse_scale;
-                float loss = data[i] - (1.0f - sigi);
-                intransit_residual += loss * loss * dy[i];
+        // Block-wide minimum, then one atomic per block
+        for (int o = 16; o > 0; o >>= 1) {
+            unsigned long long other = __shfl_down_sync(0xffffffff, key, o);
+            key = other < key ? other : key;
+        }
+        __shared__ unsigned long long warpMin[32];
+        int lane = threadIdx.x & 31;
+        int warp = threadIdx.x >> 5;
+        if (lane == 0) {
+            warpMin[warp] = key;
+        }
+        __syncthreads();
+        if (warp == 0) {
+            int nWarps = (blockDim.x + 31) >> 5;
+            key = lane < nWarps ? warpMin[lane] : 0xffffffffffffffffull;
+            for (int o = 16; o > 0; o >>= 1) {
+                unsigned long long other = __shfl_down_sync(0xffffffff, key, o);
+                key = other < key ? other : key;
             }
-
-            float current_stat = intransit_residual + ootr - summed_edge_effect_correction;
-            out[tid + durationIndex * (*resultArrayXAxisSize) + periodIndex * (*resultArrayXAxisSize) * (*in_duration_size)] = current_stat;
-        } else {
-            out[tid + durationIndex * (*resultArrayXAxisSize) + periodIndex * (*resultArrayXAxisSize) * (*in_duration_size)] = FLOAT_INFINITY;
+            if (lane == 0 && key != 0xffffffffffffffffull) {
+                atomicMin(best + z, key);
+            }
         }
     }
-
 }

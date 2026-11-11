@@ -92,6 +92,7 @@ def validate_args(self, kwargs):
     self.a = kwargs.get("a", constants.DEFAULT_A)
 
     self.T0_fit_margin = kwargs.get("T0_fit_margin", constants.T0_FIT_MARGIN)
+    self.T0_refine_margin = kwargs.get("T0_refine_margin", constants.T0_REFINE_MARGIN)
 
     # If an impact parameter is given, it overrules the supplied inclination
     if "b" in kwargs:
@@ -177,9 +178,7 @@ def validate_args(self, kwargs):
     if self.n_transits_min < 1:
         raise ValueError("n_transits_min must be an integer value >= 1")
 
-    # Assert 0 < T0_fit_margin < 0.1
-    if self.T0_fit_margin < 0:
-        self.T0_fit_margin = 0
-    elif self.T0_fit_margin > 0.125:  # Sensible limit 12.5% of transit duration
-        self.T0_fit_margin = 0.125
+    # Clip the T0 steps to [0, 0.125] (sensible limit 12.5% of transit duration)
+    self.T0_fit_margin = min(max(self.T0_fit_margin, 0), 0.125)
+    self.T0_refine_margin = min(max(self.T0_refine_margin, 0), 0.125)
     return self, kwargs
