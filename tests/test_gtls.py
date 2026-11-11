@@ -12,7 +12,7 @@ import batman
 import cupy as cp
 import numpy as np
 
-from gputls import gtls
+from gputls import core, gtls
 from gputls.helpers import cleaned_array
 
 GPU_DEVICE = int(os.environ.get("GTLS_GPU_DEVICE", 0))
@@ -80,7 +80,10 @@ def test_kepler_custom_periods():
     assert len(result.raw_chi2) == len(periods)
     assert np.all(np.isfinite(result.raw_chi2))
     assert periods.min() <= result.period <= periods.max()
-    assert np.isfinite(result.SDE)
+    # Every period exceeds the 89 d baseline, so each fold holds every event once and the
+    # deepest single event gives the same lowest chi2 at all periods: the periodogram is flat
+    # (to float32 rounding) and the SDE is undefined.
+    np.testing.assert_allclose(result.raw_chi2, result.raw_chi2[0], rtol=1e-6)
 
 
 def test_gpu_memory_released():
@@ -90,6 +93,71 @@ def test_gpu_memory_released():
         gtls(t, y, verbose=False).power(GPUDeviceID=GPU_DEVICE)
         with cp.cuda.Device(GPU_DEVICE):
             assert cp.get_default_memory_pool().total_bytes() == 0
+
+
+class _PeakMemory(cp.cuda.MemoryHook):
+    """Peak of the memory held by live CuPy arrays while active."""
+
+    name = "PeakMemory"
+
+    def __init__(self):
+        self.live = self.peak = 0
+        self.sizes = {}
+
+    def malloc_postprocess(self, device_id, size, mem_size, mem_ptr, pmem_id):
+        self.sizes[mem_ptr] = mem_size
+        self.live += mem_size
+        self.peak = max(self.peak, self.live)
+
+    def free_postprocess(self, device_id, mem_size, mem_ptr, pmem_id):
+        self.live -= self.sizes.pop(mem_ptr, 0)
+
+
+def test_batch_memory_model():
+    """One batch must stay within bytes_per_period per period, and batches within the grid limit."""
+    checked = []
+    batch_size = core.MultiGPUSearch.batch_size
+
+    def checked_batch_size(search, n_periods):
+        size = batch_size(search, n_periods)
+        assert 1 <= size <= min(core.MAX_BATCH, n_periods)
+        periods = np.geomspace(0.5, 50, 64)
+        search.primary.chi2_batch(periods, len(periods), refine=False)  # compile outside the hook
+        hook = _PeakMemory()
+        with cp.cuda.Device(GPU_DEVICE), hook:
+            search.primary.chi2_batch(periods, len(periods), refine=False)
+        assert hook.peak <= len(periods) * search.bytes_per_period()
+        checked.append(size)
+        return size
+
+    core.MultiGPUSearch.batch_size = checked_batch_size
+    try:
+        t, y = synthetic_light_curve()
+        gtls(t, y, verbose=False).power(GPUDeviceID=GPU_DEVICE, fast=True)
+    finally:
+        core.MultiGPUSearch.batch_size = batch_size
+    assert checked
+
+
+def test_batch_size_does_not_change_chi2():
+    """Each period is searched over its own durations, whatever periods share its batch."""
+    chi2 = {}
+    batch_size = core.MultiGPUSearch.batch_size
+
+    def all_sizes(search, n_periods):
+        periods = np.geomspace(0.5, 50, 500)
+        for size in (1, 7, 64, 500):
+            chi2[size] = search.chi2(periods, size, refine=False)
+        return batch_size(search, n_periods)
+
+    core.MultiGPUSearch.batch_size = all_sizes
+    try:
+        t, y = synthetic_light_curve()
+        gtls(t, y, verbose=False).power(GPUDeviceID=GPU_DEVICE, fast=True)
+    finally:
+        core.MultiGPUSearch.batch_size = batch_size
+    for size in (7, 64, 500):
+        np.testing.assert_array_equal(chi2[1], chi2[size])
 
 
 def test_multi_gpu_matches_single_gpu():

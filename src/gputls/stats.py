@@ -101,10 +101,15 @@ def intransit_stats(t, y, transit_times, transit_duration_in_days):
 
 
 def pink_noise(data, width):
-    std = 0
+    """Mean standard deviation of all windows of width points, divided by sqrt(width)."""
+    std = np.float64(0.0)
     datapoints = len(data) - width + 1
-    for i in range(datapoints):
-        std += np.std(data[i : i + width])
+    if datapoints > 0 and width > 0:
+        windows = np.lib.stride_tricks.sliding_window_view(data, width)
+        # Bound the temporary memory of np.std to about 2**22 values per chunk
+        chunk = max(1, 2 ** 22 // width)
+        for i in range(0, datapoints, chunk):
+            std += np.std(windows[i:i + chunk], axis=1).sum()
     return std / (datapoints * width ** 0.5)
 
 
