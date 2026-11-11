@@ -40,16 +40,18 @@ extern "C"{
 
     /**
      * Phase sort, stage 1: fold and count the points of each bucket floor(phase * tSize)
-     * (about one point per bucket). phase = time / period - floor(time / period).
+     * (about one point per bucket). phase = time / period - floor(time / period), with the
+     * division done as a multiplication by the correctly rounded 1 / period (float64 division
+     * is a long instruction sequence, multiplication a single instruction).
      */
-    __global__ void foldBuckets(const double* time, const double* periods, double* phase,
+    __global__ void foldBuckets(const double* time, const double* inversePeriods, double* phase,
                                 int* counts, int tSize) {
         int i = blockIdx.x * blockDim.x + threadIdx.x;  // point index
         int z = blockIdx.y;                             // period index
         if (i >= tSize) {
             return;
         }
-        double phaseRaw = time[i] / periods[z];
+        double phaseRaw = time[i] * inversePeriods[z];
         double p = phaseRaw - (int)(phaseRaw);
         long long o = (long long)z * tSize;
         phase[o + i] = p;

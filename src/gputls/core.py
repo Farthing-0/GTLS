@@ -208,12 +208,12 @@ class GPUSearch:
             raise ValueError("Too many start points per period for the GPU search")
 
         # Phase fold and sort (bucket sort, equal to a stable argsort of the phases)
-        periodsGPU = cp.asarray(periods).astype(cp.float64)
+        inversePeriodsGPU = cp.asarray(1.0 / np.asarray(periods, dtype=np.float64))
         phasesGPU = cp.empty((nPeriods, tSize), dtype=cp.float64)
         countsGPU = cp.zeros((nPeriods, tSize), dtype=cp.int32)
         grid = ((tSize + 255) // 256, nPeriods)
         module.get_function("foldBuckets")(
-            grid, (256,), (self.tGPU, periodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
+            grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
         cursorGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
         module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(tSize)))
         sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
