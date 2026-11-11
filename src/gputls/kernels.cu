@@ -258,7 +258,7 @@ __device__ __forceinline__ unsigned int orderedKey(float f) {
  * step and sum A_R, A_2 with warp shuffles. With one thread per window, neighbouring threads
  * read points strides[y] apart, which wastes memory transactions and evicts the overlap of
  * neighbouring windows from L1 once the stride is large; G is chosen per duration from the
- * stride (see core.lanes_per_window and bench/window_lanes).
+ * stride (see core.lanes_per_window and bench/window_lanes on branch perf/window-lanes).
  */
 template <int G>
 __device__ __forceinline__ void searchChi2Lanes(
