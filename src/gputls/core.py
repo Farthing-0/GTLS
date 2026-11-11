@@ -427,7 +427,7 @@ def search_single_period(search, period, t, y, dy):
 
     dataOutTransit = np.concatenate((bestFlux[0:bestRowT0], bestFlux[bestRowT0 + durationPointsNum:]))
 
-    snrFit = (1 - transitDepth) * (durationPointsNum ** 0.5) / np.std(dataOutTransit)
+    snrFit = transitDepth * (durationPointsNum ** 0.5) / np.std(dataOutTransit)
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum]) / durationPointsNum
     redNoise = np.std(DataSlideAvg)
@@ -436,7 +436,7 @@ def search_single_period(search, period, t, y, dy):
     T0 = Tx - int((Tx - min(t)) / period) * period - period
     transit_times = all_transit_times(T0, t, period)
 
-    snrFitPink = (1 - transitDepth) / (
+    snrFitPink = transitDepth / (
         (np.std(dataOutTransit) ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
 
     transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
