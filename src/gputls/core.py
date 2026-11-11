@@ -75,6 +75,28 @@ def start_strides(widths, margin):
     return np.where(widths > skip, widths // skip, 1).astype(np.int32)
 
 
+WINDOW_LANES = (1, 2, 4, 8, 16, 32)  # threads per window of the searchChi2_G* kernels
+LANE_STEP_BYTES = 64  # bytes of start stride per thread of a window, see lanes_per_window
+POINT_BYTES = 8  # bytes read per point by searchChi2 (float2 of w r and w)
+
+
+def lanes_per_window(strides):
+    """Threads sharing one searchChi2 window: the smallest G in WINDOW_LANES with
+    stride * POINT_BYTES / G <= LANE_STEP_BYTES, at most 32.
+
+    One read instruction of a warp covers 32 / G windows of G consecutive points each, spaced
+    stride points apart: it spans stride / G times the bytes it uses, and the overlap of
+    neighbouring windows is reused stride / G steps later. Keeping stride / G <= 8 keeps both
+    small (bench/window_lanes: within a few percent of the fastest G for every stride, data
+    size, batch size and L1 size measured). Depends only on the stride, not on the device.
+    """
+    needed = np.asarray(strides, dtype=np.int64) * POINT_BYTES / LANE_STEP_BYTES
+    lanes = np.full(needed.shape, WINDOW_LANES[-1], dtype=np.int32)
+    for g in reversed(WINDOW_LANES):
+        lanes[needed <= g] = g
+    return lanes
+
+
 def duration_limit_args(R_star_min, R_star_max, M_star_min, M_star_max):
     """Scalar arguments (rShort, gmShort, rLong, gmLong, upperLimit) of the durationsGrid kernel.
 
@@ -218,13 +240,27 @@ class GPUSearch:
             (residualGPU, weightedGPU, cumResidualGPU, baseGPU, np.int32(tSize), np.int32(patchedSize)))
         del residualGPU
 
+        # One launch per run of durations sharing the same threads per window (the strides,
+        # and so the lanes, grow with the duration)
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
-        module.get_function("searchChi2")(
-            ((int(offsets[-1]) + 255) // 256, nPeriods), (256,),
-            (bestGPU, cumResidualGPU, weightedGPU, baseGPU, self.signalGPU, self.overshootGPU,
-             self.widthsGPU, cp.asarray(selected), cp.asarray(offsets.astype(np.int32)),
-             cp.asarray(strides), periodMaskGPU, np.int32(len(selected)), np.int32(len(self.durations)),
-             np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min))
+        lanes = lanes_per_window(strides)
+        selectedGPU = cp.asarray(selected)
+        offsetsGPU = cp.asarray(offsets.astype(np.int32))
+        stridesGPU = cp.asarray(strides)
+        yBegin = 0
+        while yBegin < len(selected):
+            G = int(lanes[yBegin])
+            yEnd = yBegin + 1
+            while yEnd < len(selected) and lanes[yEnd] == G:
+                yEnd += 1
+            nWindows = int(offsets[yEnd] - offsets[yBegin])
+            module.get_function(f"searchChi2_G{G}")(
+                ((nWindows * G + 255) // 256, nPeriods), (256,),
+                (bestGPU, cumResidualGPU, weightedGPU, baseGPU, self.signalGPU, self.overshootGPU,
+                 self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
+                 np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
+                 np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min))
+            yBegin = yEnd
         return bestGPU
 
     def chi2_batch(self, periods, size, refine):
