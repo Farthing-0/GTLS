@@ -3,6 +3,9 @@ compare them with a saved run.
 
     python bench/window_lanes/regress.py save ref.npz      # e.g. on main
     python bench/window_lanes/regress.py compare ref.npz   # on the branch under test
+    python bench/window_lanes/regress.py compare ref.npz --save new.npz   # both in one run
+
+An optional comma-separated list of case names restricts the run to those cases.
 """
 import pathlib, sys, time
 import numpy as np, cupy as cp
@@ -121,10 +124,18 @@ def compare(ref, new):
 
 
 if __name__ == "__main__":
-    mode, path = sys.argv[1], sys.argv[2]
-    only = sys.argv[3].split(",") if len(sys.argv) > 3 else None
+    args = sys.argv[1:]
+    save_to = None
+    if "--save" in args:
+        i = args.index("--save")
+        save_to = args[i + 1]
+        del args[i:i + 2]
+    mode, path = args[0], args[1]
+    only = args[2].split(",") if len(args) > 2 else None
     res = run(only)
     if mode == "save":
         np.savez(path, **res)
     else:
+        if save_to:
+            np.savez(save_to, **res)
         compare(dict(np.load(path)), res)
