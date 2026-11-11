@@ -8,7 +8,6 @@
 |---|---|
 | `lanes.cu` | 微基准内核：G 个线程合作计算一个窗口（G = 1 即原内核的做法，G = 32 即一个 warp 算一个窗口），每次启动只处理一个时长 |
 | `bench.py` | 对每个窗口长度 L、每个 G 测量单个窗口的耗时，并输出容量模型的预测值 |
-| `end_to_end.py` | 在原流程里替换 `searchChi2`，比较三种方案的速度和结果（针对第 7 节之前的接口） |
 | `regress.py` | 用一组固定的光变曲线运行完整流程，保存或比较全部结果和每个内核的耗时 |
 | `results/rtx3090_*.csv` | 在 RTX 3090（cc 8.6）上测得的原始数据 |
 
@@ -71,7 +70,7 @@ G_cap = T_SM · b · S / C_L1        (C_L1：每个 SM 可用的 L1 字节数)
 
 （G = 1 的平均值被大 L 主导；这些 L 在网格上是均匀取的，不代表真实的时长分布。）
 
-端到端结果（`end_to_end.py`，单卡，热启动）：
+端到端结果（单卡，热启动；当时用的是对原 `searchChi2` 做 monkeypatch 的临时脚本，已在第 7 节的实现后删除，现由 `regress.py` 取代）：
 
 | 数据 | N | 现行 | warp, L ≥ 256 | **G ≥ S/8** |
 |---|---|---|---|---|
@@ -121,7 +120,7 @@ G_cap = T_SM · b · S / C_L1        (C_L1：每个 SM 可用的 L1 字节数)
   ```bash
   python bench/window_lanes/bench.py --out results/<gpu>_default.csv
   python bench/window_lanes/bench.py --margin 0.01 --out results/<gpu>_margin0.01.csv
-  python bench/window_lanes/end_to_end.py
+  python bench/window_lanes/regress.py save results/<gpu>_regress.npz   # 完整流程的结果与逐内核耗时
   ```
 
 - 如果 1650 / A100 上测出的常数明显偏离 8，可以在首次运行时自动标定：对 3–4 个 S 值、每个 S 两到三个相邻的 G 做测量，耗时约 1 s，结果按设备型号和内核版本缓存。这样定出的值仍然是形式化的（"在本机上使 χ² 内核单窗口耗时最小的 G"），只是不依赖手册数据。
