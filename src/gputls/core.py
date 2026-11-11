@@ -60,6 +60,9 @@ def find_nearest_indices(a, b):
 
 EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
 SCAN_THREADS = 512  # threads per row of the scan kernels
+MAX_BATCH = 65535  # periods are the y dimension of the kernel grids
+BATCHES_MIN = 30  # the first pass is split into at least this many batches
+MEMORY_FRACTION = 0.9  # share of the free device memory used by one batch
 
 
 def start_strides(widths, margin):
@@ -162,18 +165,20 @@ class GPUSearch:
              cp.asarray(self.durations).astype(cp.int32), durationBoolArrayGPU))
         return durationBoolArrayGPU
 
-    def best_keys(self, periods, durationsBool, margin):
+    def best_keys(self, periods, periodMaskGPU, margin):
         """Packed lowest chi2 and its location of each period (see searchChi2 and decode_keys).
 
-        The location is durationIndex * tSize + start, with durationIndex counting the
-        durations selected by durationsBool. Start points are tested about margin of a
-        duration apart (every point for margin = 0).
+        periodMaskGPU (periods x durations, from duration_mask) selects the durations searched
+        for each period. The location is durationIndex * tSize + start, with durationIndex
+        counting the durations used by any period of the batch. Start points are tested about
+        margin of a duration apart (every point for margin = 0).
         """
         module = self.module
         tSize = self.tSize
         patchedSize = self.patchedDatasSize
         nPeriods = len(periods)
 
+        durationsBool = cp.any(periodMaskGPU, axis=0).get()
         selected = np.flatnonzero(durationsBool).astype(np.int32)
         strides = start_strides(self.durations[selected], margin)
         offsets = np.concatenate(([0], np.cumsum(-(-tSize // strides))))
@@ -218,28 +223,28 @@ class GPUSearch:
             ((int(offsets[-1]) + 255) // 256, nPeriods), (256,),
             (bestGPU, cumResidualGPU, weightedGPU, baseGPU, self.signalGPU, self.overshootGPU,
              self.widthsGPU, cp.asarray(selected), cp.asarray(offsets.astype(np.int32)),
-             cp.asarray(strides), np.int32(len(selected)), np.int32(tSize), np.int32(patchedSize),
-             np.int32(self.maxWidth), self.transit_depth_min))
+             cp.asarray(strides), periodMaskGPU, np.int32(len(selected)), np.int32(len(self.durations)),
+             np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min))
         return bestGPU
 
     def chi2_batch(self, periods, size, refine):
         """Lowest chi2 of each period of one batch, padded to size periods.
 
-        All periods of a batch are searched over the union of their plausible durations,
-        so results depend on the batching, not on the device evaluating each batch.
+        Each period is searched over its own plausible durations only, so results depend
+        neither on the batching nor on the device evaluating each batch. A period without
+        plausible duration gets the chi2 of the light curve without transit.
         """
         valid_range = len(periods)
-        # Durations needed by any period of this batch
-        durationsBool = cp.any(self.duration_mask(periods), axis=0).get()
-        if not durationsBool.any():
-            return np.full(valid_range, self.constant_residual, dtype=np.float32)
-
         # Pad the last batch with its last period, so all batches have the same shape
         if valid_range < size:
             periods = np.append(periods, np.full(size - valid_range, periods[-1]))
 
+        periodMaskGPU = self.duration_mask(periods)
+        if not bool(periodMaskGPU.any()):
+            return np.full(valid_range, self.constant_residual, dtype=np.float32)
+
         margin = self.T0_refine_margin if refine else self.T0_fit_margin
-        chi2, _ = decode_keys(self.best_keys(periods, durationsBool, margin)[:valid_range])
+        chi2, _ = decode_keys(self.best_keys(periods, periodMaskGPU, margin)[:valid_range])
         chi2 = cp.where(cp.isfinite(chi2), chi2, self.constant_residual)
         return chi2.astype(cp.float32).get()
 
@@ -260,21 +265,42 @@ class MultiGPUSearch:
     def primary(self):
         return self.searches[0]
 
+    def bytes_per_period(self):
+        """Peak device memory of one period of a best_keys batch, in bytes.
+
+        Live arrays peak in scanResidual at 20 P + 16 (P = patchedDatasSize): residual (4 P),
+        weighted (8 P), cumResidual (8 P), base and periods. The memory pool places residual
+        inside the freed 8 N phase buffer of the sort and cannot return that buffer to the
+        driver, so the device footprint is 8 N + 16 P + 16 (N = tSize), plus one byte per
+        duration for the period mask of searchChi2. Independent of T0_fit_margin.
+        """
+        s = self.primary
+        return 8 * s.tSize + 16 * s.patchedDatasSize + len(s.durations) + 16
+
+    @staticmethod
+    def available_memory(device_id):
+        """Free device memory, including blocks cached but unused by the CuPy memory pool."""
+        with cp.cuda.Device(device_id):
+            pool = cp.get_default_memory_pool()
+            return cp.cuda.Device(device_id).mem_info[0] + pool.total_bytes() - pool.used_bytes()
+
     def batch_size(self, n_periods):
-        """Periods per batch, limited by the free memory of the fullest device."""
-        free = min(cp.cuda.Device(device_id).mem_info[0] for device_id in self.device_ids)
-        patchedDatasSize = self.primary.patchedDatasSize
-        nDurations = len(self.primary.durations)
-        singleCalcPeriods_max = free / (
-            5 * (patchedDatasSize * 2 + 2 + nDurations * patchedDatasSize * 4 + 2 * nDurations))
-        singleCalcPeriods = int(np.min([np.floor(singleCalcPeriods_max), n_periods / 30]))
-        if singleCalcPeriods < 15:
-            singleCalcPeriods = int(singleCalcPeriods / 1.1)
-        return max(singleCalcPeriods, 1)
+        """Periods per batch: at least BATCHES_MIN batches (progress bar and balance between
+        devices), within the memory of the fullest device. Results do not depend on it."""
+        free = min(self.available_memory(device_id) for device_id in self.device_ids)
+        by_memory = int(MEMORY_FRACTION * free // self.bytes_per_period())
+        if free < self.bytes_per_period():
+            raise MemoryError(
+                f"One period needs {self.bytes_per_period() / 2**20:.0f} MiB of GPU memory, "
+                f"{free / 2**20:.0f} MiB are free")
+        return max(min(by_memory, int(n_periods / BATCHES_MIN), MAX_BATCH), 1)
 
     def chi2(self, periods, singleCalcPeriods, refine, pbar=None):
         """Lowest chi2 of each period, evaluated in batches of singleCalcPeriods periods."""
         periods = np.asarray(periods)
+        # Short lists (the refinement passes) are padded to their own length, not to a full batch;
+        # padding repeats the last period, so the searched durations are the same either way
+        singleCalcPeriods = max(min(singleCalcPeriods, len(periods)), 1)
         chi2 = np.empty(len(periods), dtype=np.float32)
         batches = iter(range(0, len(periods), singleCalcPeriods))
         lock = threading.Lock()
@@ -403,11 +429,12 @@ def search_single_period(search, period, t, y, dy):
     tSize = search.tSize
     maxDuration = search.maxDuration
 
-    durationsBool = search.duration_mask(np.array([period]))[0].get()
+    periodMaskGPU = search.duration_mask(np.array([period]))
+    durationsBool = periodMaskGPU[0].get()
     durations = search.durations[durationsBool]
     single_lc_cache_overview = search.lc_cache_overview[durationsBool]
 
-    chi2, location = decode_keys(search.best_keys(np.array([period]), durationsBool, margin=0))
+    chi2, location = decode_keys(search.best_keys(np.array([period]), periodMaskGPU, margin=0))
     bestLocation = int(location[0]) if bool(cp.isfinite(chi2[0])) else 0
 
     durationIndex = np.floor(bestLocation / (tSize)).astype(int)

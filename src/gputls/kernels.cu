@@ -247,7 +247,9 @@ extern "C"{
      * (the algebraic expansion of TLS 2.0). The mean depth comes from a float64 prefix sum of r.
      *
      * Work items of a period are the start points of all searched durations, laid out by
-     * `offsets`; start points of duration y are multiples of strides[y].
+     * `offsets`; start points of duration y are multiples of strides[y]. The searched durations
+     * are the union over the batch; a period only tests those of its own row of periodMask
+     * (physically plausible durations, see durationBool), so results do not depend on the batch.
      * best[z] receives min over work items of (orderedKey(chi2) << 32 | y * tSize + start), so
      * ties resolve to the first duration, then the first start point.
      */
@@ -261,8 +263,9 @@ extern "C"{
                                const int* selected,           // (nSelected) searched durations
                                const int* offsets,            // (nSelected + 1)
                                const int* strides,            // (nSelected)
-                               int nSelected, int tSize, int patchedSize, int maxWidth,
-                               float transitDepthMin) {
+                               const bool* periodMask,        // (periods, nDurations)
+                               int nSelected, int nDurations, int tSize, int patchedSize,
+                               int maxWidth, float transitDepthMin) {
         int z = blockIdx.y;
         int g = blockIdx.x * blockDim.x + threadIdx.x;
         unsigned long long key = 0xffffffffffffffffull;
@@ -279,7 +282,7 @@ extern "C"{
             double windowSum = C[start + L - 1] - (start > 0 ? C[start - 1] : 0.0);
             float meanDepth = (float)(windowSum / L);
 
-            if (meanDepth > transitDepthMin) {
+            if (periodMask[(long long)z * nDurations + d] && meanDepth > transitDepthMin) {
                 float k = meanDepth * overshoot[d] * 2.0f;  // 2 = 1 / SIGNAL_DEPTH
                 const float2* x = patchedWeighted + (long long)z * patchedSize + start;
                 const float* s = signal + (long long)d * maxWidth;
