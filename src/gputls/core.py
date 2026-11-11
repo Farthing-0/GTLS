@@ -157,6 +157,20 @@ class GPUSearch:
         self.transit_depth_min = np.float32(transit_depth_min)
         self.constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
 
+        # chi2 without transit, sum of w r^2 as searchChi2 weights the points (patchWeighted):
+        # it does not depend on the order of the points, so it is the same for every period
+        dy2 = cp.maximum(self.dyGPU * self.dyGPU, cp.float32(1e-10))
+        weightedResidual = (cp.float32(1.0) / dy2) * self.residualGPU
+        self.base = float(cp.sum(weightedResidual.astype(cp.float64) * self.residualGPU.astype(cp.float64)))
+
+        # Fixed-point scale 2^E of the residual prefix sums (scanResidual): the largest E with
+        # patchedDatasSize * max|r| * 2^E < 2^62, so no prefix sum can overflow int64
+        bound = self.patchedDatasSize * float(cp.max(cp.abs(self.residualGPU)))
+        exponent = 62 - int(np.ceil(np.log2(bound))) if bound > 0 else 62
+        exponent = int(np.clip(exponent, -100, 100))
+        self.fixedScale = np.float32(2.0 ** exponent)
+        self.fixedInvScale = np.float64(2.0 ** -exponent)
+
         # Template depth profiles s = 1 - lc, one row per duration
         self.maxWidth = int(np.max(durations))
         signal = np.zeros((len(durations), self.maxWidth), dtype=np.float32)
@@ -232,12 +246,11 @@ class GPUSearch:
              np.int32(tSize), np.int32(patchedSize)))
         del sortIndexGPU
 
-        # Prefix sums of the residuals and the chi2 of the light curve without transit
-        cumResidualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.float64)
-        baseGPU = cp.empty(nPeriods, dtype=cp.float64)
+        # Fixed-point prefix sums of the residuals
+        cumResidualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.int64)
         module.get_function("scanResidual")(
             (nPeriods,), (SCAN_THREADS,),
-            (residualGPU, weightedGPU, cumResidualGPU, baseGPU, np.int32(tSize), np.int32(patchedSize)))
+            (residualGPU, cumResidualGPU, self.fixedScale, np.int32(patchedSize)))
         del residualGPU
 
         # One launch per run of durations sharing the same threads per window (the strides,
@@ -256,7 +269,8 @@ class GPUSearch:
             nWindows = int(offsets[yEnd] - offsets[yBegin])
             module.get_function(f"searchChi2_G{G}")(
                 ((nWindows * G + 255) // 256, nPeriods), (256,),
-                (bestGPU, cumResidualGPU, weightedGPU, baseGPU, self.signalGPU, self.overshootGPU,
+                (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, np.float64(self.base),
+                 self.signalGPU, self.overshootGPU,
                  self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
                  np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
                  np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min))
@@ -305,7 +319,7 @@ class MultiGPUSearch:
         """Peak device memory of one period of a best_keys batch, in bytes.
 
         Live arrays peak in scanResidual at 20 P + 16 (P = patchedDatasSize): residual (4 P),
-        weighted (8 P), cumResidual (8 P), base and periods. The memory pool places residual
+        weighted (8 P), cumResidual (8 P) and periods (bounded by 16 bytes). The memory pool places residual
         inside the freed 8 N phase buffer of the sort and cannot return that buffer to the
         driver, so the device footprint is 8 N + 16 P + 16 (N = tSize), plus one byte per
         duration for the period mask of searchChi2. Independent of T0_fit_margin.

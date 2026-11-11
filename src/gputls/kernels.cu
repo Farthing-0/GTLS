@@ -206,31 +206,24 @@ extern "C"{
     }
 
     /**
-     * Inclusive float64 prefix sum of each row of the patched residuals (one block per row),
-     * and base = sum of w r^2 over the first tSize (not patched) points of the row.
+     * Inclusive prefix sum of each row of the patched residuals (one block per row), in fixed
+     * point: every residual is rounded to a multiple of 1 / scale (scale = 2^E, chosen by
+     * GPUSearch so the row sums fit in 63 bits), then summed exactly in int64. Window sums are
+     * exact differences of two prefix sums, whatever the row length and the residual offset.
      */
-    __global__ void scanResidual(const float* patchedResidual, const float2* patchedWeighted,
-                                 double* cumResidual, double* base, int tSize, int patchedSize) {
+    __global__ void scanResidual(const float* patchedResidual, long long* cumResidual, float scale,
+                                 int patchedSize) {
         long long o = (long long)blockIdx.x * patchedSize;
-        double carry = 0.0;
-        double chi2 = 0.0;
+        long long carry = 0;
         for (int tile = 0; tile < patchedSize; tile += blockDim.x) {
             int q = tile + threadIdx.x;
-            double r = q < patchedSize ? (double)patchedResidual[o + q] : 0.0;
-            if (q < tSize) {
-                chi2 += (double)patchedWeighted[o + q].x * r;
-            }
-            double total;
-            double inclusive = blockInclusiveScan(r, &total);
+            long long r = q < patchedSize ? __float2ll_rn(patchedResidual[o + q] * scale) : 0;
+            long long total;
+            long long inclusive = blockInclusiveScan(r, &total);
             if (q < patchedSize) {
                 cumResidual[o + q] = carry + inclusive;
             }
             carry += total;
-        }
-        double total;
-        blockInclusiveScan(chi2, &total);
-        if (threadIdx.x == 0) {
-            base[blockIdx.x] = total;
         }
     }
 
@@ -249,7 +242,8 @@ __device__ __forceinline__ unsigned int orderedKey(float f) {
  * the chi2
  *     sum_{all points} w r^2 - sum_{window} w r^2 + sum_{window} w (r - k s)^2
  * is evaluated as base - 2 k A_R + k^2 A_2 with A_R = sum s_i (w r)_i, A_2 = sum s_i^2 w_i
- * (the algebraic expansion of TLS 2.0). The mean depth comes from a float64 prefix sum of r.
+ * (the algebraic expansion of TLS 2.0); base = sum_{all points} w r^2 does not depend on the
+ * period. The mean depth comes from the fixed-point prefix sums of r (see scanResidual).
  *
  * Work items of a period are the start points of all searched durations, laid out by
  * `offsets`; start points of duration y are multiples of strides[y]. The searched durations
@@ -267,9 +261,10 @@ __device__ __forceinline__ unsigned int orderedKey(float f) {
 template <int G>
 __device__ __forceinline__ void searchChi2Lanes(
         unsigned long long* best,
-        const double* cumResidual,     // (periods, patchedSize), inclusive
+        const long long* cumResidual,  // (periods, patchedSize), inclusive, fixed point
+        double invScale,               // 1 / scale of cumResidual
         const float2* patchedWeighted, // (periods, patchedSize)
-        const double* base,            // (periods)
+        double base,                   // sum of w r^2 over all points
         const float* signal,           // (durations, maxWidth)
         const float* overshoot,        // (durations)
         const int* widths,             // (durations)
@@ -299,8 +294,8 @@ __device__ __forceinline__ void searchChi2Lanes(
         d = selected[y];
         int L = widths[d];
         if (periodMask[(long long)z * nDurations + d]) {
-            const double* C = cumResidual + (long long)z * patchedSize;
-            double windowSum = C[start + L - 1] - (start > 0 ? C[start - 1] : 0.0);
+            const long long* C = cumResidual + (long long)z * patchedSize;
+            double windowSum = (double)(C[start + L - 1] - (start > 0 ? C[start - 1] : 0)) * invScale;
             meanDepth = (float)(windowSum / L);
             active = meanDepth > transitDepthMin;  // the same for all G lanes of the window
         }
@@ -324,7 +319,7 @@ __device__ __forceinline__ void searchChi2Lanes(
     }
     if (active && sub == 0) {
         float k = meanDepth * overshoot[d] * 2.0f;  // 2 = 1 / SIGNAL_DEPTH
-        float chi2 = (float)(base[z] + (double)(k * (k * a2 - 2.0f * ar)));
+        float chi2 = (float)(base + (double)(k * (k * a2 - 2.0f * ar)));
         key = ((unsigned long long)orderedKey(chi2) << 32) | (unsigned int)(y * tSize + start);
     }
 
@@ -356,12 +351,12 @@ __device__ __forceinline__ void searchChi2Lanes(
 // searchChi2_G1 ... searchChi2_G32: G threads per window
 #define SEARCH_CHI2(G)                                                                            \
     extern "C" __global__ void searchChi2_G##G(                                                   \
-            unsigned long long* best, const double* cumResidual, const float2* patchedWeighted,   \
-            const double* base, const float* signal, const float* overshoot, const int* widths,   \
+            unsigned long long* best, const long long* cumResidual, double invScale,              \
+            const float2* patchedWeighted, double base, const float* signal, const float* overshoot, const int* widths,   \
             const int* selected, const int* offsets, const int* strides, const bool* periodMask,  \
             int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth,       \
             float transitDepthMin) {                                                              \
-        searchChi2Lanes<G>(best, cumResidual, patchedWeighted, base, signal, overshoot, widths,   \
+        searchChi2Lanes<G>(best, cumResidual, invScale, patchedWeighted, base, signal, overshoot, widths,   \
                            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations,      \
                            tSize, patchedSize, maxWidth, transitDepthMin);                        \
     }
