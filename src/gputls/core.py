@@ -87,8 +87,9 @@ def lanes_per_window(strides):
     One read instruction of a warp covers 32 / G windows of G consecutive points each, spaced
     stride points apart: it spans stride / G times the bytes it uses, and the overlap of
     neighbouring windows is reused stride / G steps later. Keeping stride / G <= 8 keeps both
-    small (bench/window_lanes: within a few percent of the fastest G for every stride, data
-    size, batch size and L1 size measured). Depends only on the stride, not on the device.
+    small (bench/window_lanes on branch perf/window-lanes: within a few percent of the fastest
+    G for every stride, data size, batch size and L1 size measured). Depends only on the
+    stride, not on the device.
     """
     needed = np.asarray(strides, dtype=np.int64) * POINT_BYTES / LANE_STEP_BYTES
     lanes = np.full(needed.shape, WINDOW_LANES[-1], dtype=np.int32)
