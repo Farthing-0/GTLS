@@ -35,10 +35,10 @@ _load = core.load_module
 core.load_module = lambda: TimedModule(_load())
 
 
-def box(days, cadence_min, offset=0.0, seed=0):
+def box(days, cadence_min, offset=0.0, seed=0, flux_offset=0.0):
     rng = np.random.default_rng(seed)
     t = np.arange(0, days, cadence_min / 1440.) + offset
-    y = 1 + rng.normal(0, 5e-4, t.size)
+    y = 1 + flux_offset + rng.normal(0, 5e-4, t.size)
     ph = ((t - offset - 2.1 + 7.3 / 2) % 7.3) - 7.3 / 2
     y[np.abs(ph) < 0.06] -= 1e-3
     return t, y, np.full_like(t, 5e-4)
@@ -72,6 +72,9 @@ CASES = {
     "kepler_4q_bjd": lambda: box(360, 29.4, offset=2454833.0),
     "tess20s_27d": lambda: box(27, 1 / 3),
     "kepler_17q": lambda: box(1460, 29.4),
+    # badly normalized flux: large residual prefix sums (stress for their precision)
+    "kepler_4q_flux-1e-3": lambda: box(360, 29.4, flux_offset=-1e-3),
+    "tess20s_flux-1e-2": lambda: box(27, 1 / 3, flux_offset=-1e-2),
 }
 FIELDS = ["periods", "raw_chi2", "chi2", "power", "period", "T0", "duration", "depth", "SDE", "snr", "snrFit",
           "transitTimes", "durationPoints"]
