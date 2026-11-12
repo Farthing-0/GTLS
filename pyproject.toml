@@ -32,11 +32,16 @@ dependencies = [
   "numba",
   "tqdm",
   "batman-package",
+  # batman imports distutils, which Python 3.12 removed; setuptools provides it
+  "setuptools",
 ]
 
 [project.optional-dependencies]
+# The kernels are compiled at runtime and need the CUDA headers: [ctk] installs them from
+# pip. cupy-cuda11x has no [ctk] extra, so CUDA 11 needs a local CUDA Toolkit.
 cuda11 = ["cupy-cuda11x"]
-cuda12 = ["cupy-cuda12x"]
+cuda12 = ["cupy-cuda12x[ctk]"]
+cuda13 = ["cupy-cuda13x[ctk]"]
 test = ["pytest", "astropy", "lightkurve"]
 
 [project.urls]
