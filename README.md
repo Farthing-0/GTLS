@@ -37,9 +37,20 @@ pip install gputls
 Or let pip pick a CuPy build for you:
 
 ```bash
-pip install "gputls[cuda12]"   # CUDA 12.x
-pip install "gputls[cuda11]"   # CUDA 11.x
+pip install "gputls[cuda13]"   # CUDA 13.x, installs cupy-cuda13x[ctk]
+pip install "gputls[cuda12]"   # CUDA 12.x, installs cupy-cuda12x[ctk]
+pip install "gputls[cuda11]"   # CUDA 11.x, installs cupy-cuda11x (needs a local CUDA Toolkit)
 ```
+
+GTLS compiles its CUDA kernels at runtime, so CuPy must be able to find the CUDA
+headers, otherwise the search fails with `Failed to find CUDA headers`:
+
+- CUDA 12 / 13: the `cuda12` / `cuda13` extras install the headers from pip through
+  CuPy's `[ctk]` extra. If you install CuPy yourself, use `pip install "cupy-cuda12x[ctk]"`
+  (or `cupy-cuda13x[ctk]`), or point `CUDA_PATH` to a local CUDA Toolkit.
+- CUDA 11: `cupy-cuda11x` has no `[ctk]` extra (and stops at CuPy 13), so install the
+  [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) and set `CUDA_PATH`
+  if it is not in the default location (e.g. `export CUDA_PATH=/usr/local/cuda-11.8`).
 
 To install from source:
 
