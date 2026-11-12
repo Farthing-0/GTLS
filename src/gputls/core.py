@@ -75,7 +75,7 @@ def start_strides(widths, margin):
     return np.where(widths > skip, widths // skip, 1).astype(np.int32)
 
 
-WINDOW_LANES = (1, 2, 4, 8, 16, 32)  # threads per window of the searchChi2_G* kernels
+WINDOW_LANES = (1, 2, 4, 8, 16, 32)  # threads per window of the searchChi2G* kernels
 LANE_STEP_BYTES = 64  # bytes of start stride per thread of a window, see lanes_per_window
 POINT_BYTES = 8  # bytes read per point by searchChi2 (float2 of w r and w)
 
@@ -271,7 +271,7 @@ class GPUSearch:
             while yEnd < len(selected) and lanes[yEnd] == G:
                 yEnd += 1
             nWindows = int(offsets[yEnd] - offsets[yBegin])
-            module.get_function(f"searchChi2_G{G}")(
+            module.get_function(f"searchChi2G{G}")(
                 ((nWindows * G + 255) // 256, nPeriods), (256,),
                 (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
                  self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
