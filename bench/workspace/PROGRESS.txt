@@ -625,3 +625,14 @@ Certified integer screening prefixes
   used/total pool bytes without diagnostic GC. Mixed prefix1.516553 ->0.508431s;
   constant prefix1.017921 ->0.272412s. Looser quantization bounds modestly increase
   screening time; net API elapsed still improves8.75% mixed and6.04% constant.
+
+Follow-up profiling and local experiments
+  NCU on the current coarse mixed screening kernel: FP64 pipeline82.5%, DRAM8.5%,
+  L2 hit91.0%, registers134/thread and achieved occupancy21.1%. FP64 arithmetic
+  remains the principal measured bottleneck after integer prefix acceleration.
+  Local32 integer accumulation: prefix37.768 ->35.026ms, but total666.061
+  ->665.961ms in the same short batches. Keep the simpler64-bit implementation.
+  Exact seed upper bounds preserve original FP32 statistics in36 independent
+  comparisons (all G, packed/unpacked, three sample grids). Mixed target243.785
+  ->231.185ms for32 samples/duration;128/512 give232.040/240.917ms. Several seeds
+  add work without a larger gain. Uniform-path evaluation remains experimental.
