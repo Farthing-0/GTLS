@@ -383,3 +383,11 @@ Screening rounding-budget checkpoint
   GPU0 five752-period batches: screen228.940 ->208.359ms; GPU1226.184
   ->205.743ms. Every exact winner key unchanged. Combined CPU/GPU changes
   pass92 tests with both3090s visible; no skips. Full730d validation next.
+  Full budget/reconstruction validation at7894587: mixed11.816806s,
+  constant12.508825s. Both24 fields bitwise equal, no thermal flags.
+  Mixed timing overlapped NCU on GPU1 (possible shared host/PCIe contention);
+  retain that qualification rather than repeating the same unchanged run.
+  Mixed coarse screen1.936 ->1.659s. Prefix2.640s remains largest.
+  Prefix NCU on GPU1:752 rows form0.8 occupancy waves,162 registers/thread,
+  49.5% DRAM utilization. Shared transpose regresses on GPU0, while packing
+  mass writes gives only~4%; exploring independent row sections next.
