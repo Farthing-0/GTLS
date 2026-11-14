@@ -257,10 +257,14 @@ class GPUSearch:
             (residualGPU, cumResidualGPU, self.fixedScale, np.int32(patchedSize)))
         del residualGPU
 
-        # One launch per run of durations sharing the same threads per window (the strides,
-        # and so the lanes, grow with the duration)
+        # Adjacent windows share input loads for the longer windows. Group within each
+        # duration, so an incomplete group never consumes starts from the next duration.
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
         lanes = lanes_per_window(strides)
+        if np.any(lanes >= 8):
+            adjacent = np.where(lanes == 32, 4, np.where(lanes >= 8, 2, 1))
+            group_counts = (np.diff(offsets) + adjacent - 1) // adjacent
+            offsets = np.concatenate(([0], np.cumsum(group_counts)))
         selectedGPU = cp.asarray(selected)
         offsetsGPU = cp.asarray(offsets.astype(np.int32))
         stridesGPU = cp.asarray(strides)
@@ -270,9 +274,10 @@ class GPUSearch:
             yEnd = yBegin + 1
             while yEnd < len(selected) and lanes[yEnd] == G:
                 yEnd += 1
-            nWindows = int(offsets[yEnd] - offsets[yBegin])
-            module.get_function(f"searchChi2G{G}")(
-                ((nWindows * G + 255) // 256, nPeriods), (256,),
+            nGroups = int(offsets[yEnd] - offsets[yBegin])
+            kernel = f"searchChi2AdjacentG{G}" if G >= 8 else f"searchChi2G{G}"
+            module.get_function(kernel)(
+                ((nGroups * G + 255) // 256, nPeriods), (256,),
                 (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
                  self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
                  np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
@@ -281,16 +286,14 @@ class GPUSearch:
         return bestGPU
 
     def chi2_batch(self, periods, size, refine):
-        """Lowest chi2 of each period of one batch, padded to size periods.
+        """Lowest chi2 of each period of one batch, using its actual length.
 
         Each period is searched over its own plausible durations only, so results depend
         neither on the batching nor on the device evaluating each batch. A period without
         plausible duration gets the chi2 of the light curve without transit.
+        size is the planned batch capacity; the final batch need not fill it.
         """
         valid_range = len(periods)
-        # Pad the last batch with its last period, so all batches have the same shape
-        if valid_range < size:
-            periods = np.append(periods, np.full(size - valid_range, periods[-1]))
 
         periodMaskGPU = self.duration_mask(periods)
         if not bool(periodMaskGPU.any()):
@@ -351,8 +354,7 @@ class MultiGPUSearch:
     def chi2(self, periods, singleCalcPeriods, refine, pbar=None):
         """Lowest chi2 of each period, evaluated in batches of singleCalcPeriods periods."""
         periods = np.asarray(periods)
-        # Short lists (the refinement passes) are padded to their own length, not to a full batch;
-        # padding repeats the last period, so the searched durations are the same either way
+        # Bound the planned capacity for short lists such as the refinement passes.
         singleCalcPeriods = max(min(singleCalcPeriods, len(periods)), 1)
         chi2 = np.empty(len(periods), dtype=np.float32)
         batches = iter(range(0, len(periods), singleCalcPeriods))

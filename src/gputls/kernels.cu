@@ -371,3 +371,167 @@ SEARCH_CHI2(4)
 SEARCH_CHI2(8)
 SEARCH_CHI2(16)
 SEARCH_CHI2(32)
+
+/**
+ * Q adjacent windows share one stream of (w*r, w). Their overlapping interior
+ * loads each input point once, while retaining both sums for arbitrary weights.
+ * Each physical lane accumulates one residue class modulo G in every window.
+ * Rotating those accumulators back to the original lanes before the XOR sum
+ * preserves the original per-lane FMA order and reduction tree, including ties.
+ * offsets counts groups of Q windows separately for each selected duration.
+ */
+__device__ __forceinline__ void storeAdjacentBest(unsigned long long key,
+                                                   unsigned long long* best, int period) {
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        unsigned long long other = __shfl_down_sync(0xffffffff, key, offset);
+        key = other < key ? other : key;
+    }
+    __shared__ unsigned long long warpMin[32];
+    int lane = threadIdx.x & 31;
+    int warp = threadIdx.x >> 5;
+    if (lane == 0) warpMin[warp] = key;
+    __syncthreads();
+    if (warp == 0) {
+        key = lane < blockDim.x / 32 ? warpMin[lane] : 0xffffffffffffffffull;
+        for (int offset = 16; offset > 0; offset >>= 1) {
+            unsigned long long other = __shfl_down_sync(0xffffffff, key, offset);
+            key = other < key ? other : key;
+        }
+        if (lane == 0 && key != 0xffffffffffffffffull) atomicMin(best + period, key);
+    }
+}
+
+#define REUSE_ARGS unsigned long long* best, const long long* cumResidual, float invScale, \
+    const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+    const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+    int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin
+#define REUSE_PASS best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+    selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+    maxWidth, transitDepthMin
+
+template<int G, int Q>
+__device__ __forceinline__ void searchAdjacentWindows(REUSE_ARGS) {
+    int period = blockIdx.y;
+    int lane = threadIdx.x % G;
+    int group = offsets[yBegin] + (blockIdx.x * blockDim.x + threadIdx.x) / G;
+    float cross[Q] = {}, square[Q] = {}, depth[Q] = {};
+    bool active[Q] = {};
+    int selectedIndex = yBegin, start = 0, duration = 0, stride = 0, width = 0;
+    bool any = false;
+    if (group < offsets[yEnd]) {
+        while (offsets[selectedIndex + 1] <= group) ++selectedIndex;
+        duration = selected[selectedIndex];
+        stride = strides[selectedIndex];
+        width = widths[duration];
+        start = (group - offsets[selectedIndex]) * Q * stride;
+        if (periodMask[(long long)period * nDurations + duration]) {
+            const long long* row = cumResidual + (long long)period * patchedSize;
+            #pragma unroll
+            for (int q = 0; q < Q; ++q) {
+                int ws = start + q * stride;
+                if (ws < tSize) {
+                    long long sum = row[ws + width - 1] - (ws > 0 ? row[ws - 1] : 0);
+                    depth[q] = __fdiv_rn(__ll2float_rn(sum) * invScale, (float)width);
+                    active[q] = depth[q] > transitDepthMin;
+                    any |= active[q];
+                }
+            }
+        }
+        if (any) {
+            const float* h = signal + (long long)duration * maxWidth;
+            const float2* data = patchedWeighted + (long long)period * patchedSize + start;
+            bool all = true;
+            #pragma unroll
+            for (int q = 0; q < Q; ++q) all &= active[q];
+            if (all) {
+                // The common interior has no per-point activity or bounds branches.
+                int j = lane;
+                for (; j < min(width, (Q - 1) * stride); j += G) {
+                    float2 v = start + j < patchedSize ? data[j] : make_float2(0, 0);
+                    #pragma unroll
+                    for (int q = 0; q < Q; ++q) {
+                        int k = j - q * stride;
+                        if (active[q] && k >= 0 && k < width) {
+                            float s = h[k];
+                            cross[q] = fmaf(s, v.x, cross[q]);
+                            square[q] = fmaf(s * s, v.y, square[q]);
+                        }
+                    }
+                }
+                for (; j < width; j += G) {
+                    float2 v = data[j];
+                    #pragma unroll
+                    for (int q = 0; q < Q; ++q) {
+                        float s = h[j - q * stride];
+                        cross[q] = fmaf(s, v.x, cross[q]);
+                        square[q] = fmaf(s * s, v.y, square[q]);
+                    }
+                }
+                for (; j < width + (Q - 1) * stride; j += G) {
+                    float2 v = start + j < patchedSize ? data[j] : make_float2(0, 0);
+                    #pragma unroll
+                    for (int q = 0; q < Q; ++q) {
+                        int k = j - q * stride;
+                        if (active[q] && k >= 0 && k < width) {
+                            float s = h[k];
+                            cross[q] = fmaf(s, v.x, cross[q]);
+                            square[q] = fmaf(s * s, v.y, square[q]);
+                        }
+                    }
+                }
+            } else {
+                // Stream the union once. For window q, lane ownership rotates by q*S.
+                // Undo that rotation before the original XOR reduction, preserving FP32 order.
+                for (int j = lane; j < width + (Q - 1) * stride; j += G) {
+                    bool needed = false;
+                    #pragma unroll
+                    for (int q = 0; q < Q; ++q)
+                        needed |= active[q] && j >= q * stride && j < width + q * stride;
+                    if (needed) {
+                        float2 v = data[j];
+                        #pragma unroll
+                        for (int q = 0; q < Q; ++q) {
+                            int k = j - q * stride;
+                            if (active[q] && k >= 0 && k < width) {
+                                float s = h[k];
+                                cross[q] = fmaf(s, v.x, cross[q]);
+                                square[q] = fmaf(s * s, v.y, square[q]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    unsigned long long key = 0xffffffffffffffffull;
+    #pragma unroll
+    for (int q = 0; q < Q; ++q) {
+        cross[q] = __shfl_sync(0xffffffff, cross[q], (lane + q * stride) % G, G);
+        square[q] = __shfl_sync(0xffffffff, square[q], (lane + q * stride) % G, G);
+        #pragma unroll
+        for (int offset = G / 2; offset > 0; offset >>= 1) {
+            cross[q] += __shfl_xor_sync(0xffffffff, cross[q], offset);
+            square[q] += __shfl_xor_sync(0xffffffff, square[q], offset);
+        }
+        if (active[q] && lane == 0) {
+            float amplitude = depth[q] * overshoot[duration] * 2.0f;
+            float delta = amplitude * (amplitude * square[q] - 2.0f * cross[q]);
+            unsigned long long candidate = ((unsigned long long)orderedKey(delta) << 32)
+                | (unsigned int)(selectedIndex * tSize + start + q * stride);
+            key = candidate < key ? candidate : key;
+        }
+    }
+    storeAdjacentBest(key, best, period);
+}
+
+
+#define SEARCH_ADJACENT(G,Q) \
+    extern "C" __global__ void searchChi2AdjacentG##G(REUSE_ARGS) { \
+        searchAdjacentWindows<G,Q>(REUSE_PASS); \
+    }
+SEARCH_ADJACENT(8,2)
+SEARCH_ADJACENT(16,2)
+SEARCH_ADJACENT(32,4)
+#undef SEARCH_ADJACENT
+#undef REUSE_ARGS
+#undef REUSE_PASS
