@@ -495,3 +495,15 @@ Other probes rejected during this checkpoint
   Coarse prefix launches51 ->45, prefix2.147950 ->2.070006s, patch1.130635
   ->0.989399s, compacted exact G320.142589 ->0.077695s. Full result improves
   10.276813 ->9.964720s. No unchanged variable-dy full rerun for this node.
+
+Exact phase-fraction checkpoint
+  Extract the fractional bits of nonnegative int32-range cycle counts with
+  integer operations; retain the original arithmetic for other values. No phase
+  precision changes.100012 random/boundary values and three752-row batches
+  match original phase bits/counts. GPU0 fold13.8 ->11.5ms; GPU115.5 ->14.8ms.
+  Directed FP32 bucket intervals preserve3000040 edge/random cases and complete
+  sort indices, but offer no stable pipeline gain; leave bucket arithmetic intact.
+  Recomputing phases in scatter/sort removes a buffer but adds sort cost; the
+  simple fractional extraction provides the better time/complexity tradeoff.
+  Follow-up128-bit prefix conversion passed19399 signed/rounding cases, but
+  regressed general52.89 ->65.60ms and uniform31.82 ->33.93ms; not adopted.
