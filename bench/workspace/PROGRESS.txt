@@ -127,3 +127,12 @@ A100 checkpoint complete; optimization continues
   a cooled repeat was started, then stopped immediately at user's direction.
   User requests focusing on performance-changing code, not repeated end-to-end
   timing. Continue kernel-level optimization; one full validation after a gain.
+
+Kernel-focused work after user stopped timing reruns
+  Precomputing gamma/tiny: 17.944576ms -> 17.961984ms; no gain, reverted.
+  Two double2 prefix planes: screening 18.082816ms -> 13.751296ms (1.315x),
+  with prefix values, candidate bounds and upper keys all bitwise identical.
+  One full 730-day mixed-dy validation: 33.510078s, all 24 fields match bitwise.
+  Original double4 data interleaved the correlation prefixes with mass prefixes;
+  separate contiguous planes reduce the memory footprint of sparse prefix gathers.
+  Full source snapshot: prefix-planes-730-mixed. Screening kernel probe: prefix-planes-probe.
