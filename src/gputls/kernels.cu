@@ -547,7 +547,7 @@ SEARCH_ADJACENT(32,4)
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
 // Two contiguous double2 planes per row: (D_z, D_w), then (S_abs_z, S_w).
 extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
-    constexpr int ITEMS = 4;
+    constexpr int ITEMS = 16;
     long long row = (long long)blockIdx.x * size;
     double zCarry = 0, wCarry = 0, absCarry = 0, dzCarry = 0, dwCarry = 0;
     for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {

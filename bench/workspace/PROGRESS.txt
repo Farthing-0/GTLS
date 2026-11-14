@@ -147,3 +147,31 @@ Four samples per thread in screening scan
   Full mixed-dy validation 30.477027s, every one of 24 result fields bitwise equal.
   Regression: 77 passed on both GPUs, one existing flat-SDE warning.
   Raw timing is a single new-code validation, not a repeated performance campaign.
+
+Long optimization authorization, 2026-11-14 14:49:51 UTC
+  User expects to return 10-12 hours later (2026-11-15 00:49-02:49 UTC), requests
+  continued varied optimization, online research when blocked, and alternating
+  GPU0/GPU1 if hot. Do not stop optimization early merely because a milestone passes.
+  Device monitor now resolves the CUDA-visible GPU by PCI address before querying
+  NVML. scan16-730-mixed ran correctly on GPU1, but its old monitor read GPU0;
+  its telemetry is explicitly invalidated, while timing and bitwise checks remain valid.
+  GPU1 scan16 full validation: 31.773633s, 24 fields match; not directly comparable
+  to GPU0 scan4 timing. Same-GPU native-batch tuning is the selection evidence.
+  Further research: https://research.nvidia.com/publication/2016-03_single-pass-parallel-prefix-scan-decoupled-look-back
+  PTX release/acquire reference: https://docs.nvidia.com/cuda/parallel-thread-execution/index.html
+  External lookback prototype uses per-row dynamic tile IDs and separate immutable
+  aggregate/complete states. Release flags publish states; acquire flags precede
+  reads. Bounded waits report failures rather than leaving an unbounded GPU spin.
+
+16-point scan checkpoint
+  GPU0, actual batch=629: scan4 46.471680ms, scan8 37.020639ms,
+  scan16 34.933249ms, scan16 warp-only 31.956463ms. Warp-only was slower
+  on the smaller GPU1 probe; retain the general scan16 implementation for now.
+  Update conservative rounding depth to 48 per level; keep the 512-point tile.
+  Regression remains 77 passed; GPU1 full output matches all 24 baseline fields.
+  The final FP32 candidate sums and tie selection remain unchanged.
+  Block-mapped screening improves kernel time only 2.47%; keep as a secondary
+  candidate pending larger bottleneck work, not yet merged.
+  Lookback scan passed ten independent high-precision sizes but was 5.5% slower
+  at block 128 and 17% slower at block 256; block 512 exceeded register resources.
+  Keep that experiment outside production and pursue fixed-point prefix scans.
