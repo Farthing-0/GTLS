@@ -7,6 +7,30 @@ from gputls import core
 from gputls.workspace import bucket_count
 
 
+def test_phase_fraction_matches_original_gpu_arithmetic():
+    rng = np.random.default_rng(42389)
+    positive = np.ldexp(rng.uniform(.5, 1, 50000), rng.integers(-1070, 1022, 50000))
+    integers = np.ldexp(np.ones(32), np.arange(32))
+    values = np.concatenate((positive, -positive, integers,
+                             np.nextafter(integers, 0.), np.nextafter(integers, np.inf),
+                             [0., -0., np.inf, -np.inf]))
+    code = core.KERNEL_SOURCE.read_text() + r'''
+extern "C" __global__ void checkFraction(const double* x, double* actual,
+                                        double* reference, int size) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < size) {
+        actual[i] = phaseFraction(x[i]);
+        reference[i] = x[i] - (int)x[i];
+    }
+}
+'''
+    kernel = cp.RawModule(code=code).get_function('checkFraction')
+    actual, reference = cp.empty(values.size, cp.float64), cp.empty(values.size, cp.float64)
+    kernel(((values.size+255)//256,), (256,),
+           (cp.asarray(values), actual, reference, np.int32(values.size)))
+    np.testing.assert_array_equal(actual.get().view(np.uint64), reference.get().view(np.uint64))
+
+
 @pytest.mark.parametrize('n', [1, 2, 3, 101, 1031])
 def test_bucket_sort_matches_stable_cpu_order(n):
     rng = np.random.default_rng(217)

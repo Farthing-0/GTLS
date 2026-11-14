@@ -35,6 +35,22 @@ __device__ __forceinline__ T blockInclusiveScan(T value, T* blockTotal) {
     return value;
 }
 
+// Extract the exact binary fraction without a double-to-int conversion and
+// double subtraction. Preserve the original arithmetic outside its normal
+// nonnegative, int32-range input. The remaining fraction is exactly representable.
+__device__ __forceinline__ double phaseFraction(double cycles) {
+    unsigned long long bits = __double_as_longlong(cycles);
+    int exponent = ((bits >> 52) & 2047) - 1023;
+    if ((bits >> 63) || exponent >= 31) return cycles - (int)cycles;
+    if (exponent < 0) return cycles;
+    int shift = 52 - exponent;
+    unsigned long long fraction = bits & ((1ull << shift) - 1);
+    if (!fraction) return 0.;
+    int lead = 63 - __clzll(fraction);
+    return __longlong_as_double(((unsigned long long)(lead - shift + 1023) << 52)
+        | ((fraction << (52 - lead)) & 0xfffffffffffffull));
+}
+
 // Folded phases are nonnegative finite doubles. Their complete IEEE bit strings
 // have the same order as the values, so integer comparisons lose no precision.
 // Keep small buckets entirely in registers to avoid repeated phase gathers and
@@ -126,7 +142,7 @@ extern "C"{
             return;
         }
         double cycles = time[pointIndex] * inversePeriods[periodIndex];
-        double pointPhase = cycles - (int)(cycles);
+        double pointPhase = phaseFraction(cycles);
         long long rowOffset = (long long)periodIndex * tSize;
         phase[rowOffset + pointIndex] = pointPhase;
         int bucket = min((int)(pointPhase * nBuckets), nBuckets - 1);
