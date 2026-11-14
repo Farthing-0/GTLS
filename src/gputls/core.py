@@ -418,6 +418,21 @@ class GPUSearch:
             nBounds = int(offsets[-1])
             lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
+            if len(selected)*tSize < 2**32:
+                # Reuse the upper-bound buffer for the chosen original-grid
+                # location, then replace it with that candidate's exact delta.
+                module.get_function("seedScreenCandidates")(
+                    (nPeriods,), (256,),
+                    (upperGPU, cumResidualGPU, self.fixedInvScale, self.widthsGPU,
+                     selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
+                     np.int32(len(selected)), np.int32(len(self.durations)),
+                     np.int32(tSize), np.int32(patchedSize), self.transit_depth_min))
+                module.get_function("evaluateScreenSeedPacked" if packed else "evaluateScreenSeed")(
+                    (nPeriods,), (32,),
+                    (upperGPU, cumResidualGPU, self.fixedInvScale, weightedGPU,
+                     self.signalGPU, self.overshootGPU, self.widthsGPU, selectedGPU,
+                     lanesGPU, np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth),
+                     self.uniformWeight if packed else np.float32(0)))
             screen_before = (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
                              self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
                              lanesGPU, periodMaskGPU)

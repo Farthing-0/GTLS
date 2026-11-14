@@ -538,3 +538,56 @@ def test_quantized_certificate_covers_long_curve_dot(uniform, outlier):
                 target = np.sum(window*template.astype(np.longdouble))
                 bound = row[2+column]*(np.sum(abs(window))+width*radius[column])+row[6+column]
                 assert abs(estimate-target) <= bound
+
+
+@pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
+@pytest.mark.parametrize('packed', [False, True])
+@pytest.mark.parametrize('pattern', ['random', 'tie', 'overflow'])
+def test_screen_seed_matches_original_candidate_statistic(g, packed, pattern):
+    module = core.load_module()
+    rng = np.random.default_rng(113)
+    rows, n, width = 33, 131, 513
+    size = n+width
+    integers = rng.integers(-11, 17, (rows, n))
+    integers[:, 0] = 100
+    repeated = integers[:, np.arange(size) % n]
+    inv = np.float32(2.**111 if pattern == 'overflow' else 2.**-14)
+    residual = repeated.astype(np.float32)*inv
+    weight = np.exp(rng.uniform(-3, 3, (rows, size))).astype(np.float32)
+    if packed:
+        weight.fill(.27)
+    weighted = cp.asarray(np.stack((residual*weight, weight), axis=-1))
+    cumulative = cp.asarray(np.cumsum(repeated, axis=1))
+    x = np.linspace(-1, 1, width)
+    signal = cp.asarray((.5*np.maximum(0, 1-x*x)**.3).astype(np.float32))
+    if pattern == 'tie':
+        signal.fill(0)
+    overshoot = cp.asarray([1.173], cp.float32)
+    widths, selected = cp.asarray([width], cp.int32), cp.asarray([0], cp.int32)
+    offsets, strides = cp.asarray([0, n], cp.int32), cp.ones(1, cp.int32)
+    lanes = cp.asarray([g], cp.int32)
+    mask = cp.ones((rows, 1), cp.bool_)
+    mask[0] = False
+    upper = cp.full(rows, core.EMPTY_KEY, cp.uint64)
+    module.get_function('seedScreenCandidates')((rows,), (256,),
+        (upper, cumulative, inv, widths, selected, offsets, strides, mask,
+         np.int32(1), np.int32(1), np.int32(n), np.int32(size), np.float32(-1)))
+    chosen = upper.get()
+    valid = chosen != core.EMPTY_KEY
+    starts = (chosen & np.uint64(0xffffffff)).astype(np.int64)
+    assert not valid[0]
+    module.get_function('evaluateScreenSeedPacked' if packed else 'evaluateScreenSeed')((rows,), (32,),
+        (upper, cumulative, inv, weighted[:, :, 0].copy() if packed else weighted,
+         signal, overshoot, widths, selected, lanes, np.int32(n), np.int32(size),
+         np.int32(width), np.float32(.27)))
+    # Evaluate only the chosen original-grid candidate in the unchanged kernel.
+    lower = cp.full((rows, n), cp.inf, cp.float32)
+    lower[cp.asarray(np.flatnonzero(valid)), cp.asarray(starts[valid])] = -cp.inf
+    best = cp.full(rows, core.EMPTY_KEY, cp.uint64)
+    zero_upper = cp.full(rows, np.uint64(0x8000000000000000), cp.uint64)
+    args = (best, cumulative, inv, weighted, signal, overshoot, widths, selected,
+            offsets, strides, mask, np.int32(0), np.int32(1), np.int32(1),
+            np.int32(n), np.int32(size), np.int32(width), np.float32(-1), lower,
+            zero_upper, np.int32(n))
+    module.get_function(f'searchChi2ScreenedG{g}')(((n*g+255)//256, rows), (256,), args)
+    np.testing.assert_array_equal(upper.get() >> 32, best.get() >> 32)
