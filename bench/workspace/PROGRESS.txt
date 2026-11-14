@@ -345,3 +345,6 @@ A100 comparison completed at source21fc9ae
   ArchiveSHA2560d2697bf9b428b00059abaaf04abbe27afab7872697b173729d07e70cf3ea582.
   Instance60674743 DESTROYED at18:02:48UTC; API confirms no remaining instances.
   Lease44.50min, estimated$0.308 at quoted rate (not final invoice).
+  Full fused-patch validation at48ac580: mixed14.192267s, constant16.129551s;
+  both24 fields bitwise equal. Mixed patch/scan1.724 ->1.144s; other stages
+  essentially unchanged. Relative to OOM-fixed workspace:2.593x/3.425x.
