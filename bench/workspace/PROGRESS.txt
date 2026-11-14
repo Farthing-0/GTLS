@@ -239,3 +239,25 @@ Compaction and CPU certificate checkpoint
   Further candidates: singleton bucket scatter; reuse bucket IDs; outward-rounded
   FP32 certificate arithmetic (not final statistic), using NVIDIA directed-rounding
   intrinsics: https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__INTRINSIC__SINGLE.html
+
+Memory-kernel checkpoint
+  Independent loads were being interleaved with the dependent FMA chain.
+  A warp synchronization point after13 loads preserves actual overlap:
+  initial-screen72.779778 ->55.046143ms,1.322x; bounds/keys bitwise identical.
+  Five629-period batches: combined screening469.530 ->369.765ms.
+  Use on sm70+ without the A100 cheap-bound branch; retain the existing four-
+  point implementation on fast-FP64 devices and older architectures.
+  CUDA12.9 synccheck:0 errors for divergent term counts9/568/19, masked rows
+  and partial warps. System12.0 checker could not attach; an official12.9
+  package is extracted only under workspace-optimization/tools/sanitizer.
+  One-warp prefix specialization35.785185 ->31.996287ms,1.118x; prefix arrays
+  bitwise equal across7 sizes including706406 and mixed/zero signed inputs.
+  Smaller histogram: native629-period sort87.799 ->64.256ms,1.366x at three
+  points/bucket. Stable indices match for every tested bucket count.
+  Counts/cursors now useceil(N/3); their aligned reusable offsets and memory
+  budget are updated. Screened prefix arena size is unchanged.
+  82 existing/updated regression checks plus5 stable-sort edge cases pass.
+  Other trials kept outside production: singleton scatter slower; bucket-ID
+  storage no net gain; cache modifiers and forced asm loads no gain; directed
+  FP32 error budgets pass63 checks but no timing gain; lookback scan all slower.
+  Full combined730-day validation is next.
