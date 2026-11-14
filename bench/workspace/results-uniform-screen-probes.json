@@ -1,0 +1,102 @@
+{
+  "gpu0": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.13619199953973293,
+        "durationBool": 0.07168000005185604,
+        "foldBuckets": 69.85523223876953,
+        "scanCounts": 8.964095950126648,
+        "bucketScatter": 119.2611198425293,
+        "sortBuckets": 105.49555015563965,
+        "patchScan": 87.20179271697998,
+        "prepareScreenBudgets": 0.1094720009714365,
+        "scanScreening": 194.37359619140625,
+        "screenCandidatesMapped": 132.63155460357666,
+        "refineCandidatesMapped": 125.03753471374512,
+        "compactCandidates": 2.4913280233740807,
+        "searchChi2CompactedG32": 11.302304148674011,
+        "searchChi2CompactedG16": 0.08681599795818329
+      },
+      "screen_ms": 452.042685508728,
+      "total_kernel_ms": 857.0182685833424,
+      "elapsed_seconds": 0.8763031214475632,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "all",
+      "kernel_ms": {
+        "durationsGrid": 0.13516799919307232,
+        "durationBool": 0.07270399946719408,
+        "foldBuckets": 70.51468753814697,
+        "scanCounts": 9.001951932907104,
+        "bucketScatter": 120.78079986572266,
+        "sortBuckets": 106.40179252624512,
+        "patchScan": 87.731201171875,
+        "prepareScreenBudgets": 0.11043200083076954,
+        "scanScreening": 161.05369567871094,
+        "screenCandidatesMapped": 103.92780780792236,
+        "refineCandidatesMapped": 89.14425706863403,
+        "compactCandidates": 2.499551974236965,
+        "searchChi2CompactedG32": 10.779808014631271,
+        "searchChi2CompactedG16": 0.08752000331878662
+      },
+      "screen_ms": 354.12576055526733,
+      "total_kernel_ms": 762.2413775818422,
+      "elapsed_seconds": 0.7818797063082457,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    }
+  ],
+  "gpu1": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.1341439988464117,
+        "durationBool": 0.070656000636518,
+        "foldBuckets": 80.41171169281006,
+        "scanCounts": 8.971264004707336,
+        "bucketScatter": 172.5972442626953,
+        "sortBuckets": 112.4874267578125,
+        "patchScan": 85.89203262329102,
+        "prepareScreenBudgets": 0.1076159980148077,
+        "scanScreening": 264.4858856201172,
+        "screenCandidatesMapped": 129.81759929656982,
+        "refineCandidatesMapped": 124.76825761795044,
+        "compactCandidates": 2.4759359881281853,
+        "searchChi2CompactedG32": 11.83292806148529,
+        "searchChi2CompactedG16": 0.08550400286912918
+      },
+      "screen_ms": 519.0717425346375,
+      "total_kernel_ms": 994.138205925934,
+      "elapsed_seconds": 1.0128569230437279,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "all",
+      "kernel_ms": {
+        "durationsGrid": 0.13411199860274792,
+        "durationBool": 0.08902399986982346,
+        "foldBuckets": 80.47206401824951,
+        "scanCounts": 8.94976007938385,
+        "bucketScatter": 172.57062530517578,
+        "sortBuckets": 112.31744194030762,
+        "patchScan": 86.34265613555908,
+        "prepareScreenBudgets": 0.10899199917912483,
+        "scanScreening": 159.2309741973877,
+        "screenCandidatesMapped": 103.88070392608643,
+        "refineCandidatesMapped": 89.30604791641235,
+        "compactCandidates": 2.50671998411417,
+        "searchChi2CompactedG32": 11.198335945606232,
+        "searchChi2CompactedG16": 0.08617600053548813
+      },
+      "screen_ms": 352.4177260398865,
+      "total_kernel_ms": 827.1936334464699,
+      "elapsed_seconds": 0.8466820996254683,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    }
+  ]
+}

@@ -391,3 +391,19 @@ Screening rounding-budget checkpoint
   Prefix NCU on GPU1:752 rows form0.8 occupancy waves,162 registers/thread,
   49.5% DRAM utilization. Shared transpose regresses on GPU0, while packing
   mass writes gives only~4%; exploring independent row sections next.
+
+Uniform-input screening checkpoint
+  Inspect actual prepared FP32 weights on every GPUSearch. Only exactly equal
+  weights enable this path; changing dy rechecks the condition and rebuilds all
+  weighted state. Variable weights continue through the general implementation.
+  Compute template A2 once using the original per-lane FP32 FMA and XOR tree.
+  Its value is identical for all windows at that duration/G; eA2 can be zero.
+  Keep only D_z and S_abs_z in12P prefix bytes (general path remains24P).
+  Sorted data, exact final kernels, window IDs, and tie comparisons are unchanged.
+  GPU0 five752-period batches: prefix+screens452.043 ->354.126ms;
+  GPU1519.072 ->352.418ms. Every exact winner key equal.
+  104 checks passed before six independent A2 tests were added; the15 targeted
+  prefix/A2 checks also pass. Precomputed A2 is bitwise equal to the original
+  exact kernel for all G; compact prefixes match the corresponding general
+  prefix columns bitwise, including odd lengths and tails. Full730d next.
+  Memory sanitizer:27 uniform/prefix checks pass, zero errors.

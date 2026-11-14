@@ -215,11 +215,16 @@ class GPUSearch:
         # every-point fit and small curves retain the adjacent-window path.
         self.screening = (self.tSize >= 8192 and self.maxWidth >= MIN_WIDTH
                           and min(T0_fit_margin, T0_refine_margin) > 0)
+        self.uniformWeight = None
         if self.screening:
             max_z = float(cp.max(cp.abs(weightedResidual)))
             max_w = float(cp.max(cp.float32(1) / dy2))
             self.screening = bool(np.isfinite(max_z) and np.isfinite(max_w))
             if self.screening:
+                # Check this call's actual FP32 weights, including the variance
+                # floor. No uniform-weight assumption survives across searches.
+                if bool(cp.all(self.preparedGPU[:, 1] == self.preparedGPU[0, 1])):
+                    self.uniformWeight = np.float32(self.preparedGPU[0, 1].get())
                 self.screenCertificates = []
                 for tolerance in SCREEN_TOLERANCES:
                     pos, coef, meta, mass_error = certificates(
@@ -230,6 +235,9 @@ class GPUSearch:
         self.screenMapKey = None
         self.screenMapGPU = None
         self.screenBudgetsGPU = None
+        self.uniformSquareGPU = (cp.empty(len(self.durations), dtype=cp.float32)
+                                 if self.uniformWeight is not None else None)
+        self.screenPrefixBytes = 12 if self.uniformWeight is not None else 24
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
             self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
 
@@ -238,7 +246,8 @@ class GPUSearch:
         if self.workspace is None or self.workspace.capacity < capacity:
             self.workspace = None
             self.workspace = BatchWorkspace(capacity, self.tSize, self.patchedDatasSize,
-                                            self.maxScreenStarts, self.screening)
+                                            self.maxScreenStarts, self.screening,
+                                            prefix_bytes=self.screenPrefixBytes)
         return self.workspace
 
     def duration_mask(self, periods):
@@ -340,9 +349,15 @@ class GPUSearch:
                     ((len(selected)+63)//64,), (64,),
                     (self.widthsGPU, selectedGPU, lanesGPU, self.screenCertificates[0][2],
                      self.screenBudgetsGPU, np.int32(len(selected)), np.int32(len(self.durations))))
+                if self.uniformWeight is not None:
+                    module.get_function("prepareUniformSquare")(
+                        (len(selected),), (32,),
+                        (self.signalGPU, self.widthsGPU, selectedGPU, lanesGPU,
+                         np.int32(self.maxWidth), self.uniformWeight, self.uniformSquareGPU))
                 self.screenMapKey = mapKey
-            prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 24), cp.uint8)
-            module.get_function("scanScreening")(
+            prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, self.screenPrefixBytes), cp.uint8)
+            prefixKernel = "scanScreeningUniform" if self.uniformWeight is not None else "scanScreening"
+            module.get_function(prefixKernel)(
                 (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])
             lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
@@ -356,11 +371,14 @@ class GPUSearch:
             # passes reuse the same prefix and bound buffers; final FP32 evaluation
             # and tie ordering are unchanged.
             for level, certificate in enumerate(self.screenCertificates):
-                kernel = "refineCandidatesMapped" if level else "screenCandidatesMapped"
+                kernel = "refineCandidates" if level else "screenCandidates"
+                kernel += "Uniform" if self.uniformWeight is not None else "Mapped"
+                uniform_args = ((self.uniformSquareGPU, self.uniformWeight)
+                                if self.uniformWeight is not None else ())
                 module.get_function(kernel)(
                     (len(self.screenMapGPU), nPeriods), (SCREEN_THREADS,),
                     screen_before + certificate + screen_after
-                    + (self.screenMapGPU, self.screenBudgetsGPU))
+                    + (self.screenMapGPU, self.screenBudgetsGPU) + uniform_args)
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):
@@ -444,7 +462,8 @@ class MultiGPUSearch:
         Layout padding is budgeted separately in batch_size.
         """
         s = self.primary
-        return (workspace_bytes_per_period(s.tSize, s.patchedDatasSize, s.maxScreenStarts, s.screening)
+        return (workspace_bytes_per_period(s.tSize, s.patchedDatasSize, s.maxScreenStarts, s.screening,
+                                           prefix_bytes=s.screenPrefixBytes)
                 + len(s.durations) + 128)
 
     @staticmethod
