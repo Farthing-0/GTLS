@@ -68,6 +68,7 @@ def find_nearest_indices(a, b):
 EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
 SCAN_THREADS = 512  # threads per row of the integer scan kernels
 SCREEN_SCAN_THREADS = 32  # 16 samples per thread: a 512-point screening tile
+SCREEN_THREADS = 32  # nearby starts share prefix cache lines across durations
 MAX_BATCH = 65535  # periods are the y dimension of the kernel grids
 BATCHES_MIN = 30  # the first pass is split into at least this many batches
 MEMORY_FRACTION = 0.9  # share of the free device memory used by one batch
@@ -81,6 +82,17 @@ def start_strides(widths, margin):
         return np.ones(len(widths), dtype=np.int32)
     skip = int(1 / margin)
     return np.where(widths > skip, widths // skip, 1).astype(np.int32)
+
+
+def screen_block_map(offsets, strides):
+    """Schedule contiguous candidate blocks by start time, retaining original IDs."""
+    counts = (np.diff(offsets) + SCREEN_THREADS - 1) // SCREEN_THREADS
+    duration = np.repeat(np.arange(len(strides), dtype=np.int32), counts)
+    item = np.concatenate([np.arange(left, right, SCREEN_THREADS, dtype=np.int32)
+                           for left, right in zip(offsets[:-1], offsets[1:])])
+    start = (item - offsets[duration]) * strides[duration]
+    order = np.argsort(start, kind='stable')
+    return np.column_stack((duration[order], item[order])).astype(np.int32)
 
 
 WINDOW_LANES = (1, 2, 4, 8, 16, 32)  # threads per window of the searchChi2G* kernels
@@ -215,6 +227,8 @@ class GPUSearch:
                     self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
                                                     cp.asarray(meta), *map(np.float64, mass_error)))
         self.workspace = None
+        self.screenMapKey = None
+        self.screenMapGPU = None
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
             self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
 
@@ -313,6 +327,12 @@ class GPUSearch:
         offsetsGPU = cp.asarray(offsets.astype(np.int32))
         stridesGPU = cp.asarray(strides)
         if screening:
+            # Only geometry is reused, within this search. The latest map suffices
+            # for consecutive batches; weights and bounds are always input-dependent.
+            mapKey = (tuple(selected), tuple(strides))
+            if mapKey != self.screenMapKey:
+                self.screenMapGPU = cp.asarray(screen_block_map(offsets, strides))
+                self.screenMapKey = mapKey
             prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 24), cp.uint8)
             module.get_function("scanScreening")(
                 (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
@@ -328,10 +348,10 @@ class GPUSearch:
             # passes reuse the same prefix and bound buffers; final FP32 evaluation
             # and tie ordering are unchanged.
             for level, certificate in enumerate(self.screenCertificates):
-                kernel = "refineCandidates" if level else "screenCandidates"
+                kernel = "refineCandidatesMapped" if level else "screenCandidatesMapped"
                 module.get_function(kernel)(
-                    ((nBounds + 255)//256, nPeriods), (256,),
-                    screen_before + certificate + screen_after)
+                    (len(self.screenMapGPU), nPeriods), (SCREEN_THREADS,),
+                    screen_before + certificate + screen_after + (self.screenMapGPU,))
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):

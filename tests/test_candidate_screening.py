@@ -7,6 +7,18 @@ from gputls import core
 from gputls.screening import certificates, template_certificate, SCREEN_TOLERANCES
 
 
+def test_screen_schedule_covers_candidates_once_in_time_order():
+    offsets = np.array([0, 17, 82, 209, 466], dtype=np.int64)
+    strides = np.array([1, 7, 33, 81], dtype=np.int32)
+    blocks = core.screen_block_map(offsets, strides)
+    starts = (blocks[:, 1]-offsets[blocks[:, 0]])*strides[blocks[:, 0]]
+    assert np.all(np.diff(starts) >= 0)
+    items = np.concatenate([np.arange(first, min(first+core.SCREEN_THREADS, offsets[d+1]))
+                            for d, first in blocks])
+    np.testing.assert_array_equal(np.sort(items), np.arange(offsets[-1]))
+    assert blocks.dtype == np.int32
+
+
 @pytest.mark.parametrize('size', [1, 127, 128, 129, 511, 512, 513, 1025, 706406])
 def test_chunked_prefixes_fit_high_precision_error_budget(size):
     rng = np.random.default_rng(734)
@@ -74,7 +86,9 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
          offsets, strides, cp.asarray([g], dtype=cp.int32), mask, cp.asarray(pos), cp.asarray(coef),
          cp.asarray(meta), *map(np.float64, mass_error), np.int32(1), np.int32(1),
          np.int32(n), np.int32(size), np.float32(-1))
-    module.get_function('screenCandidates')(((n+255)//256, n), (256,), screen_args)
+    block_map = cp.asarray(core.screen_block_map(np.array([0, n]), np.array([1])))
+    module.get_function('screenCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
+                                                  screen_args+(block_map,))
     best = cp.full(n, core.EMPTY_KEY, dtype=cp.uint64)
     args = (best, cum, inv_scale, weighted, cp.asarray(signal), overshoot,
             widths, selected, offsets, strides, mask, np.int32(0), np.int32(1),
@@ -105,7 +119,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         # Seed the best exact value as a valid upper bound, so the early-bound
         # path is exercised even when the entire row fits in a single block.
         upper.fill(np.uint64(int(expected[0]) & 0xffffffff00000000))
-        module.get_function('screenCandidates')(((n+255)//256, n), (256,), screen_args)
+        module.get_function('screenCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
+                                                      screen_args+(block_map,))
         assert np.all(lower[0].get() <= delta)
         best.fill(core.EMPTY_KEY)
         exact(grid, (256,), args+(lower, upper, np.int32(n)))
@@ -118,7 +133,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         before_lower, before_upper = lower.copy(), upper.copy()
         refined_args = screen_args[:12] + (cp.asarray(pos), cp.asarray(coef), cp.asarray(meta),
                                            *map(np.float64, mass_error)) + screen_args[17:]
-        module.get_function('refineCandidates')(((n+255)//256, n), (256,), refined_args)
+        module.get_function('refineCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
+                                                      refined_args+(block_map,))
         assert bool(cp.all(lower >= before_lower))
         assert bool(cp.all(upper <= before_upper))
         if pattern != 'overflow':

@@ -348,3 +348,12 @@ A100 comparison completed at source21fc9ae
   Full fused-patch validation at48ac580: mixed14.192267s, constant16.129551s;
   both24 fields bitwise equal. Mixed patch/scan1.724 ->1.144s; other stages
   essentially unchanged. Relative to OOM-fixed workspace:2.593x/3.425x.
+
+Screening locality checkpoint
+  Schedule each32-candidate block by its physical start time across durations,
+  preserving the original item IDs, FP32 exact statistic, and tie ordering.
+  Cache only the latest geometry map within a search; no input-dependent cache.
+  GPU0 five752-period batches: coarse291.468 ->151.366ms, refinements83.856
+  ->76.040ms; all exact winner keys equal. GPU1 total376.738 ->225.650ms.
+  90 tests pass;2 optional/device skips. Sync sanitizer: zero errors in mapped
+  bounds/refinement tests. Full730d validation follows this source checkpoint.

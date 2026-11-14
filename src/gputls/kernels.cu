@@ -677,10 +677,16 @@ __device__ __forceinline__ float cheapScreenLower32(float amplitude, int width, 
     return finite && isfinite(a) ? low : -__int_as_float(0x7f800000);
 }
 
-template <bool Refine>
-__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
+template <bool Refine, bool Mapped = false>
+__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr) {
     int period = blockIdx.y;
+    int d = 0;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
+    if (Mapped) {
+        int2 mapped = blockMap[blockIdx.x];
+        d = mapped.x;
+        item = mapped.y + threadIdx.x;
+    }
     int count = offsets[nSelected];
     // Upper bounds only decrease. A stale atomic snapshot can retain extra work,
     // but can never discard a winner. The first pass starts with an empty key.
@@ -690,10 +696,10 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
     unsigned int high = (unsigned int)(earlierUpperKey >> 32);
     float earlierUpper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
     unsigned long long key = 0xffffffffffffffffull;
-    if (item < count && (!Refine || !(lower[(long long)period*count+item] > earlierUpper))) {
+    int end = Mapped ? offsets[d+1] : count;
+    if (item < end && (!Refine || !(lower[(long long)period*count+item] > earlierUpper))) {
         float lo = -__int_as_float(0x7f800000);
-        int d = 0;
-        while (offsets[d + 1] <= item) ++d;
+        if (!Mapped) while (offsets[d + 1] <= item) ++d;
         int duration = selected[d], width = widths[duration];
         int start = (item - offsets[d]) * strides[d];
         if (!mask[(long long)period*nDurations + duration]) {
@@ -844,6 +850,18 @@ extern "C" __global__ void refineCandidates(SCREEN_ARGS) {
     screenCandidatesImpl<true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
         absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin);
+}
+
+extern "C" __global__ void screenCandidatesMapped(SCREEN_ARGS, const int2* blockMap) {
+    screenCandidatesImpl<false, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap);
+}
+
+extern "C" __global__ void refineCandidatesMapped(SCREEN_ARGS, const int2* blockMap) {
+    screenCandidatesImpl<true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap);
 }
 #undef SCREEN_ARGS
 
