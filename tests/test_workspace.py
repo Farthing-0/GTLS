@@ -9,11 +9,13 @@ from test_candidate_screening import _screened_curve
 
 
 @pytest.mark.parametrize("screening", [False, True])
+@pytest.mark.parametrize("sparse_prefix", [False, True])
 @pytest.mark.parametrize("prefix_bytes", [12, 24])
 @pytest.mark.parametrize("weighted_bytes", [4, 8])
-def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes, weighted_bytes):
+def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes, weighted_bytes, sparse_prefix):
     capacity, n, patched, starts = 7, 101, 133, 239
-    workspace = BatchWorkspace(capacity, n, patched, starts, screening, prefix_bytes, weighted_bytes)
+    prefix_points = (patched+15)//16+1 if sparse_prefix else patched
+    workspace = BatchWorkspace(capacity, n, patched, starts, screening, prefix_bytes, weighted_bytes, prefix_points)
     index_bytes = workspace.index_bytes
     ranges = []
     for offset, width, dtype in [(0, n, cp.int32), (index_bytes, n, cp.uint32),
@@ -24,7 +26,7 @@ def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes, weighted
         ranges.append((view.data.ptr, view.data.ptr+view.nbytes))
     for i, (begin, end) in enumerate(ranges):
         assert all(end <= b or begin >= e for b,e in ranges[i+1:])
-    prefix = workspace.view('scratch', (capacity,patched,prefix_bytes), cp.uint8) if screening else None
+    prefix = workspace.view('scratch', (capacity,prefix_points,prefix_bytes), cp.uint8) if screening else None
     weighted = workspace.view('weighted', (capacity,patched,weighted_bytes//4), cp.float32)
     cumulative = workspace.view('cumulative', (capacity,patched), cp.int64)
     lower = workspace.view('lower', (capacity,starts), cp.float32)
@@ -33,10 +35,11 @@ def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes, weighted
     for value,view in enumerate([x for x in (prefix, weighted, cumulative, lower) if x is not None], 1):
         assert bool(cp.all(view == value))
     assert workspace.storage.nbytes <= capacity*bytes_per_period(
-        n, patched, starts, screening, prefix_bytes, weighted_bytes)+LAYOUT_ALLOWANCE
+        n, patched, starts, screening, prefix_bytes, weighted_bytes, prefix_points)+LAYOUT_ALLOWANCE
 
 
 def test_repeated_tail_and_refine_batches_reuse_storage(monkeypatch):
+    memory_before = cp.get_default_memory_pool().used_bytes()
     original = core.MultiGPUSearch.batch_size
     checked = []
 
@@ -71,7 +74,8 @@ def test_repeated_tail_and_refine_batches_reuse_storage(monkeypatch):
     result=gtls(t[:-1],y[:-1],dy[:-1],verbose=False).power(periods=np.linspace(2,2.5,65),
             T0_fit_margin=.01,T0_refine_margin=.005,GPUDeviceID=0)
     assert checked and np.isfinite(result.period)
-    assert cp.get_default_memory_pool().used_bytes()==0
+    # Other tests/CUDA users may retain allocations; this search must release its own.
+    assert cp.get_default_memory_pool().used_bytes() == memory_before
 
 
 def test_oom_splits_batch_without_skipping_periods(monkeypatch):
