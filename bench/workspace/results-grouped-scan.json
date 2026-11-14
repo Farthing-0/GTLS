@@ -1,0 +1,156 @@
+{
+  "all_fields_bitwise_equal": true,
+  "fields": [
+    {
+      "field": "periods",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "periods__mask",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "period",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "rawDuration",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "durationPoints",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "rawDurations",
+      "bitwise_equal": true,
+      "shape": [
+        37
+      ]
+    },
+    {
+      "field": "duration",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "depth",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "T0",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "SDE",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "chi2",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "chi2__mask",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "transitTimes",
+      "bitwise_equal": true,
+      "shape": [
+        103
+      ]
+    },
+    {
+      "field": "power",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "power__mask",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "snr",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "snrPink",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "snrFit",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "snrFitPink",
+      "bitwise_equal": true,
+      "shape": []
+    },
+    {
+      "field": "raw_power",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "raw_power__mask",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "raw_chi2",
+      "bitwise_equal": true,
+      "shape": [
+        48935
+      ]
+    },
+    {
+      "field": "possiblePeriodsIndices",
+      "bitwise_equal": true,
+      "shape": [
+        200
+      ]
+    },
+    {
+      "field": "possiblePeriods",
+      "bitwise_equal": true,
+      "shape": [
+        200
+      ]
+    }
+  ],
+  "reference": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/workspace-730-mixed",
+  "candidate": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/grouped-scan-730-mixed",
+  "reference_median_seconds": 36.80561357922852,
+  "candidate_median_seconds": 36.688713589683175,
+  "speedup": 1.0031862656961137
+}

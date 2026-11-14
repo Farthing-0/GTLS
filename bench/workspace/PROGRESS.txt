@@ -72,3 +72,12 @@ nsys checkpoint (before further optimization)
     searchChi2ScreenedG32 6.098s (17.43%). Profiled API time 36.594s.
   Profiled times are diagnostic only; upcoming speed comparisons use untraced repeats.
   Traces: nsys-workspace-730 and nsys-workspace-730-mixed under experiment root.
+
+Attempt: grouped independent FP64 scans (not retained)
+  Shared barriers between channels while preserving each scalar addition tree.
+  Six direct FP64 bitwise checks and the search regression passed (48 passed,
+  2 skipped); all 24 full-run fields matched the mixed-dy workspace baseline.
+  Baseline median 36.805614s; attempt median 36.688714s: 1.00319x, within noise.
+  Reverted implementation and its dedicated tests rather than retain complexity
+  without a demonstrated gain. Patch, source snapshot and tests are preserved in
+  grouped-scan-730-mixed/ under the experiment root; compact result is committed.
