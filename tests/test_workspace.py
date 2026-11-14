@@ -103,3 +103,33 @@ def test_oom_splits_batch_without_skipping_periods(monkeypatch):
     monkeypatch.setattr(core.MultiGPUSearch,'batch_size',probe)
     gtls(*_screened_curve(),verbose=False).power(periods=np.linspace(2,2.5,33),GPUDeviceID=0)
     assert checked
+
+
+def test_close_releases_device_arrays_with_retained_initialization_frame(monkeypatch):
+    # Model a compiler/debugger retaining the caller frame. Resource cleanup must
+    # not rely on collection of that frame or destruction of the search object.
+    import gc
+    import sys
+    gc.collect()
+    memory_before = cp.get_default_memory_pool().used_bytes()
+    frames = []
+    original = core.sparse_certificate
+
+    def retain(*args, **kwargs):
+        frames.append(sys._getframe(1))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(core, 'sparse_certificate', retain)
+    try:
+        result = gtls(*_screened_curve(), verbose=False).power(
+            periods=np.linspace(2, 2.5, 33), T0_fit_margin=.01,
+            T0_refine_margin=.005, GPUDeviceID=0)
+        assert frames and np.isfinite(result.period)
+        assert cp.get_default_memory_pool().used_bytes() == memory_before
+        for frame in frames:
+            search = frame.f_locals['self']
+            assert search.workspace is None
+            assert not search.screenCertificates
+            assert not any(isinstance(value, cp.ndarray) for value in vars(search).values())
+    finally:
+        frames.clear()
