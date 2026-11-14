@@ -313,7 +313,7 @@ class GPUSearch:
         offsetsGPU = cp.asarray(offsets.astype(np.int32))
         stridesGPU = cp.asarray(strides)
         if screening:
-            prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 4), cp.float64)
+            prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 24), cp.uint8)
             module.get_function("scanScreening")(
                 (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])

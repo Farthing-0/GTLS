@@ -18,8 +18,8 @@ def bucket_count(n):
 
 def bytes_per_period(n, patched, starts=0, screening=False):
     # Sort: index(4N), phase(8N), count(4B), cursor(4B), B=ceil(N/3).
-    # Patch: index(4N), residual(4P). Screening: prefix(32P).
-    scratch = max(12*n+8*bucket_count(n), 4*n+4*patched, 32*patched if screening else 0)
+    # Patch: index(4N), residual(4P). Screening: prefix(24P).
+    scratch = max(12*n+8*bucket_count(n), 4*n+4*patched, 24*patched if screening else 0)
     return scratch + 16*patched + 4*starts
 
 
@@ -33,7 +33,7 @@ class BatchWorkspace:
         bucket_bytes = (capacity*4*self.bucket_count+ALIGNMENT-1)//ALIGNMENT*ALIGNMENT
         self.cursor_offset = 3*self.index_bytes+bucket_bytes
         scratch = max(self.cursor_offset+bucket_bytes, self.index_bytes+capacity*4*patched,
-                      capacity*32*patched if screening else 0)
+                      capacity*24*patched if screening else 0)
         self.regions = {}
         total = 0
         for name, size in [('scratch', scratch), ('weighted', capacity*8*patched),

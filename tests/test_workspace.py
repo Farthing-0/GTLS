@@ -22,7 +22,7 @@ def test_workspace_alignment_and_stage_aliases(screening):
         ranges.append((view.data.ptr, view.data.ptr+view.nbytes))
     for i, (begin, end) in enumerate(ranges):
         assert all(end <= b or begin >= e for b,e in ranges[i+1:])
-    prefix = workspace.view('scratch', (capacity,patched,4), cp.float64) if screening else None
+    prefix = workspace.view('scratch', (capacity,patched,24), cp.uint8) if screening else None
     weighted = workspace.view('weighted', (capacity,patched,2), cp.float32)
     cumulative = workspace.view('cumulative', (capacity,patched), cp.int64)
     lower = workspace.view('lower', (capacity,starts), cp.float32)

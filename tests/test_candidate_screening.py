@@ -13,7 +13,7 @@ def test_chunked_prefixes_fit_high_precision_error_budget(size):
     weight = np.exp(rng.uniform(-10, 10, size)).astype(np.float32)
     z = (weight*rng.normal(0, .01, size)).astype(np.float32)
     weighted = cp.asarray(np.column_stack((z, weight))[None])
-    prefix = cp.empty((1, 2, size, 2), dtype=cp.float64)
+    prefix = cp.empty(24*size, dtype=cp.uint8)
     core.load_module().get_function('scanScreening')(
         (1,), (core.SCREEN_SCAN_THREADS,), (weighted, prefix, np.int32(size)))
     z_long, w_long = z.astype(np.longdouble), weight.astype(np.longdouble)
@@ -24,8 +24,11 @@ def test_chunked_prefixes_fit_high_precision_error_budget(size):
     gamma = steps*2.0**-53/(1-steps*2.0**-53)
     maxima = np.array([abs(z_long).max(), w_long.max()])
     budgets = 4*gamma*np.array([size*size, size])[:, None]*maxima
-    error = np.max(abs(prefix[0].get().astype(np.longdouble)-expected), axis=1)
-    assert np.all(error <= budgets)
+    actual_d = prefix[:16*size].view(cp.float64).reshape(size, 2).get().astype(np.longdouble)
+    actual_mass = prefix[16*size:].view(cp.float32).reshape(size, 2).get().astype(np.longdouble)
+    assert np.all(np.max(abs(actual_d-expected[0]), axis=0) <= budgets[0])
+    storage_radius = 2.0**-23*abs(actual_mass)+2.0**-125
+    assert np.all(abs(actual_mass-expected[1]) <= budgets[1]+storage_radius)
 
 
 @pytest.mark.parametrize('cheap_bound', [False, True])
@@ -37,7 +40,7 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     size = n + width
     integers = rng.integers(-11, 17, n)
     integers[0] = 100
-    inv_scale = np.float32(2.0**90 if pattern == 'overflow' else 2.0**-14)
+    inv_scale = np.float32(2.0**110 if pattern == 'overflow' else 2.0**-14)
     residual = np.resize(integers, size).astype(np.float32)*inv_scale
     dy = np.exp(rng.uniform(-3, 3, n)).astype(np.float32)
     if pattern == 'outlier':
@@ -54,7 +57,7 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     # candidate separately with the original FMA chain and XOR reduction.
     weighted = cp.asarray(np.tile(np.stack((z, weight), axis=-1), (n, 1, 1)))
     cum = cp.asarray(np.tile(np.cumsum(np.resize(integers, size)), (n, 1)))
-    prefix = cp.empty((n, size, 4), dtype=cp.float64)
+    prefix = cp.empty(n*size*24, dtype=cp.uint8)
     module = cp.RawModule(code=core.KERNEL_SOURCE.read_text(),
                           options=(f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}",))
     module.get_function('scanScreening')((n,), (core.SCREEN_SCAN_THREADS,), (weighted, prefix, np.int32(size)))
