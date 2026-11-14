@@ -81,3 +81,17 @@ Attempt: grouped independent FP64 scans (not retained)
   Reverted implementation and its dedicated tests rather than retain complexity
   without a demonstrated gain. Patch, source snapshot and tests are preserved in
   grouped-scan-730-mixed/ under the experiment root; compact result is committed.
+
+Cheap absolute-mass bound evaluation (in progress)
+  Full varying-dy output matches all 24 baseline fields bitwise. All 44 regression
+  tests pass with both RTX 3090 devices visible (one existing flat-SDE warning).
+  Median 36.969757s vs 36.805614s; thermal flags occurred in the new untraced run.
+  nsys screening 13.976961s vs 13.849242s: no demonstrated gain yet.
+  User confirmed grouped scan stays reverted, cheap bound continues evaluation.
+
+A100 extension authorized by user
+  Rent one A100 through Vast.ai, compare identical frozen source/input/settings
+  and separate profiler captures. Include matched batch cap and default capacity.
+  User explicitly requires DESTROY after saving artifacts, not merely stop.
+  Lease 60654842: NVIDIA A100 PCIe 40GB, Japan, actual quoted $0.61985185/hour
+  including 40GB disk. Local lease/access records stay outside the Git repository.

@@ -1,0 +1,55 @@
+{
+  "status": "experiment under evaluation, not retained in committed source",
+  "times_seconds": [
+    36.69980167970061,
+    36.969757130369544,
+    37.12512106075883
+  ],
+  "median_seconds": 36.969757130369544,
+  "thermal_throttled": true,
+  "all_fields_bitwise_equal": true,
+  "speedup": 0.9955600587106324,
+  "tests": "44 passed including multiple GPUs; 1 existing flat SDE warning",
+  "kernels": [
+    {
+      "name": "screenCandidates",
+      "count": 80,
+      "seconds": 13.976960975,
+      "share_percent": 39.7690047904823,
+      "min_seconds": 0.000632341,
+      "max_seconds": 0.332799315
+    },
+    {
+      "name": "scanScreening",
+      "count": 80,
+      "seconds": 7.072976097,
+      "share_percent": 20.124919915544073,
+      "min_seconds": 0.012861964,
+      "max_seconds": 0.091458397
+    },
+    {
+      "name": "searchChi2ScreenedG32",
+      "count": 80,
+      "seconds": 6.099038687,
+      "share_percent": 17.35375087577934,
+      "min_seconds": 0.000138686,
+      "max_seconds": 0.14457719
+    },
+    {
+      "name": "bucketScatter",
+      "count": 81,
+      "seconds": 2.728062149,
+      "share_percent": 7.762225054957947,
+      "min_seconds": 4.3455e-05,
+      "max_seconds": 0.035542233
+    },
+    {
+      "name": "foldBuckets",
+      "count": 81,
+      "seconds": 1.308300238,
+      "share_percent": 3.7225401520026162,
+      "min_seconds": 1.8815e-05,
+      "max_seconds": 0.016978203
+    }
+  ]
+}
