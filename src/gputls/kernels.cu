@@ -1505,3 +1505,70 @@ COMPACTED_EXACT_PACKED(8)
 COMPACTED_EXACT_PACKED(16)
 COMPACTED_EXACT_PACKED(32)
 #undef COMPACTED_EXACT_PACKED
+
+// Seed screening with one original-grid candidate selected from32 starts per
+// duration. Its FP32 statistic is evaluated with the original G/FMA/XOR order.
+// This supplies only an upper bound; strict screening still retains exact ties.
+extern "C" __global__ void seedScreenCandidates(unsigned long long* seeds,const long long* residual,
+    float invScale,const int* widths,const int* selected,const int* offsets,const int* strides,
+    const bool* mask,int nSelected,int nDurations,int tSize,int size,float depthMin) {
+    int period=blockIdx.x,lane=threadIdx.x&31;
+    const long long* row=residual+(long long)period*size;
+    unsigned long long best=0;
+    for(int i=threadIdx.x;i<nSelected*32;i+=blockDim.x) {
+        int d=i/32,sample=i%32,duration=selected[d];
+        if(!mask[(long long)period*nDurations+duration])continue;
+        int width=widths[duration],count=offsets[d+1]-offsets[d];
+        int ordinal=(long long)sample*count/32,start=ordinal*strides[d];
+        long long sum=row[start+width-1]-(start?row[start-1]:0);
+        float depth=__fdiv_rn(__ll2float_rn(sum)*invScale,(float)width);
+        float score=(depth*depth)*(float)width;
+        if(depth>depthMin && score>0 && isfinite(score)) {
+            unsigned int index=(unsigned int)d*(unsigned int)tSize+(unsigned int)start;
+            unsigned long long key=((unsigned long long)__float_as_uint(score)<<32)|(0xffffffffu-index);
+            best=key>best?key:best;
+        }
+    }
+    for(int offset=16;offset;offset>>=1){unsigned long long v=__shfl_xor_sync(0xffffffff,best,offset);best=v>best?v:best;}
+    __shared__ unsigned long long shared[32];
+    if(lane==0)shared[threadIdx.x/32]=best;
+    __syncthreads();
+    if(threadIdx.x<32) {
+        best=threadIdx.x<blockDim.x/32?shared[threadIdx.x]:0;
+        for(int offset=16;offset;offset>>=1){unsigned long long v=__shfl_xor_sync(0xffffffff,best,offset);best=v>best?v:best;}
+        if(threadIdx.x==0)seeds[period]=best?((best&0xffffffff00000000ull)|(0xffffffffu-(unsigned int)best)):0xffffffffffffffffull;
+    }
+}
+template <bool Packed> __device__ void evaluateScreenSeedImpl(unsigned long long* upper,const long long* residual,float invScale,
+    const float2* weighted,const float* signal,const float* overshoot,const int* widths,const int* selected,
+    const int* lanes,int tSize,int size,int maxWidth,float uniformWeight) {
+    int period=blockIdx.x,lane=threadIdx.x;unsigned long long seed=upper[period];
+    if(seed==0xffffffffffffffffull)return;
+    unsigned int index=(unsigned int)seed;int d=index/(unsigned int)tSize,start=index%(unsigned int)tSize,duration=selected[d],width=widths[duration],g=lanes[d];
+    const float* h=signal+(long long)duration*maxWidth;
+    long long offset=(long long)period*size+start;
+    float cross=0,square=0;
+    if(lane<g)for(int j=lane;j<width;j+=g) {
+        float s=h[j];float2 v=Packed?make_float2(((const float*)weighted)[offset+j],uniformWeight):weighted[offset+j];
+        cross=fmaf(s,v.x,cross);square=fmaf(s*s,v.y,square);
+    }
+    for(int k=g/2;k;k>>=1){cross+=__shfl_xor_sync(0xffffffff,cross,k);square+=__shfl_xor_sync(0xffffffff,square,k);}
+    if(lane==0) {
+        const long long* r=residual+(long long)period*size;
+        long long sum=r[start+width-1]-(start?r[start-1]:0);
+        float depth=__fdiv_rn(__ll2float_rn(sum)*invScale,(float)width);
+        float amplitude=depth*overshoot[duration]*2.0f;
+        float delta=amplitude*(amplitude*square-2.0f*cross);
+        upper[period]=isfinite(delta)?((unsigned long long)orderedKey(delta)<<32):0xffffffffffffffffull;
+    }
+}
+extern "C" __global__ void evaluateScreenSeed(unsigned long long* upper,const long long* residual,float invScale,
+    const float2* weighted,const float* signal,const float* overshoot,const int* widths,const int* selected,
+    const int* lanes,int tSize,int size,int maxWidth,float uniformWeight) {
+    evaluateScreenSeedImpl<false>(upper,residual,invScale,weighted,signal,overshoot,widths,selected,lanes,tSize,size,maxWidth,uniformWeight);
+}
+extern "C" __global__ void evaluateScreenSeedPacked(unsigned long long* upper,const long long* residual,float invScale,
+    const float2* weighted,const float* signal,const float* overshoot,const int* widths,const int* selected,
+    const int* lanes,int tSize,int size,int maxWidth,float uniformWeight) {
+    evaluateScreenSeedImpl<true>(upper,residual,invScale,weighted,signal,overshoot,widths,selected,lanes,tSize,size,maxWidth,uniformWeight);
+}

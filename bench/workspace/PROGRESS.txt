@@ -636,3 +636,17 @@ Follow-up profiling and local experiments
   comparisons (all G, packed/unpacked, three sample grids). Mixed target243.785
   ->231.185ms for32 samples/duration;128/512 give232.040/240.917ms. Several seeds
   add work without a larger gain. Uniform-path evaluation remains experimental.
+
+Exact initial upper bound
+  Sample32 original-grid starts per selected duration, choose the strongest
+  depth-squared*width proxy, and evaluate that one candidate with the original
+  FP32 FMA/XOR order for its G. Reuse the existing upper buffer for selection and
+  the resulting exact upper bound. Invalid/overflowing proxies and nonfinite
+  exact values leave an empty upper bound; large encoded locations skip seeding.
+  This does not supply the final result or discard equal candidates.
+  Five752-period batches: mixed total668.894 ->655.165ms; constant540.151
+  ->511.421ms. Constant refinement70.54 ->44.33ms accounts for most of the gain.
+  More samples and multiple seeds did not improve the overall tradeoff.
+  Regression439 passed, one multi-GPU skip; sanitizer37 passed with zero errors.
+  Dedicated two-device checks pass for both ordinary and screened searches.
+  Full constant/mixed validation is next.
