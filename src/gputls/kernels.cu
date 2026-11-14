@@ -611,6 +611,46 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
     const double* metadata, double absMassError, double weightMassError, \
     int nSelected, int nDurations, int tSize, int size, float depthMin
 
+__device__ __forceinline__ double2 screenSparseDot(const double2* p, int start,
+    const int* positions, const double2* coefficients, int begin, int terms) {
+    double ar = 0, a2 = 0;
+    // Prefetch independent prefixes before the dependent FMA chain.
+    // Accumulate in the original order, including the scalar tail.
+#if __CUDA_ARCH__ >= 700
+    constexpr int PREFETCH = 13;
+#else
+    constexpr int PREFETCH = 4;
+#endif
+    int j = begin;
+    for (; j+PREFETCH <= begin+terms; j += PREFETCH) {
+        double2 values[PREFETCH], weights[PREFETCH];
+        #pragma unroll
+        for (int q=0;q<PREFETCH;++q) {
+            int k=start+positions[j+q]-2;
+            values[q]=k>=0?p[k]:make_double2(0,0);
+            weights[q]=coefficients[j+q];
+        }
+#if __CUDA_ARCH__ >= 700
+        // Keep the independent reads ahead of the FMA chain.
+        // This mask names only the currently executing lanes;
+        // no value or reduction is shared between lanes here.
+        __syncwarp(__activemask());
+#endif
+        #pragma unroll
+        for (int q=0;q<PREFETCH;++q) {
+            ar=fma(weights[q].x,values[q].x,ar);
+            a2=fma(weights[q].y,values[q].y,a2);
+        }
+    }
+    for (;j<begin+terms;++j) {
+        int k=start+positions[j]-2;
+        double2 v=k>=0?p[k]:make_double2(0,0);
+        double2 c=coefficients[j];
+        ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
+    }
+    return make_double2(ar, a2);
+}
+
 // Drop the nonnegative A2 term for a cheap lower bound. All nonnegative
 // quantities are rounded upward, then negated. If FP32 intermediates cannot
 // certify that the original statistic is finite, retain the full bound path.
@@ -667,6 +707,13 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
                     const double2* p = prefix + (long long)period*size;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
+                    double ar = 0, a2 = 0;
+                    if (Refine) {
+                        double2 dot = screenSparseDot(p, start, positions, coefficients, begin, terms);
+                        ar = dot.x; a2 = dot.y;
+                    }
+#endif
                     const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
                     uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
                     double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
@@ -692,40 +739,9 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
 #endif
                     if (!discarded) {
 #if !GTLS_CHEAP_SCREEN_BOUNDS
-                    double ar = 0, a2 = 0;
-                    // Prefetch independent prefixes before the dependent FMA chain.
-                    // Accumulate in the original order, including the scalar tail.
-#if __CUDA_ARCH__ >= 700
-                    constexpr int PREFETCH = 13;
-#else
-                    constexpr int PREFETCH = 4;
-#endif
-                    int j = begin;
-                    for (; j+PREFETCH <= begin+terms; j += PREFETCH) {
-                        double2 values[PREFETCH], weights[PREFETCH];
-                        #pragma unroll
-                        for (int q=0;q<PREFETCH;++q) {
-                            int k=start+positions[j+q]-2;
-                            values[q]=k>=0?p[k]:make_double2(0,0);
-                            weights[q]=coefficients[j+q];
-                        }
-#if __CUDA_ARCH__ >= 700
-                        // Keep the independent reads ahead of the FMA chain.
-                        // This mask names only the currently executing lanes;
-                        // no value or reduction is shared between lanes here.
-                        __syncwarp(__activemask());
-#endif
-                        #pragma unroll
-                        for (int q=0;q<PREFETCH;++q) {
-                            ar=fma(weights[q].x,values[q].x,ar);
-                            a2=fma(weights[q].y,values[q].y,a2);
-                        }
-                    }
-                    for (;j<begin+terms;++j) {
-                        int k=start+positions[j]-2;
-                        double2 v=k>=0?p[k]:make_double2(0,0);
-                        double2 c=coefficients[j];
-                        ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
+                    if (!Refine) {
+                        double2 dot = screenSparseDot(p, start, positions, coefficients, begin, terms);
+                        ar = dot.x; a2 = dot.y;
                     }
 #endif
                     int g = lanes[d];

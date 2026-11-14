@@ -1,0 +1,52 @@
+[
+  {
+    "mode": "baseline",
+    "kernel_ms": {
+      "durationsGrid": 0.13308800011873245,
+      "durationBool": 0.06655999924987555,
+      "foldBuckets": 66.39206504821777,
+      "scanCounts": 7.04912006855011,
+      "bucketScatter": 144.37580680847168,
+      "sortBuckets": 91.64492607116699,
+      "patchWeighted": 70.68671894073486,
+      "scanResidual": 34.414527893066406,
+      "scanScreening": 197.28281784057617,
+      "screenCandidates": 244.28339195251465,
+      "refineCandidates": 91.68780839443207,
+      "compactCandidates": 2.0715520158410072,
+      "searchChi2CompactedG32": 4.5539199858903885,
+      "searchChi2CompactedG8": 0.07977599650621414,
+      "searchChi2CompactedG16": 0.08569599688053131
+    },
+    "screen_ms": 91.68780839443207,
+    "total_kernel_ms": 954.8077750122175,
+    "elapsed_seconds": 0.971805197186768,
+    "keys_bitwise_equal": true,
+    "first_pass_bounds_not_narrower": null
+  },
+  {
+    "mode": "all",
+    "kernel_ms": {
+      "durationsGrid": 0.1290879976004362,
+      "durationBool": 0.06649599969387054,
+      "foldBuckets": 65.2922887802124,
+      "scanCounts": 6.990847945213318,
+      "bucketScatter": 144.21299362182617,
+      "sortBuckets": 90.80214405059814,
+      "patchWeighted": 70.20223999023438,
+      "scanResidual": 34.490368366241455,
+      "scanScreening": 196.85472106933594,
+      "screenCandidates": 244.7052822113037,
+      "refineCandidates": 69.72512090206146,
+      "compactCandidates": 2.076672025024891,
+      "searchChi2CompactedG32": 4.612384021282196,
+      "searchChi2CompactedG8": 0.07974400371313095,
+      "searchChi2CompactedG16": 0.08579199761152267
+    },
+    "screen_ms": 69.72512090206146,
+    "total_kernel_ms": 930.326182981953,
+    "elapsed_seconds": 0.9470701133832335,
+    "keys_bitwise_equal": true,
+    "first_pass_bounds_not_narrower": null
+  }
+]

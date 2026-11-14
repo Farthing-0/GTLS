@@ -309,3 +309,10 @@ FP32 cheap-bound checkpoint
   best1.222x, but GPU0 at752 periods regresses61.908 ->68.106ms. Not adopted.
   Register/write-order tuning also differs between devices: GPU0 gains under
   3%, so keep current scan. No new dependency or register restriction added.
+  Full FP32-shortcut validation: mixed15.172459s (thermal flag recorded),
+  constant16.706262s (no thermal flag), all24 fields bitwise equal for both.
+  Coarse screen3.731s; refinement regresses1.150 ->1.482s because moving its
+  dot product behind the mass reads serialized memory access. Restored the
+  original refinement ordering via an inline shared dot helper. Five629-period
+  probe improves refinement91.688 ->69.725ms, exact keys equal;63 checks pass.
+  Current node is ready for a fresh A100 comparison with no active rental yet.
