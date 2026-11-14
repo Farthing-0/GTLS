@@ -136,3 +136,14 @@ Kernel-focused work after user stopped timing reruns
   Original double4 data interleaved the correlation prefixes with mass prefixes;
   separate contiguous planes reduce the memory footprint of sparse prefix gathers.
   Full source snapshot: prefix-planes-730-mixed. Screening kernel probe: prefix-planes-probe.
+
+Four samples per thread in screening scan
+  Scan only the totals of four-point chunks, then reconstruct each point prefix.
+  Keep a 512-point tile (128 threads); increase the conservative prefix budget
+  from 16 to 24 rounding operations per level for local sums and reconstruction.
+  Exact FP32 candidate evaluation is unchanged; prefixes only certify pruning.
+  Independent long-double checks cover odd lengths, tile boundaries and P=706406.
+  Scan kernel 41.915394ms -> 22.292480ms (1.880x) on 256 rows.
+  Full mixed-dy validation 30.477027s, every one of 24 result fields bitwise equal.
+  Regression: 77 passed on both GPUs, one existing flat-SDE warning.
+  Raw timing is a single new-code validation, not a repeated performance campaign.

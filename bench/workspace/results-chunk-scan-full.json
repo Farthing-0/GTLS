@@ -1,0 +1,7 @@
+{
+  "full_validation_seconds": 30.477027494460344,
+  "reference_median_seconds": 36.80561357922852,
+  "ratio_to_reference": 1.2076510278411663,
+  "all_24_fields_bitwise_equal": true,
+  "timing_note": "One full validation timing after the code change; no repeated full benchmark per user direction. Earlier reference had two thermal samples."
+}
