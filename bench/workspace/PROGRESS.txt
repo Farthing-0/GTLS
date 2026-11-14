@@ -554,3 +554,6 @@ Sparse uniform-prefix checkpoint
   available for references. Full constant-dy validation is next.
   Integer-residual prefix reuse was rejected: direct conversion215 ->224/236ms,
   exact128-bit accumulation216 ->302/331ms. No such path enters production.
+  Full validation ata7d917b: constant8.399009s, all24 fields bitwise
+  equal, thermal=False, used/total pool bytes after=0/0.
+  Variable-dy algorithm remains unchanged and is not rerun at this node.
