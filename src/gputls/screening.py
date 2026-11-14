@@ -54,6 +54,32 @@ def _adaptive_knots(target, scale, tolerance):
     return np.flatnonzero(chosen)
 
 
+@njit(cache=True, fastmath=False)
+def _reconstruction_error(target, positions, coefficients):
+    """Measure the represented template in one reverse pass without dense arrays.
+
+    Zero impulses do not change a finite slope. Keep both prefix additions in
+    order; their FP64 rounding error is covered by the host certificate budget.
+    """
+    n = len(target)
+    k = len(positions)-1
+    slope0 = slope1 = value0 = value1 = error0 = error1 = 0.0
+    for i in range(n+1, 1, -1):
+        if k >= 0 and positions[k] == i:
+            slope0 += coefficients[k, 0]
+            slope1 += coefficients[k, 1]
+            k -= 1
+        value0 += slope0
+        value1 += slope1
+        e0 = abs(value0-target[i-2, 0])
+        e1 = abs(value1-target[i-2, 1])
+        if np.isnan(e0) or np.isnan(e1):
+            return np.array([np.nan, np.nan])
+        error0 = max(error0, e0)
+        error1 = max(error1, e1)
+    return np.array([error0, error1])
+
+
 def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
     """Joint adaptive knots; sparse second differences and measured error bounds."""
     signal = np.asarray(signal, dtype=np.float32)
@@ -70,13 +96,14 @@ def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
     positions, coefficients = positions[keep], coefficients[keep]
     # Reconstruct the actual rounded coefficients, including the zero extension.
     # Bound reconstruction roundoff as well, so tolerance is never a certificate.
-    impulses = np.zeros((n + 2, 2), dtype=np.longdouble)
-    impulses[positions] = coefficients
-    represented = np.cumsum(np.cumsum(impulses[::-1], axis=0), axis=0)[::-1][2:]
+    measured = np.nextafter(_reconstruction_error(target, positions, coefficients), np.inf)
     mass = np.sum(np.abs(coefficients), axis=0)
+    # Two FP64 prefix scans contribute <= gamma_(2N)*N*sum|c|, N=n+2.
+    # For GPU-supported int32 widths this is far below32*eps*N^2*sum|c|,
+    # including rounding in the mass/budget calculation. nextafter above also
+    # covers the final subtraction from the exactly represented FP32 target.
     reconstruction_error = 32 * np.finfo(float).eps * (n + 2)**2 * mass
-    error = np.nextafter(np.asarray(np.max(np.abs(represented - target), axis=0), float)
-                         + reconstruction_error, np.inf)
+    error = np.nextafter(measured + reconstruction_error, np.inf)
     return positions, coefficients, error, maxima
 
 

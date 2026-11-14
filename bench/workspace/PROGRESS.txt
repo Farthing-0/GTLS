@@ -364,3 +364,13 @@ Screening locality checkpoint
   rate661.83 ->270.05GB/s while duration8.52 ->4.91ms. Cache reuse confirmed.
   Prefetch tuning after locality:8 vs13 sync gives only~1%; retain13 pending
   stronger evidence. Removing sync and increasing beyond16 both regress.
+
+CPU certificate reconstruction checkpoint
+  Replace dense long-double double-cumsum temporaries with one Numba reverse
+  pass over the sparse impulses. Keep knots, coefficients, and peaks unchanged.
+  The existing32*eps*N^2*sum|c| budget covers both FP64 prefix rounding paths;
+  nextafter also covers the measured final subtraction before adding the budget.
+  148 representative certificates:0.603398 ->0.251445s,2.40x. Largest budget
+  change7.24e-13; every bound covers independent long-double reconstruction.
+  64 candidate/certificate checks pass; one multi-GPU skip. Combined full check
+  follows the GPU budget-hoisting change now under evaluation.
