@@ -231,3 +231,11 @@ Compaction and CPU certificate checkpoint
   Extended compaction checks cover every exact candidate, allG, empty rows,
   strict ties, NaN/infinite bounds, subrange and nonmultiple tails.81 tests pass.
   Full combined730-day validation is the next step.
+  Combined full mixed validation19.275394s, all24 fields bitwise equal,1.909x
+  workspace reference. Nsys: exactG32 .074s, compaction .030s, other exact
+  groups negligible. Remaining screen6.042s, refine1.332s, prefix3.049s,
+  scatter2.710s, fold1.243s, sort1.126s, patch1.115s.
+  The latest constant full result25.547004s belongs to preceding d78df2c.
+  Further candidates: singleton bucket scatter; reuse bucket IDs; outward-rounded
+  FP32 certificate arithmetic (not final statistic), using NVIDIA directed-rounding
+  intrinsics: https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__INTRINSIC__SINGLE.html
