@@ -580,3 +580,9 @@ Sparse general-prefix checkpoint
   Optional benchmark memory diagnostics preserve observed post-search bytes and
   separately report surviving array shapes/referrer types and post-GC bytes.
   Full mixed-dy validation is next.
+  Full mixed validation atcbb2e82:9.560614s, all24 fields bitwise equal,
+  no thermal throttling. Previous10.590583s,9.73% lower elapsed time.
+  Prefix1.516553s, coarse1.925331s, refine0.984658s, scatter1.535602s.
+  Observed pool2,043,392bytes belongs to the25920-point initialization search;
+  diagnostic found retained __init__ frames. Explicit GC releases all bytes.
+  This is a reference-cycle investigation, not an additional arena allocation.
