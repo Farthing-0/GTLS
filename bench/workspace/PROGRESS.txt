@@ -564,3 +564,19 @@ Sparse uniform-prefix checkpoint
   with no surviving tracked reduction inputs/outputs. Keep the original2.5MB
   observation in the result; do not overwrite it or claim an identified cause.
   Further resource diagnostics will accompany the next changed workload.
+
+Sparse general-prefix checkpoint
+  Extend certified prefix resampling to variable weights: D_z and D_w use8-point
+  nodes, with separate interpolation/split/merge/FMA allowances. Window masses
+  use outward grid endpoints. Final exact candidate kernels and G are unchanged.
+  Prefix storage is24*(ceil(P/8)+1), down from24P; the reused sort arena now
+  dominates scratch capacity. Uniform stride16 coefficients remain bitwise equal
+  to a7d917b in16 CPU comparisons, so no unchanged uniform full rerun is needed.
+  Five752-period batches, GPU0 prefix/screens408.990 ->347.914ms; GPU1
+  471.432 ->353.287ms. All exact keys equal. Stride16 saves a little scan time
+  but increases exact survivors; stride8 retains tighter bounds.
+  Related regression244 passed, one multi-GPU skip;20 expanded direct-dot and
+  prefix tests passed. Compute-sanitizer61 tests passed, zero device errors.
+  Optional benchmark memory diagnostics preserve observed post-search bytes and
+  separately report surviving array shapes/referrer types and post-GC bytes.
+  Full mixed-dy validation is next.

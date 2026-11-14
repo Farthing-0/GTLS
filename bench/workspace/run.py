@@ -23,6 +23,7 @@ parser.add_argument('--baseline',action='store_true')
 parser.add_argument('--batch-cap',type=int)
 parser.add_argument('--repeats',type=int,default=3)
 parser.add_argument('--profile',action='store_true')
+parser.add_argument('--diagnose-memory',action='store_true')
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
 out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -152,6 +153,31 @@ try:
                   thermal_throttled=any(v['throttle_bits']&0x60 for v in states),
                   pool_used_after=cp.get_default_memory_pool().used_bytes(),
                   pool_total_after=cp.get_default_memory_pool().total_bytes())
+    if args.diagnose_memory and result['pool_used_after']:
+        # Preserve the observed post-search bytes; GC diagnostics happen after timing.
+        import gc
+        import types
+        live = []
+        for obj in gc.get_objects():
+            if type(obj) is cp.ndarray:
+                refs = gc.get_referrers(obj)
+                owners = []
+                for ref in refs:
+                    if type(ref) is types.FrameType:
+                        owners.append(ref.f_code.co_filename+':'+ref.f_code.co_name)
+                    else:
+                        owners.append(type(ref).__name__)
+                live.append(dict(shape=list(obj.shape), dtype=str(obj.dtype),
+                                 nbytes=obj.nbytes, owners=owners))
+                if refs:
+                    del ref
+                del refs, owners
+        del obj
+        result['memory_diagnostic'] = dict(arrays=live, collected=gc.collect())
+        cp.get_default_memory_pool().free_all_blocks()
+        result['memory_diagnostic'].update(
+            used_after_gc=cp.get_default_memory_pool().used_bytes(),
+            total_after_gc=cp.get_default_memory_pool().total_bytes())
 except Exception:
     result.update(ok=False,phase='error',error=traceback.format_exc())
     print(result['error'],flush=True)

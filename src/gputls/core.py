@@ -11,7 +11,8 @@ from . import constants
 from .grid import duration_limit_masses
 from .helpers import transit_mask
 from .screening import (certificates, MIN_WIDTH, SCREEN_TOLERANCES,
-                        UNIFORM_PREFIX_STRIDE, uniform_sparse_certificate)
+                        UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE,
+                        uniform_sparse_certificate, sparse_certificate)
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
 from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
                         bytes_per_period as workspace_bytes_per_period)
@@ -236,6 +237,7 @@ class GPUSearch:
             max_w = float(cp.max(cp.float32(1) / dy2))
             self.screening = bool(np.isfinite(max_z) and np.isfinite(max_w))
             if self.screening:
+                self.screenPrefixStride = GENERAL_PREFIX_STRIDE
                 # Check this call's actual FP32 weights, including the variance
                 # floor. No uniform-weight assumption survives across searches.
                 if bool(cp.all(self.preparedGPU[:, 1] == self.preparedGPU[0, 1])):
@@ -247,9 +249,12 @@ class GPUSearch:
                 for tolerance in SCREEN_TOLERANCES:
                     pos, coef, meta, mass_error = certificates(
                         signal, durations, max_z, max_w, certificateSize, tolerance)
-                    if stride > 1:
+                    if self.uniformWeight is not None:
                         pos, coef, meta = uniform_sparse_certificate(
                             pos, coef, meta, stride, certificateSize, max_z)
+                    else:
+                        pos, coef, meta = sparse_certificate(
+                            pos, coef, meta, stride, certificateSize, max_z, max_w)
                     self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
                                                     cp.asarray(meta), *map(np.float64, mass_error)))
         self.workspace = None
@@ -374,7 +379,7 @@ class GPUSearch:
                 self.screenMapGPU = cp.asarray(screen_block_map(offsets, strides))
                 if self.screenBudgetsGPU is None:
                     self.screenBudgetsGPU = cp.empty((3*len(self.durations), 4), dtype=cp.float64)
-                module.get_function("prepareScreenBudgetsUniformSparse" if packed else "prepareScreenBudgets")(
+                module.get_function("prepareScreenBudgetsUniformSparse" if packed else "prepareScreenBudgetsSparse")(
                     ((len(selected)+63)//64,), (64,),
                     (self.widthsGPU, selectedGPU, lanesGPU, self.screenCertificates[0][2],
                      self.screenBudgetsGPU, np.int32(len(selected)), np.int32(len(self.durations))))
@@ -385,7 +390,7 @@ class GPUSearch:
                          np.int32(self.maxWidth), self.uniformWeight, self.uniformSquareGPU))
                 self.screenMapKey = mapKey
             prefixGPU = workspace.view('scratch', (nPeriods, self.screenPrefixSize, self.screenPrefixBytes), cp.uint8)
-            prefixKernel = "scanScreeningUniformSparse" if packed else "scanScreening"
+            prefixKernel = "scanScreeningUniformSparse" if packed else "scanScreeningSparse"
             module.get_function(prefixKernel)(
                 (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])
@@ -401,7 +406,7 @@ class GPUSearch:
             # and tie ordering are unchanged.
             for level, certificate in enumerate(self.screenCertificates):
                 kernel = "refineCandidates" if level else "screenCandidates"
-                kernel += "UniformSparse" if self.uniformWeight is not None else "Mapped"
+                kernel += "UniformSparse" if self.uniformWeight is not None else "MappedSparse"
                 uniform_args = ((self.uniformSquareGPU, self.uniformWeight)
                                 if self.uniformWeight is not None else ())
                 module.get_function(kernel)(

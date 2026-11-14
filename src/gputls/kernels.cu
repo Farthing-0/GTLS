@@ -749,9 +749,16 @@ __device__ __forceinline__ double warpInclusiveScan(double value, double* total)
     return value;
 }
 
-extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
+template <int Stride>
+__device__ __forceinline__ void scanScreeningImpl(const float2* weighted, double2* prefix, int size) {
     constexpr int ITEMS = 16;
-    long long row = (long long)blockIdx.x * size;
+    int prefixSize = Stride == 1 ? size : (size+Stride-1)/Stride+1;
+    long long sourceRow = (long long)blockIdx.x*size;
+    long long row = (long long)blockIdx.x*prefixSize;
+    if (Stride > 1 && threadIdx.x == 0) {
+        prefix[row] = make_double2(0, 0);
+        ((uint2*)(prefix+(long long)gridDim.x*prefixSize))[row] = make_uint2(0, 0);
+    }
     double zCarry = 0, wCarry = 0, absCarry = 0, dzCarry = 0, dwCarry = 0;
     for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {
         int begin = tile + ITEMS*threadIdx.x;
@@ -759,7 +766,7 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
         double sz = 0, sw = 0, sa = 0, sdz = 0, sdw = 0;
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
-            float2 v = begin+q < size ? weighted[row+begin+q] : make_float2(0,0);
+            float2 v = begin+q < size ? weighted[sourceRow+begin+q] : make_float2(0,0);
             sz += (double)v.x; sw += (double)v.y; sa += fabs((double)v.x);
             sdz += sz; sdw += sw;
             z[q] = sz; w[q] = sw; az[q] = sa; dz[q] = sdz; dw[q] = sdw;
@@ -774,17 +781,28 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
         double beforeDW = dwCarry + (warpInclusiveScan(blockDW, &dwTotal)-blockDW);
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
-            if (begin+q < size) {
-                prefix[row+begin+q] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
+            bool store = Stride == 1 ? begin+q < size
+                : begin+q < (prefixSize-1)*Stride && (begin+q+1)%Stride == 0;
+            if (store) {
+                int index = Stride == 1 ? begin+q : (begin+q+1)/Stride;
+                prefix[row+index] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
                                                     beforeDW + (dw[q]+(q+1)*beforeW));
-                uint2* mass = (uint2*)(prefix+(long long)gridDim.x*size);
-                mass[row+begin+q] = make_uint2(__double2hiint(beforeA+az[q]),
+                uint2* mass = (uint2*)(prefix+(long long)gridDim.x*prefixSize);
+                mass[row+index] = make_uint2(__double2hiint(beforeA+az[q]),
                                              __double2hiint(beforeW+w[q]));
             }
         }
         zCarry += zTotal; wCarry += wTotal; absCarry += absTotal;
         dzCarry += dzTotal; dwCarry += dwTotal;
     }
+}
+
+extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
+    scanScreeningImpl<1>(weighted, prefix, size);
+}
+
+extern "C" __global__ void scanScreeningSparse(const float2* weighted, double2* prefix, int size) {
+    scanScreeningImpl<8>(weighted, prefix, size);
 }
 
 // Equal weights make the template-square statistic independent of the window.
@@ -956,6 +974,11 @@ extern "C" __global__ void prepareScreenBudgetsUniformSparse(const int* widths, 
     prepareScreenBudgetsImpl<16>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
 }
 
+extern "C" __global__ void prepareScreenBudgetsSparse(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    prepareScreenBudgetsImpl<8>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
+}
+
 // Drop the nonnegative A2 term for a cheap lower bound. All nonnegative
 // quantities are rounded upward, then negated. If FP32 intermediates cannot
 // certify that the original statistic is finite, retain the full bound path.
@@ -1013,10 +1036,10 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                 if (terms) {
                     double4 rounding = Mapped ? budgets[duration] : screenRoundingBudget(width,lanes[d]);
                     int prefixSize = PrefixStride == 1 ? size : (size+PrefixStride-1)/PrefixStride+1;
-                    int dotStart = Uniform ? start/PrefixStride : start;
+                    int dotStart = start/PrefixStride;
                     const double2* p = Uniform
                         ? (const double2*)((const double*)prefix+(long long)period*prefixSize)
-                        : prefix+(long long)period*size;
+                        : prefix+(long long)period*prefixSize;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     if (Refine) {
@@ -1037,8 +1060,10 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                         az = fmax(0.0, end-first)+absMassError+storageError;
                         w = __dmul_ru((double)uniformWeight, (double)width);
                     } else {
-                        const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
-                        uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
+                        const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*prefixSize)+(long long)period*prefixSize;
+                        int endIndex = PrefixStride == 1 ? start+width-1 : (start+width+PrefixStride-1)/PrefixStride;
+                        int firstIndex = PrefixStride == 1 ? start-1 : start/PrefixStride;
+                        uint2 endBits=mass[endIndex], firstBits=start?mass[firstIndex]:make_uint2(0,0);
                         double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
                         double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
                         // Dropping the low32 bits keeps the full FP64 exponent and
@@ -1211,6 +1236,20 @@ extern "C" __global__ void refineCandidatesUniformSparse(SCREEN_ARGS, const int2
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
         absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
         blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void screenCandidatesMappedSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets) {
+    screenCandidatesImpl<false, true, false, 8>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
+}
+
+extern "C" __global__ void refineCandidatesMappedSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets) {
+    screenCandidatesImpl<true, true, false, 8>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
 }
 #undef SCREEN_ARGS
 

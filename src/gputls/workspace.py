@@ -20,7 +20,8 @@ def bytes_per_period(n, patched, starts=0, screening=False, prefix_bytes=24, wei
                      prefix_points=None):
     # Sort: index(4N), compact phase key(4N), count(4B), cursor(4B), B=ceil(N/3).
     # Equal weights use12 bytes per sparse prefix node and4P weighted residuals;
-    # general weights use24P prefixes and8P weighted pairs. Integer sums use8P.
+    # general weights use24 bytes per sparse node and8P weighted pairs.
+    # Integer sums use8P. The default prefix_points retains the full-prefix layout.
     prefix_points = patched if prefix_points is None else prefix_points
     scratch = max(8*n+8*bucket_count(n), prefix_bytes*prefix_points if screening else 0)
     return scratch + (8+weighted_bytes)*patched + 4*starts

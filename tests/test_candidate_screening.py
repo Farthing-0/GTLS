@@ -4,7 +4,9 @@ import numpy as np
 import pytest
 
 from gputls import core
-from gputls.screening import certificates, template_certificate, SCREEN_TOLERANCES, uniform_sparse_certificate, UNIFORM_PREFIX_STRIDE
+from gputls.screening import (certificates, template_certificate, SCREEN_TOLERANCES,
+                             uniform_sparse_certificate, sparse_certificate,
+                             UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE)
 
 
 def test_screen_schedule_covers_candidates_once_in_time_order():
@@ -74,6 +76,48 @@ def test_chunked_prefixes_fit_high_precision_error_budget(size):
     assert np.all(abs(interpolated-exact_d) <= prefix_budget+(stride*stride/8)*maxima[0])
 
 
+@pytest.mark.parametrize('size', [1, 7, 8, 9, 127, 128, 129, 511, 512, 513, 1025, 706406])
+def test_general_sparse_prefix_grid_bits_and_interpolation_bound(size):
+    stride = GENERAL_PREFIX_STRIDE
+    rng = np.random.default_rng(size)
+    w = np.exp(rng.uniform(-10, 10, size)).astype(np.float32)
+    z = (w*rng.normal(0, .01, size)).astype(np.float32)
+    inputs = np.column_stack((z, w))
+    weighted = cp.asarray(inputs)
+    padded_size = (size+stride-1)//stride*stride
+    prefix_size = padded_size//stride+1
+    full = cp.empty(24*size, cp.uint8)
+    sparse = cp.empty(24*prefix_size, cp.uint8)
+    module = core.load_module()
+    module.get_function('scanScreening')((1,), (core.SCREEN_SCAN_THREADS,),
+                                         (weighted, full, np.int32(size)))
+    module.get_function('scanScreeningSparse')((1,), (core.SCREEN_SCAN_THREADS,),
+                                               (weighted, sparse, np.int32(size)))
+    d = sparse[:16*prefix_size].view(cp.float64).reshape(prefix_size, 2).get()
+    mass_bits = sparse[16*prefix_size:].view(cp.uint32).reshape(prefix_size, 2).get()
+    mass = (mass_bits.astype(np.uint64) << 32).view(np.float64).astype(np.longdouble)
+    indices = np.arange(stride, size+1, stride)-1
+    assert d[1:len(indices)+1].tobytes() == full[:16*size].view(cp.float64).reshape(size, 2).get()[indices].tobytes()
+    np.testing.assert_array_equal(mass_bits[1:len(indices)+1], full[16*size:].view(cp.uint32).reshape(size, 2).get()[indices])
+    padded = np.zeros((padded_size, 2), np.longdouble)
+    padded[:size] = inputs
+    zero = np.zeros((1, 2), np.longdouble)
+    expected_d = np.vstack((zero, np.cumsum(np.cumsum(padded, axis=0), axis=0)))
+    expected_mass = np.vstack((zero, np.cumsum(abs(padded), axis=0)))
+    steps = 2*((padded_size+511)//512+48)
+    gamma = steps*2.**-53/(1-steps*2.**-53)
+    maxima = np.max(abs(padded), axis=0)
+    prefix_budget = 4*gamma*padded_size**2*maxima
+    nodes = np.arange(prefix_size)*stride
+    assert np.all(abs(d.astype(np.longdouble)-expected_d[nodes]) <= prefix_budget)
+    assert np.all(abs(mass-expected_mass[nodes]) <= 4*gamma*padded_size*maxima+2.**-19*abs(mass)+2.**-1020)
+    at = np.arange(padded_size+1)
+    cells = at//stride
+    fraction = (at%stride).astype(np.longdouble)[:, None]/stride
+    interpolated = (1-fraction)*d[cells]+fraction*d[np.minimum(cells+1, prefix_size-1)]
+    assert np.all(abs(interpolated-expected_d) <= prefix_budget+(stride*stride/8)*maxima)
+
+
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
 def test_uniform_square_uses_original_fma_and_reduction_order(g):
     widths = np.array([1, 7, 513, 1025], dtype=np.int32)
@@ -103,11 +147,12 @@ def test_uniform_square_uses_original_fma_and_reduction_order(g):
 @pytest.mark.parametrize('cheap_bound', [False, True])
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
 @pytest.mark.parametrize('pattern', ['random', 'outlier', 'tie', 'overflow', 'uniform',
-                                     'sparse', 'sparse-outlier', 'sparse-tie', 'sparse-overflow'])
+                                     'sparse', 'sparse-outlier', 'sparse-tie', 'sparse-overflow',
+                                     'coarse-random', 'coarse-outlier', 'coarse-tie', 'coarse-overflow'])
 def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
-    sparse = pattern.startswith('sparse')
-    uniform = pattern == 'uniform' or sparse
-    pattern = pattern.replace('sparse-', '') if '-' in pattern else pattern
+    sparse = pattern.startswith(('sparse', 'coarse'))
+    uniform = pattern == 'uniform' or pattern.startswith('sparse')
+    pattern = pattern.split('-', 1)[1] if '-' in pattern else pattern
     rng = np.random.default_rng(318)
     n, width = 131, 513
     size = n + width
@@ -129,13 +174,14 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     if pattern == 'tie':
         signal.fill(0)
     def make_certificate(tolerance):
-        stride = UNIFORM_PREFIX_STRIDE if sparse else 1
+        stride = (UNIFORM_PREFIX_STRIDE if uniform else GENERAL_PREFIX_STRIDE) if sparse else 1
         padded_size = (size+stride-1)//stride*stride
         pos, coef, meta, mass_error = certificates(
             signal[None], [width], abs(z).max(), weight.max(), padded_size, tolerance)
         if sparse:
-            pos, coef, meta = uniform_sparse_certificate(
-                pos, coef, meta, stride, padded_size, float(abs(z).max()))
+            pos, coef, meta = sparse_certificate(
+                pos, coef, meta, stride, padded_size, float(abs(z).max()),
+                float(weight.max()), uniform)
         return pos, coef, meta, mass_error
 
     pos, coef, meta, mass_error = make_certificate(SCREEN_TOLERANCES[0])
@@ -146,8 +192,10 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     prefix = cp.empty(n*size*24, dtype=cp.uint8)
     module = cp.RawModule(code=core.KERNEL_SOURCE.read_text(),
                           options=(f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}",))
-    prefix_kernel = 'scanScreeningUniformSparse' if sparse else ('scanScreeningUniform' if uniform else 'scanScreening')
-    module.get_function(prefix_kernel)((n,), (core.SCREEN_SCAN_THREADS,), (weighted[:, :, 0].copy() if sparse else weighted, prefix, np.int32(size)))
+    prefix_kernel = 'scanScreening' + ('Uniform' if uniform else '') + ('Sparse' if sparse else '')
+    prefix_input = weighted[:, :, 0].copy() if sparse and uniform else weighted
+    module.get_function(prefix_kernel)((n,), (core.SCREEN_SCAN_THREADS,),
+                                       (prefix_input, prefix, np.int32(size)))
     widths = cp.asarray([width], dtype=cp.int32)
     selected = cp.asarray([0], dtype=cp.int32)
     offsets = cp.asarray([0, n], dtype=cp.int32)
@@ -162,10 +210,11 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
          np.int32(n), np.int32(size), np.float32(-1))
     block_map = cp.asarray(core.screen_block_map(np.array([0, n]), np.array([1])))
     budgets = cp.empty((3, 4), dtype=cp.float64)
-    module.get_function('prepareScreenBudgetsUniformSparse' if sparse else 'prepareScreenBudgets')((1,), (64,),
+    budget_kernel = 'prepareScreenBudgets' + (('UniformSparse' if uniform else 'Sparse') if sparse else '')
+    module.get_function(budget_kernel)((1,), (64,),
         (widths, selected, screen_args[10], screen_args[14], budgets, np.int32(1), np.int32(1)))
     extra = (block_map, budgets)
-    suffix = 'Mapped'
+    suffix = 'MappedSparse' if sparse else 'Mapped'
     if uniform:
         square = cp.empty(1, cp.float32)
         module.get_function('prepareUniformSquare')((1,), (32,),
@@ -269,9 +318,11 @@ def test_sparse_certificate_reconstructs_target_within_bound(tolerance):
         assert np.all(np.max(abs(represented-target), axis=0) <= error)
 
 
+@pytest.mark.parametrize('uniform', [False, True])
 @pytest.mark.parametrize('pattern', ['random', 'constant', 'alternating', 'outlier'])
-def test_resampled_certificate_covers_direct_long_double_dot(pattern):
-    stride, width, size = UNIFORM_PREFIX_STRIDE, 513, 1408
+def test_resampled_certificate_covers_direct_long_double_dot(pattern, uniform):
+    stride = UNIFORM_PREFIX_STRIDE if uniform else GENERAL_PREFIX_STRIDE
+    width, size = 513, 1408
     rng = np.random.default_rng(2729)
     z = rng.normal(0, .01, size).astype(np.float32)
     if pattern == 'constant':
@@ -282,18 +333,25 @@ def test_resampled_certificate_covers_direct_long_double_dot(pattern):
         z[0] = 1000.
     x = np.linspace(-1, 1, width)
     signal = (.5*np.maximum(0, 1-x*x)**.3).astype(np.float32)
-    pos, coef, meta, _ = certificates(signal[None], [width], abs(z).max(), 1., size)
-    pos, coef, meta = uniform_sparse_certificate(pos, coef, meta, stride, size, float(abs(z).max()))
-    prefix = np.r_[np.longdouble(0), np.cumsum(np.cumsum(z.astype(np.longdouble)))]
+    w = np.exp(rng.normal(0, 2, size)).astype(np.float32)
+    if pattern == 'outlier':
+        w[0] = 1e9
+    pos, coef, meta, _ = certificates(signal[None], [width], abs(z).max(), w.max(), size)
+    pos, coef, meta = sparse_certificate(pos, coef, meta, stride, size,
+                                          float(abs(z).max()), float(w.max()), uniform)
+    inputs = np.column_stack((z, w)).astype(np.longdouble)
+    prefix = np.vstack((np.zeros((1, 2), np.longdouble), np.cumsum(np.cumsum(inputs, axis=0), axis=0)))
     for start in range(2*stride):
         row = meta[start % stride]
         begin, count = map(int, row[:2])
         nodes = (start//stride+pos[begin:begin+count]-2)*stride
         values = prefix[np.maximum(nodes, 0)]
-        estimate = np.sum(values*coef[begin:begin+count, 0].astype(np.longdouble))
-        target = np.sum(z[start:start+width].astype(np.longdouble)*signal.astype(np.longdouble))
-        radius = row[2]*np.sum(abs(z[start:start+width].astype(np.longdouble)))+row[6]
-        assert abs(estimate-target) <= radius
+        for column in range(1 if uniform else 2):
+            template = signal if column == 0 else signal*signal
+            estimate = np.sum(values[:, column]*coef[begin:begin+count, column].astype(np.longdouble))
+            target = np.sum(inputs[start:start+width, column]*template.astype(np.longdouble))
+            radius = row[2+column]*np.sum(abs(inputs[start:start+width, column]))+row[6+column]
+            assert abs(estimate-target) <= radius
 
 
 def _screened_curve():
