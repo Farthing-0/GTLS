@@ -1,0 +1,35 @@
+GTLS workspace and performance work — 2026-11-14
+
+Branch: perf/gtls-memory-speed
+Baseline: 8f6c36c4a4ab5b18d1cb3201966f498ded44e7b2 (GTLS 2.2.0)
+Experiment root: /home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization
+Frozen baseline source: ../sources/gtls/gputls relative to the experiment root
+
+Objective
+  Fix the 730-day / 100-second OOM with reusable per-device storage, preserving
+  every numerical result, then profile with Nsight Systems and optimize measured
+  bottlenecks. Keep the stopped TLS2 comparison stopped. Commit each milestone.
+
+Evidence before changes
+  N=630720, P=706406, 48935 periods. Native batch=551 on GPU0 RTX 3090.
+  Batch 2 reuses 2.90 GiB of an 11.60 GiB prefix allocation for cumResidual.
+  The remaining 8.70 GiB is trapped in that split block; the next prefix needs
+  another 11.60 GiB. Required holding+request=26.12 GiB versus estimate=20.54 GiB.
+  Trimming free blocks at batch boundaries passes eight native-sized batches.
+  Diagnosis: ../memory-analysis-730d-100s relative to the experiment root.
+
+Milestones
+  [done] Create branch and record constraints / original failure.
+  [pending] Preallocate/reuse workspace; verify exact outputs and memory lifecycle.
+  [pending] Complete 730-day / 100-second run and save full reference comparisons.
+  [pending] Profile warmed search with nsys; optimize dominant cost and remeasure.
+  [pending] Final correctness, variable-dy checks, results and reproducible commands.
+
+Acceptance
+  Preserve raw_chi2, chi2, power, masks and fitted/statistical fields against the
+  frozen baseline, including nonconstant, extreme and smooth-varying dy.
+  Exercise consecutive batches, tail batches, refinement, final every-point fit,
+  multiple GPUs where available, and memory release after successful/failed search.
+  Keep floating-point reduction/FMA order unless exact equality is demonstrated.
+  Performance measurements use warmup, synchronized API wall time and repetitions;
+  profiler measurements are separate and never used as the unprofiled runtime.
