@@ -20,7 +20,7 @@ Evidence before changes
 
 Milestones
   [done] Create branch and record constraints / original failure.
-  [pending] Preallocate/reuse workspace; verify exact outputs and memory lifecycle.
+  [done] Preallocate/reuse workspace; single-GPU regression: 42 passed, 2 skipped.
   [pending] Complete 730-day / 100-second run and save full reference comparisons.
   [pending] Profile warmed search with nsys; optimize dominant cost and remeasure.
   [pending] Final correctness, variable-dy checks, results and reproducible commands.
@@ -33,3 +33,18 @@ Acceptance
   Keep floating-point reduction/FMA order unless exact equality is demonstrated.
   Performance measurements use warmup, synchronized API wall time and repetitions;
   profiler measurements are separate and never used as the unprofiled runtime.
+
+Workspace implementation checkpoint
+  One aligned arena per GPU aliases the sort, patch-residual and screening-prefix
+  storage; weighted data, cumulative residuals and lower bounds have fixed regions.
+  Tail/refinement calls retain capacity and use tightly packed active views.
+  Batch sizing respects pool limits; OOM retries smaller chunks without dropping
+  periods. Existing kernels and their arithmetic are unchanged.
+  Test command: PYTHONPATH=src CUDA_VISIBLE_DEVICES=<GPU0 UUID> .venv/bin/python
+    -m pytest tests/test_gtls.py tests/test_candidate_screening.py
+    tests/test_window_reuse.py tests/test_workspace.py -q
+  Result: 42 passed, 2 skipped (multiple GPUs hidden), 1 pre-existing flat-SDE warning.
+  Evidence: workspace-optimization/tests-workspace.txt under the experiment root's parent.
+  run.py freezes the selected source and all input/settings hashes in each output;
+  compare.py checks every result field/mask bitwise. The old source uses batch cap
+  256 to obtain a complete numerical reference despite its native-batch OOM.
