@@ -276,7 +276,9 @@ __device__ __forceinline__ void searchChi2Lanes(
         const int* strides,            // (nSelected)
         const bool* periodMask,        // (periods, nDurations)
         int yBegin, int yEnd, int nDurations, int tSize, int patchedSize,
-        int maxWidth, float transitDepthMin) {
+        int maxWidth, float transitDepthMin,
+        const float* lowerBounds = nullptr, const unsigned long long* upperKeys = nullptr,
+        int nBounds = 0) {
     int periodIndex = blockIdx.y;
     int laneInWindow = threadIdx.x % G;
     int workItem = offsets[yBegin] + (blockIdx.x * blockDim.x + threadIdx.x) / G;
@@ -302,6 +304,12 @@ __device__ __forceinline__ void searchChi2Lanes(
                                   - (windowStart > 0 ? rowCumResidual[windowStart - 1] : 0);
             meanDepth = __fdiv_rn(__ll2float_rn(windowSum) * invScale, (float)windowWidth);
             active = meanDepth > transitDepthMin;  // the same for all G lanes of the window
+            if (active && lowerBounds) {
+                unsigned int high = (unsigned int)(upperKeys[periodIndex] >> 32);
+                float upper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
+                // Strict comparison retains every exact tie, including its original location.
+                active = !(lowerBounds[(long long)periodIndex * nBounds + workItem] > upper);
+            }
         }
         if (active) {
             const float2* windowWeighted = patchedWeighted + (long long)periodIndex * patchedSize + windowStart;
@@ -535,3 +543,121 @@ SEARCH_ADJACENT(32,4)
 #undef SEARCH_ADJACENT
 #undef REUSE_ARGS
 #undef REUSE_PASS
+
+// Inclusive first/double prefixes of the actual stored float2 data, in FP64.
+// At index i: (D_z[i+2], D_w[i+2], S_abs_z[i+1], S_w[i+1]).
+extern "C" __global__ void scanScreening(const float2* weighted, double4* prefix, int size) {
+    long long row = (long long)blockIdx.x * size;
+    double zCarry = 0, wCarry = 0, absCarry = 0, dzCarry = 0, dwCarry = 0;
+    for (int tile = 0; tile < size; tile += blockDim.x) {
+        int i = tile + threadIdx.x;
+        float2 v = i < size ? weighted[row + i] : make_float2(0, 0);
+        double zTotal, wTotal, absTotal, dzTotal, dwTotal;
+        double z = zCarry + blockInclusiveScan((double)v.x, &zTotal);
+        double w = wCarry + blockInclusiveScan((double)v.y, &wTotal);
+        double az = absCarry + blockInclusiveScan(fabs((double)v.x), &absTotal);
+        double dz = dzCarry + blockInclusiveScan(z, &dzTotal);
+        double dw = dwCarry + blockInclusiveScan(w, &dwTotal);
+        if (i < size) prefix[row + i] = make_double4(dz, dw, az, w);
+        zCarry += zTotal;
+        wCarry += wTotal;
+        absCarry += absTotal;
+        dzCarry += dzTotal;
+        dwCarry += dwTotal;
+    }
+}
+
+extern "C" __global__ void screenCandidates(
+        float* lower, unsigned long long* upperKeys, const double4* prefix,
+        const long long* residual, float invScale, const float* overshoot,
+        const int* widths, const int* selected, const int* offsets, const int* strides,
+        const int* lanes, const bool* mask, const int* positions, const double2* coefficients,
+        const double* metadata, double absMassError, double weightMassError,
+        int nSelected, int nDurations, int tSize, int size, float depthMin) {
+    int period = blockIdx.y;
+    int item = blockIdx.x * blockDim.x + threadIdx.x;
+    int count = offsets[nSelected];
+    unsigned long long key = 0xffffffffffffffffull;
+    if (item < count) {
+        float lo = -__int_as_float(0x7f800000);
+        int d = 0;
+        while (offsets[d + 1] <= item) ++d;
+        int duration = selected[d], width = widths[duration];
+        int start = (item - offsets[d]) * strides[d];
+        if (!mask[(long long)period*nDurations + duration]) {
+            lo = __int_as_float(0x7f800000);
+        } else {
+            const long long* r = residual + (long long)period*size;
+            long long sum = r[start+width-1] - (start ? r[start-1] : 0);
+            float depth = __fdiv_rn(__ll2float_rn(sum)*invScale, (float)width);
+            if (!(depth > depthMin)) {
+                lo = __int_as_float(0x7f800000);
+            } else {
+                const double* m = metadata + duration*8;
+                int begin = (int)m[0], terms = (int)m[1];
+                if (terms) {
+                    const double4* p = prefix + (long long)period*size;
+                    double ar = 0, a2 = 0;
+                    for (int j = begin; j < begin+terms; ++j) {
+                        int k = start + positions[j] - 2;
+                        double4 v = k >= 0 ? p[k] : make_double4(0,0,0,0);
+                        double2 c = coefficients[j];
+                        ar = fma(c.x, v.x, ar);
+                        a2 = fma(c.y, v.y, a2);
+                    }
+                    double4 end = p[start+width-1];
+                    double4 first = start ? p[start-1] : make_double4(0,0,0,0);
+                    double az = fmax(0.0, end.z-first.z) + absMassError;
+                    double w = fmax(0.0, end.w-first.w) + weightMassError;
+                    int g = lanes[d];
+                    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
+                    double gu = steps*0x1p-24;
+                    double gamma = gu < 0.5 ? gu/(1-gu) : __int_as_float(0x7f800000);
+                    // The original FMA chains + XOR tree, including subnormal rounding.
+                    double tiny = (double)width*(steps+8)*0x1p-149;
+                    double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
+                    double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
+                    float amplitude = depth*overshoot[duration]*2.0f;
+                    double a = amplitude, aa = fabs(a);
+                    double arBound = (1+gamma)*m[4]*az + tiny;
+                    double a2Bound = (1+gamma)*m[5]*w + tiny;
+                    double finalRound = 0x1p-21*(a*a*a2Bound + 2*aa*arBound) + tiny;
+                    double proxy = a*(a*a2 - 2*ar);
+                    double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
+                    double hi = proxy+error;
+                    double low = proxy-error;
+                    double innerBound = aa*a2Bound + 2*arBound;
+                    bool noOverflow = arBound <= 0x1.fffffep+126 && a2Bound <= 0x1.fffffep+127
+                        && innerBound <= 0x1.fffffep+127 && aa*innerBound <= 0x1.fffffep+127;
+                    // Unbounded/nonfinite certificates keep the original exact path.
+                    if (noOverflow && isfinite(hi) && isfinite(low) && isfinite(amplitude)) {
+                        lo = __double2float_rd(low);
+                        float upper = __double2float_ru(hi);
+                        key = ((unsigned long long)orderedKey(upper) << 32) | (unsigned int)item;
+                    }
+                }
+            }
+        }
+        lower[(long long)period*count+item] = lo;
+    }
+    storeAdjacentBest(key, upperKeys, period);
+}
+
+#define SCREENED_EXACT(G) \
+    extern "C" __global__ void searchChi2ScreenedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds) { \
+        searchChi2Lanes<G>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds); \
+    }
+SCREENED_EXACT(1)
+SCREENED_EXACT(2)
+SCREENED_EXACT(4)
+SCREENED_EXACT(8)
+SCREENED_EXACT(16)
+SCREENED_EXACT(32)
+#undef SCREENED_EXACT

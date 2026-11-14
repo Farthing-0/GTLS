@@ -10,6 +10,7 @@ import tqdm
 from . import constants
 from .grid import duration_limit_masses
 from .helpers import transit_mask
+from .screening import certificates, MIN_WIDTH
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
 
 KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
@@ -184,6 +185,21 @@ class GPUSearch:
         self.overshootGPU = cp.asarray(self.lc_cache_overview["overshoot"]).astype(cp.float32)
         self.widthsGPU = cp.asarray(durations).astype(cp.int32)
 
+        # Screening is useful for long templates and a sampled start grid. The final
+        # every-point fit and small curves retain the adjacent-window path.
+        self.screening = (self.tSize >= 8192 and self.maxWidth >= MIN_WIDTH
+                          and min(T0_fit_margin, T0_refine_margin) > 0)
+        if self.screening:
+            max_z = float(cp.max(cp.abs(weightedResidual)))
+            max_w = float(cp.max(cp.float32(1) / dy2))
+            self.screening = bool(np.isfinite(max_z) and np.isfinite(max_w))
+            if self.screening:
+                pos, coef, meta, self.screenMassError = certificates(
+                    signal, durations, max_z, max_w, self.patchedDatasSize)
+                self.screenPositions = cp.asarray(pos)
+                self.screenCoefficients = cp.asarray(coef)
+                self.screenMetadata = cp.asarray(meta)
+
     def duration_mask(self, periods):
         """Boolean array (periods x durations) of physically plausible durations per period."""
         module = self.module
@@ -261,13 +277,29 @@ class GPUSearch:
         # duration, so an incomplete group never consumes starts from the next duration.
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
         lanes = lanes_per_window(strides)
-        if np.any(lanes >= 8):
+        screening = self.screening and margin > 0
+        if not screening and np.any(lanes >= 8):
             adjacent = np.where(lanes == 32, 4, np.where(lanes >= 8, 2, 1))
             group_counts = (np.diff(offsets) + adjacent - 1) // adjacent
             offsets = np.concatenate(([0], np.cumsum(group_counts)))
         selectedGPU = cp.asarray(selected)
         offsetsGPU = cp.asarray(offsets.astype(np.int32))
         stridesGPU = cp.asarray(strides)
+        if screening:
+            prefixGPU = cp.empty((nPeriods, patchedSize, 4), dtype=cp.float64)
+            module.get_function("scanScreening")(
+                (nPeriods,), (SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
+            nBounds = int(offsets[-1])
+            lowerGPU = cp.empty((nPeriods, nBounds), dtype=cp.float32)
+            upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
+            module.get_function("screenCandidates")(
+                ((nBounds + 255)//256, nPeriods), (256,),
+                (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
+                 self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
+                 cp.asarray(lanes), periodMaskGPU, self.screenPositions, self.screenCoefficients,
+                 self.screenMetadata, *map(np.float64, self.screenMassError), np.int32(len(selected)),
+                 np.int32(len(self.durations)), np.int32(tSize), np.int32(patchedSize), self.transit_depth_min))
+            del prefixGPU
         yBegin = 0
         while yBegin < len(selected):
             G = int(lanes[yBegin])
@@ -275,13 +307,15 @@ class GPUSearch:
             while yEnd < len(selected) and lanes[yEnd] == G:
                 yEnd += 1
             nGroups = int(offsets[yEnd] - offsets[yBegin])
-            kernel = f"searchChi2AdjacentG{G}" if G >= 8 else f"searchChi2G{G}"
+            kernel = (f"searchChi2ScreenedG{G}" if screening else
+                      f"searchChi2AdjacentG{G}" if G >= 8 else f"searchChi2G{G}")
             module.get_function(kernel)(
                 ((nGroups * G + 255) // 256, nPeriods), (256,),
                 (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
                  self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
                  np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
-                 np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min))
+                 np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min)
+                + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()))
             yBegin = yEnd
         return bestGPU
 
@@ -331,7 +365,12 @@ class MultiGPUSearch:
         duration for the period mask of searchChi2. Independent of T0_fit_margin.
         """
         s = self.primary
-        return 8 * s.tSize + 16 * s.patchedDatasSize + len(s.durations) + 16
+        base = 8 * s.tSize + 16 * s.patchedDatasSize + len(s.durations) + 16
+        if s.screening:
+            margin = min(s.T0_fit_margin, s.T0_refine_margin)
+            starts = np.sum(-(-s.tSize // start_strides(s.durations, margin)))
+            return base + 32*s.patchedDatasSize + 4*int(starts) + 8
+        return base
 
     @staticmethod
     def available_memory(device_id):

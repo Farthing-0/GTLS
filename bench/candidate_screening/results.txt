@@ -1,0 +1,37 @@
+2026-11-14, RTX 3090, round-1 baseline 50cb1db -> certified screening.
+All supplied dy patterns are heterogeneous. All 24 output fields/masks are byte-identical.
+
+End-to-end medians (seconds; complete search and fit, excluding warmup/profiling/I/O):
+  365d/100s mixed dy, GPU0, 3 repeats, cool <=65 C: 18.435958 -> 9.259865 (1.991x)
+   90d/200s random dy, GPU1, 5 repeats:             0.675785 -> 0.511456 (1.321x)
+   90d/100s stepped dy + extreme weights, 3 repeats:1.148973 -> 0.679010 (1.692x)
+   30d/600s smooth dy, 10 repeats:                 0.088102 -> 0.089623 (essentially flat)
+
+Full-flow nsys on GPU0:
+  Exact search kernels: 15.987686 -> 0.845773 seconds.
+  New FP64 prefixes: 1.781391 seconds; candidate screening: 4.288012 seconds.
+  All GPU kernels: 17.489327 -> 8.405993 seconds.
+  Full NVTX interval: 18.117185 -> 9.390949 seconds.
+  NVML sampled device memory peak (includes pool/desktop): 10.27 -> 18.85 GiB.
+  GPU busy: 96.74% -> 89.90%. Lower busy is not a regression in time to solution.
+
+Full-grid audit: 2,132,333,881 certified active candidates; 8,368,556 survive (0.39246%).
+All survivors use the original FMA/reduction/amplitude/tie-breaking arithmetic.
+
+NCU, same 815 periods on GPU1, ordinary UID 1000, 17 replay passes per kernel:
+  Old G8/G16/G32: 139.881/159.078/297.117 ms.
+  New exact G8/G16/G32: 6.219/5.501/18.482 ms.
+  Prefix 52.728 ms; screen 145.513 ms (replay times, not E2E timings).
+  Prefix FP64 pipe active: 81.68% of peak.
+  Screen: long scoreboard 72.78% of warp instruction interval, DRAM active 42.27% of peak,
+          eligible warps/scheduler 0.0248, issue-active 2.18%.
+  Next bottlenecks are prefix FP64 work and screening prefix gathers. Improving coalescing /
+  parallelism there is a better next step than tuning the now-small exact-search stage.
+
+Validation: 57 single-GPU tests + 2 multi-GPU tests passed. Existing flat-spectrum SDE warning.
+All benchmark/profiler source hashes and identical inputs were verified; reports owned by UID1000.
+No clocks were locked; temperatures, clocks, power-throttle flags and all repetitions are saved.
+Large templates / sampled grids use screening; small inputs and margin=0 retain round-1 kernels.
+
+Full report, raw data, nsys/ncu reports, plots, manifest and verification:
+/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114/round2-candidate-screening-20261114
