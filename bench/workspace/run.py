@@ -1,5 +1,6 @@
 """Frozen-source correctness, synchronized timing and nsys capture for workspace work."""
 import argparse
+import ctypes as ct
 import hashlib
 import importlib.util
 import json
@@ -9,6 +10,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import traceback
 
@@ -57,6 +59,19 @@ if args.profile:
 
 spec=importlib.util.spec_from_file_location('_campaign_monitor',EXPERIMENT/'benchmark.py')
 campaign=importlib.util.module_from_spec(spec);spec.loader.exec_module(campaign)
+
+
+class SelectedDeviceMonitor(campaign.Monitor):
+    """NVML uses physical indices; CUDA_VISIBLE_DEVICES may expose GPU1 as device 0."""
+    def __enter__(self):
+        self.rows=[];self.stop=threading.Event();self.lib=ct.CDLL('libnvidia-ml.so.1')
+        assert self.lib.nvmlInit_v2()==0
+        self.handle=ct.c_void_p()
+        bus=cp.cuda.runtime.deviceGetPCIBusId(0)
+        assert self.lib.nvmlDeviceGetHandleByPciBusId_v2(bus.encode(),ct.byref(self.handle))==0
+        self.sample()
+        self.thread=threading.Thread(target=self.loop,daemon=True);self.thread.start()
+        return self
 
 
 def digest(path):
@@ -113,7 +128,7 @@ try:
     times=[];states=[];expected=None
     for repeat in range(1 if args.profile else args.repeats):
         cp.cuda.runtime.deviceSynchronize()
-        with campaign.Monitor() as mon:
+        with SelectedDeviceMonitor() as mon:
             if args.profile:cp.cuda.profiler.start()
             cp.cuda.nvtx.RangePush('GTLS_full_power')
             start=time.perf_counter();answer=call();cp.cuda.runtime.deviceSynchronize()
