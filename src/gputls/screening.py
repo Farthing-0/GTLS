@@ -11,6 +11,7 @@ MIN_WIDTH = 512
 RELATIVE_TOLERANCE = 0.01
 # Loose-to-tight certificates reduce exact work without changing the statistic.
 SCREEN_TOLERANCES = (0.05, 0.015, 0.005, 0.00025)
+UNIFORM_PREFIX_STRIDE = 16
 
 
 @njit(cache=True, fastmath=False)
@@ -142,3 +143,66 @@ def certificates(signal, widths, max_weighted_residual, max_weight, patched_size
     mass_error = np.nextafter(4*gamma*p*maxima, np.inf)
     return (np.asarray(positions, np.int32), np.asarray(coefficients, np.float64).reshape(-1, 2),
             np.asarray(metadata, np.float64), mass_error)
+
+
+@njit(cache=True,fastmath=False)
+def uniform_sparse_certificate(positions,coefficients,metadata,stride,padded_size,max_z):
+    """Resample sparse dot coefficients onto the prefix grid for every start residue.
+
+    Linear interpolation of a discrete double prefix with |second difference| <= M
+    has error <= M*j*(stride-j)/2 <= M*stride**2/8. Summing this radius times |c|
+    covers the resampled dot. A separate FP64 allowance covers coefficient splits,
+    merged coefficients and the longer FMA chain. The supplied base certificate
+    already covers prefix rounding, with padded_size including the last grid cell.
+    Final candidate statistics and their reduction order do not use this approximation.
+    """
+    capacity = 2*len(positions)*stride
+    out_positions = np.empty(capacity, np.int32)
+    out_coefficients = np.zeros((capacity, 2), np.float64)
+    out_metadata = np.empty((len(metadata)*stride, 8), np.float64)
+    end = 0
+    u = 2.**-53
+    for duration in range(len(metadata)):
+        begin, count = int(metadata[duration, 0]), int(metadata[duration, 1])
+        mass = 0.
+        for k in range(begin, begin+count):
+            mass += abs(coefficients[k, 0])
+        mass = np.nextafter(mass*(1+8*count*u), np.inf)
+        steps = 4*count+16
+        gamma = steps*u/(1-steps*u)
+        interpolation = (stride*stride/8)*max_z*mass
+        coefficient_rounding = 4*gamma*padded_size*padded_size*max_z*mass
+        allowance = (interpolation+coefficient_rounding)*1.0000000001
+        for residue in range(stride):
+            start = end
+            for k in range(begin, begin+count):
+                cell = (positions[k]+residue-1)//stride
+                rem = (positions[k]+residue-1)%stride
+                for side in range(2):
+                    weight = (stride-rem)/stride if side == 0 else rem/stride
+                    if weight == 0:
+                        continue
+                    index = cell+side+2
+                    value = coefficients[k, 0]*weight
+                    # Sorted input cells can only revisit the last two output cells.
+                    if end > start and out_positions[end-1] == index:
+                        out_coefficients[end-1, 0] += value
+                    elif end > start+1 and out_positions[end-2] == index:
+                        out_coefficients[end-2, 0] += value
+                    else:
+                        out_positions[end] = index
+                        out_coefficients[end, 0] = value
+                        end += 1
+            stop = end
+            end = start
+            for k in range(start, stop):
+                if out_coefficients[k, 0] != 0:
+                    out_positions[end] = out_positions[k]
+                    out_coefficients[end, 0] = out_coefficients[k, 0]
+                    end += 1
+            row = duration*stride+residue
+            out_metadata[row] = metadata[duration]
+            out_metadata[row, 0] = start
+            out_metadata[row, 1] = end-start
+            out_metadata[row, 6] = np.nextafter(metadata[duration, 6]+allowance, np.inf)
+    return out_positions[:end].copy(), out_coefficients[:end].copy(), out_metadata

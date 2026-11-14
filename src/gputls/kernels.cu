@@ -789,18 +789,24 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
 
 // Equal weights make the template-square statistic independent of the window.
 // Only the weighted residual and its absolute mass need prefix storage here.
-template <bool Packed>
+template <bool Packed, int Stride = 1>
 __device__ __forceinline__ void scanScreeningUniformImpl(const float2* weighted, double* prefix, int size) {
     constexpr int ITEMS = 16;
-    long long row = (long long)blockIdx.x*size;
+    int prefixSize = Stride == 1 ? size : (size+Stride-1)/Stride+1;
+    long long sourceRow = (long long)blockIdx.x*size;
+    long long row = (long long)blockIdx.x*prefixSize;
+    if (Stride > 1 && threadIdx.x == 0) {
+        prefix[row] = 0.;
+        ((unsigned int*)(prefix+(long long)gridDim.x*prefixSize))[row] = 0;
+    }
     double zCarry = 0, absCarry = 0, dzCarry = 0;
     for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {
         int begin = tile+ITEMS*threadIdx.x;
         double az[ITEMS], dz[ITEMS], sz = 0, sa = 0, sdz = 0;
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
-            float v = begin+q < size ? (Packed ? ((const float*)weighted)[row+begin+q]
-                                                     : weighted[row+begin+q].x) : 0;
+            float v = begin+q < size ? (Packed ? ((const float*)weighted)[sourceRow+begin+q]
+                                                     : weighted[sourceRow+begin+q].x) : 0;
             sz += (double)v; sa += fabs((double)v); sdz += sz;
             az[q] = sa; dz[q] = sdz;
         }
@@ -811,9 +817,14 @@ __device__ __forceinline__ void scanScreeningUniformImpl(const float2* weighted,
         double beforeDZ = dzCarry+(warpInclusiveScan(blockDZ, &dzTotal)-blockDZ);
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
-            if (begin+q < size) {
-                prefix[row+begin+q] = beforeDZ+(dz[q]+(q+1)*beforeZ);
-                ((unsigned int*)(prefix+(long long)gridDim.x*size))[row+begin+q]
+            // Sparse nodes count samples from zero. Continue the last cell with
+            // zero input so its endpoint is valid even when size is not aligned.
+            bool store = Stride == 1 ? begin+q < size
+                : begin+q < (prefixSize-1)*Stride && (begin+q+1)%Stride == 0;
+            if (store) {
+                int index = Stride == 1 ? begin+q : (begin+q+1)/Stride;
+                prefix[row+index] = beforeDZ+(dz[q]+(q+1)*beforeZ);
+                ((unsigned int*)(prefix+(long long)gridDim.x*prefixSize))[row+index]
                     = __double2hiint(beforeA+az[q]);
             }
         }
@@ -827,6 +838,10 @@ extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* 
 
 extern "C" __global__ void scanScreeningUniformPacked(const float2* weighted, double* prefix, int size) {
     scanScreeningUniformImpl<true>(weighted, prefix, size);
+}
+
+extern "C" __global__ void scanScreeningUniformSparse(const float2* weighted, double* prefix, int size) {
+    scanScreeningUniformImpl<true, 16>(weighted, prefix, size);
 }
 
 // Preserve searchChi2Lanes' FP32 FMA sequence and XOR reduction for each G.
@@ -916,7 +931,8 @@ __device__ __forceinline__ double2 cheapScreenFactors(const double* m, double4 r
                        (double)__fmul_ru(factor, __double2float_ru(m[5])));
 }
 
-extern "C" __global__ void prepareScreenBudgets(const int* widths, const int* selected,
+template <int Stride>
+__device__ __forceinline__ void prepareScreenBudgetsImpl(const int* widths, const int* selected,
     const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     if (i < nSelected) {
@@ -924,10 +940,20 @@ extern "C" __global__ void prepareScreenBudgets(const int* widths, const int* se
         double4 r = screenRoundingBudget(widths[d], lanes[i]);
         // Three planes: rounding terms, FP64 factors, outward-rounded FP32 factors.
         budgets[d] = r;
-        budgets[nDurations+d] = screenFactors(metadata+8*d, r);
-        double2 cheap = cheapScreenFactors(metadata+8*d, r);
+        budgets[nDurations+d] = screenFactors(metadata+8*d*Stride, r);
+        double2 cheap = cheapScreenFactors(metadata+8*d*Stride, r);
         budgets[2*nDurations+d] = make_double4(cheap.x, cheap.y, 0, 0);
     }
+}
+
+extern "C" __global__ void prepareScreenBudgets(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    prepareScreenBudgetsImpl<1>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
+}
+
+extern "C" __global__ void prepareScreenBudgetsUniformSparse(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    prepareScreenBudgetsImpl<16>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
 }
 
 // Drop the nonnegative A2 term for a cheap lower bound. All nonnegative
@@ -947,7 +973,7 @@ __device__ __forceinline__ float cheapScreenLower32(float amplitude, double az, 
     return finite && isfinite(a) ? low : -__int_as_float(0x7f800000);
 }
 
-template <bool Refine, bool Mapped = false, bool Uniform = false>
+template <bool Refine, bool Mapped = false, bool Uniform = false, int PrefixStride = 1>
 __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr,
     const float* uniformSquare = nullptr, float uniformWeight = 0) {
     int period = blockIdx.y;
@@ -982,26 +1008,31 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
             if (!(depth > depthMin)) {
                 lo = __int_as_float(0x7f800000);
             } else {
-                const double* m = metadata + duration*8;
+                const double* m = metadata + (duration*PrefixStride+start%PrefixStride)*8;
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
                     double4 rounding = Mapped ? budgets[duration] : screenRoundingBudget(width,lanes[d]);
+                    int prefixSize = PrefixStride == 1 ? size : (size+PrefixStride-1)/PrefixStride+1;
+                    int dotStart = Uniform ? start/PrefixStride : start;
                     const double2* p = Uniform
-                        ? (const double2*)((const double*)prefix+(long long)period*size)
+                        ? (const double2*)((const double*)prefix+(long long)period*prefixSize)
                         : prefix+(long long)period*size;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     if (Refine) {
-                        double2 dot = screenSparseDot<Uniform>(p, start, positions, coefficients, begin, terms);
+                        double2 dot = screenSparseDot<Uniform>(p, dotStart, positions, coefficients, begin, terms);
                         ar = dot.x; a2 = Uniform ? (double)uniformSquare[duration] : dot.y;
                     }
 #endif
                     double az, w;
                     if (Uniform) {
                         const unsigned int* mass = (const unsigned int*)((const double*)prefix
-                            +(long long)gridDim.y*size)+(long long)period*size;
-                        double end = __hiloint2double(mass[start+width-1], 0);
-                        double first = start ? __hiloint2double(mass[start-1], 0) : 0;
+                            +(long long)gridDim.y*prefixSize)+(long long)period*prefixSize;
+                        // Outward grid endpoints include the complete window mass.
+                        int endIndex = PrefixStride == 1 ? start+width-1 : (start+width+PrefixStride-1)/PrefixStride;
+                        int firstIndex = PrefixStride == 1 ? start-1 : start/PrefixStride;
+                        double end = __hiloint2double(mass[endIndex], 0);
+                        double first = start ? __hiloint2double(mass[firstIndex], 0) : 0;
                         double storageError = 0x1p-19*(fabs(end)+fabs(first))+0x1p-1020;
                         az = fmax(0.0, end-first)+absMassError+storageError;
                         w = __dmul_ru((double)uniformWeight, (double)width);
@@ -1038,7 +1069,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                     if (!discarded) {
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     if (!Refine) {
-                        double2 dot = screenSparseDot<Uniform>(p, start, positions, coefficients, begin, terms);
+                        double2 dot = screenSparseDot<Uniform>(p, dotStart, positions, coefficients, begin, terms);
                         ar = dot.x; a2 = Uniform ? (double)uniformSquare[duration] : dot.y;
                     }
 #endif
@@ -1079,7 +1110,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                             double2 values[4], weights[4];
                             #pragma unroll
                             for (int q=0;q<4;++q) {
-                                int k=start+positions[j+q]-2;
+                                int k=dotStart+positions[j+q]-2;
                                 values[q]=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
                                 weights[q]=coefficients[j+q];
                             }
@@ -1090,7 +1121,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                             }
                         }
                         for (;j<begin+terms;++j) {
-                            int k=start+positions[j]-2;
+                            int k=dotStart+positions[j]-2;
                             double2 v=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
                             double2 c=coefficients[j];
                             ar=fma(c.x,v.x,ar);if (!Uniform) a2=fma(c.y,v.y,a2);
@@ -1161,6 +1192,22 @@ extern "C" __global__ void screenCandidatesUniform(SCREEN_ARGS, const int2* bloc
 extern "C" __global__ void refineCandidatesUniform(SCREEN_ARGS, const int2* blockMap,
     const double4* budgets, const float* uniformSquare, float uniformWeight) {
     screenCandidatesImpl<true, true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void screenCandidatesUniformSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<false, true, true, 16>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void refineCandidatesUniformSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<true, true, true, 16>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
         absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
         blockMap, budgets, uniformSquare, uniformWeight);

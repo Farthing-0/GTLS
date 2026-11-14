@@ -533,3 +533,24 @@ Compact exact phase-sort checkpoint
   Both runs release all pool memory. Thermal flags are retained in the result
   JSON. Constant coarse prefix launches45 ->43, fold0.936 ->0.701s and
   sort0.863 ->0.737s. Constant9.964720 ->9.581133s.
+
+Sparse uniform-prefix checkpoint
+  For confirmed uniform weights, retain D_z and S_abs_z at16-point grid nodes.
+  Preserve the original scan arithmetic at retained nodes and zero-pad the final
+  cell. Precompute interpolation coefficients for each start residue, combining
+  equal nodes; the GPU directly applies the sparse dot with no interpolation work.
+  If |second difference| <= M, linear interpolation error is <= M*h^2/8.
+  Add this times coefficient absolute mass plus outward FP64 split/merge/FMA
+  allowances to each certificate. Mass windows use outward grid endpoints.
+  Final exact candidate kernels, G selection and reduction order are unchanged.
+  Allocate12*(ceil(P/16)+1) prefix bytes instead of12P, within the persistent arena.
+  Actual dy is still inspected/rebuilt per search; variable weights retain24P.
+  Five1019-period batches: GPU0 prefix/screens469.929 ->343.795ms; GPU1
+  482.249 ->348.937ms. Exact keys equal; strides4/8/32/64 were also compared.
+  Direct long-double template dots and prefix/interpolation bounds pass; retained
+  grid values match original prefix bits, including the706406-point test.
+  Related regression196 passed, one multi-GPU skip; memcheck68 checks pass with
+  zero errors using device-only backtraces. Original full-prefix exports remain
+  available for references. Full constant-dy validation is next.
+  Integer-residual prefix reuse was rejected: direct conversion215 ->224/236ms,
+  exact128-bit accumulation216 ->302/331ms. No such path enters production.
