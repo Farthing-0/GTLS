@@ -110,3 +110,20 @@ Device-specific cheap-bound candidate
   C preprocessor output is byte-identical to each already-measured implementation
   when selecting 0/1. Final candidate regression: 68 passed with both 3090s visible.
   A100 final mixed/constant confirmation and artifact retrieval remain in progress.
+
+A100 checkpoint complete; optimization continues
+  Final device-specific source: mixed median 15.013236s, constant 22.992988s.
+  Compared with A100 workspace-only: +2.82% speed on mixed dy, +1.86% on constant.
+  Frozen original 2.2.0 (cap 256) mixed median 15.846283s, versus final 15.013236s.
+  All 24 fields match bitwise in every GPU/version comparison. A100 tests: 66 passed,
+  2 multi-GPU skips; local both-GPU tests: 68 passed. One existing flat-SDE warning.
+  A100 default batch 1078 vs RTX 3090 629. A100 cap=629 median 15.314520s vs default
+  15.436590s: larger memory capacity does not explain the observed speed gain.
+  A100 screening kernel 4.242773s -> 3.816164s with cheap bound.
+  Results archive verified SHA256 a14d338b83c09a8f4b09f5a5b1aba900d37567b76931e92e786408bc92866c85.
+  Instance 60654842 DESTROYED, API list empty at 2026-11-14T14:29:50.487139Z.
+  Lease duration ~24.1 minutes; quoted compute/disk estimate ~$0.25, not an invoice.
+  After noticing brief thermal flags in the old 3090 mixed run (2/114 samples),
+  a cooled repeat was started, then stopped immediately at user's direction.
+  User requests focusing on performance-changing code, not repeated end-to-end
+  timing. Continue kernel-level optimization; one full validation after a gain.
