@@ -51,19 +51,61 @@ __device__ __forceinline__ double phaseFraction(double cycles) {
         | ((fraction << (52 - lead)) & 0xfffffffffffffull));
 }
 
-// Folded phases are nonnegative finite doubles. Their complete IEEE bit strings
-// have the same order as the values, so integer comparisons lose no precision.
-// Keep small buckets entirely in registers to avoid repeated phase gathers and
-// intermediate index writes during insertion sort.
-__device__ __forceinline__ void sortSmallBucket(int* points, const double* phase, int count) {
+// A compact monotone key for [0, 1): floor(phase * 2^32), extracted exactly.
+// The top key also covers out-of-range values. Equal keys always fall back to
+// the full original phase, so compression cannot change ordering or tie breaks.
+__device__ __forceinline__ unsigned int phaseKey(double phase) {
+    unsigned long long bits = __double_as_longlong(phase);
+    int exponent = (bits >> 52) - 1023;
+    if (exponent >= 0) return 0xffffffffu;
+    if (exponent < -32) return 0;
+    return ((bits & 0xfffffffffffffull) | 0x10000000000000ull) >> (20 - exponent);
+}
+
+__device__ __forceinline__ int packedPhaseBucket(unsigned int key, const double* time,
+                                                double inverse, int index, int buckets) {
+    if (key != 0xffffffffu) {
+        unsigned int lower = __umulhi(key, (unsigned int)buckets);
+        // The upper endpoint is exact in FP64 for buckets < 2^21. Above that,
+        // add a conservative half-ULP product budget in units of 2^-32 before
+        // taking its floor. This also covers FP64 multiplication rounding up
+        // to an integer. Ambiguous intervals use the original expression.
+        unsigned long long upperProduct = (unsigned long long)(key + 1) * (unsigned int)buckets
+                                        + ((unsigned int)buckets >> 21);
+        unsigned int upper = upperProduct >> 32;
+        if (lower == upper) return lower;
+    }
+    return min((int)(phaseFraction(time[index] * inverse) * buckets), buckets - 1);
+}
+
+__device__ __forceinline__ bool phaseKeyGreater(unsigned long long left, int li,
+        unsigned long long right, int ri, const double*, double) {
+    return left > right || (left == right && li > ri);
+}
+
+__device__ __forceinline__ bool phaseKeyGreater(unsigned int left, int li,
+        unsigned int right, int ri, const double* time, double inverse) {
+    if (left != right) return left > right;
+    // Empty network slots must not dereference their sentinel point indices.
+    if (li == 0x7fffffff) return ri != 0x7fffffff;
+    if (ri == 0x7fffffff) return false;
+    unsigned long long a = __double_as_longlong(phaseFraction(time[li] * inverse));
+    unsigned long long b = __double_as_longlong(phaseFraction(time[ri] * inverse));
+    return a > b || (a == b && li > ri);
+}
+
+// Keep small buckets entirely in registers. Full IEEE keys and compact keys
+// share the network; the compact comparator resolves collisions in FP64.
+template <typename Key>
+__device__ __forceinline__ void sortSmallBucket(int* points, const Key* phase, int count,
+                                               const double* time, double inverse) {
     constexpr int N = 8;
-    unsigned long long keys[N];
+    Key keys[N];
     int indices[N];
     #pragma unroll
     for (int i = 0; i < N; ++i) {
         indices[i] = i < count ? points[i] : 0x7fffffff;
-        keys[i] = i < count ? (unsigned long long)__double_as_longlong(phase[indices[i]])
-                            : 0xffffffffffffffffull;
+        keys[i] = i < count ? phase[indices[i]] : (Key)0xffffffffffffffffull;
     }
     #pragma unroll
     for (int k = 2; k <= N; k <<= 1) {
@@ -73,10 +115,10 @@ __device__ __forceinline__ void sortSmallBucket(int* points, const double* phase
             for (int i = 0; i < N; ++i) {
                 int other = i ^ j;
                 if (other > i) {
-                    bool greater = keys[i] > keys[other]
-                        || (keys[i] == keys[other] && indices[i] > indices[other]);
+                    bool greater = phaseKeyGreater(keys[i], indices[i], keys[other], indices[other],
+                                                   time, inverse);
                     if ((i & k) == 0 ? greater : !greater) {
-                        unsigned long long key = keys[i];
+                        Key key = keys[i];
                         keys[i] = keys[other]; keys[other] = key;
                         int index = indices[i];
                         indices[i] = indices[other]; indices[other] = index;
@@ -202,7 +244,7 @@ extern "C"{
         int* bucketPoints = sortIndex + rowOffset + bucketEnds[(long long)periodIndex*nBuckets + bucket] - bucketSize;
         const double* rowPhase = phase + rowOffset;
         if (bucketSize <= 8) {
-            sortSmallBucket(bucketPoints, rowPhase, bucketSize);
+            sortSmallBucket(bucketPoints, (const unsigned long long*)rowPhase, bucketSize, nullptr, 0.);
             return;
         }
         for (int next = 1; next < bucketSize; next++) {
@@ -213,6 +255,70 @@ extern "C"{
                 int point = bucketPoints[slot];
                 unsigned long long value = __double_as_longlong(rowPhase[point]);
                 if (value < keyPhase || (value == keyPhase && point <= keyPoint)) break;
+                bucketPoints[slot + 1] = point;
+                slot--;
+            }
+            bucketPoints[slot + 1] = keyPoint;
+        }
+    }
+
+    // Compact phase storage with exact boundary and collision fallback.
+    __global__ void foldBucketsPackedPhase(const double* time, const double* inversePeriods, unsigned int* phase,
+                                int* counts, int tSize, int nBuckets) {
+        int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
+        int periodIndex = blockIdx.y;
+        if (pointIndex >= tSize) {
+            return;
+        }
+        double cycles = time[pointIndex] * inversePeriods[periodIndex];
+        double pointPhase = phaseFraction(cycles);
+        long long rowOffset = (long long)periodIndex * tSize;
+        phase[rowOffset + pointIndex] = phaseKey(pointPhase);
+        int bucket = min((int)(pointPhase * nBuckets), nBuckets - 1);
+        atomicAdd(counts + (long long)periodIndex*nBuckets + bucket, 1);
+    }
+
+    __global__ void bucketScatterPackedPhase(const unsigned int* phase, const double* time,
+            const double* inversePeriods, int* cursor, int* sortIndex, int tSize, int nBuckets) {
+        int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
+        int periodIndex = blockIdx.y;
+        if (pointIndex >= tSize) {
+            return;
+        }
+        long long rowOffset = (long long)periodIndex * tSize;
+        int bucket = packedPhaseBucket(phase[rowOffset + pointIndex], time,
+                                       inversePeriods[periodIndex], pointIndex, nBuckets);
+        sortIndex[rowOffset + atomicAdd(cursor + (long long)periodIndex*nBuckets + bucket, 1)] = pointIndex;
+    }
+
+    __global__ void sortBucketsPackedPhase(const unsigned int* phase, const double* time,
+            const double* inversePeriods, const int* counts, const int* bucketEnds,
+            int* sortIndex, int tSize, int nBuckets) {
+        int bucket = blockIdx.x * blockDim.x + threadIdx.x;
+        int periodIndex = blockIdx.y;
+        if (bucket >= nBuckets) {
+            return;
+        }
+        long long rowOffset = (long long)periodIndex * tSize;
+        int bucketSize = counts[(long long)periodIndex*nBuckets + bucket];
+        if (bucketSize < 2) {
+            return;
+        }
+        int* bucketPoints = sortIndex + rowOffset + bucketEnds[(long long)periodIndex*nBuckets + bucket] - bucketSize;
+        const unsigned int* rowPhase = phase + rowOffset;
+        double inverse = inversePeriods[periodIndex];
+        if (bucketSize <= 8) {
+            sortSmallBucket(bucketPoints, rowPhase, bucketSize, time, inverse);
+            return;
+        }
+        for (int next = 1; next < bucketSize; next++) {
+            int keyPoint = bucketPoints[next];
+            unsigned int keyPhase = rowPhase[keyPoint];
+            int slot = next - 1;
+            while (slot >= 0) {
+                int point = bucketPoints[slot];
+                unsigned int value = rowPhase[point];
+                if (!phaseKeyGreater(value, point, keyPhase, keyPoint, time, inverse)) break;
                 bucketPoints[slot + 1] = point;
                 slot--;
             }

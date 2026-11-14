@@ -16,8 +16,8 @@ def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes, weighted
     workspace = BatchWorkspace(capacity, n, patched, starts, screening, prefix_bytes, weighted_bytes)
     index_bytes = workspace.index_bytes
     ranges = []
-    for offset, width, dtype in [(0, n, cp.int32), (index_bytes, n, cp.float64),
-                                (3*index_bytes, bucket_count(n), cp.int32),
+    for offset, width, dtype in [(0, n, cp.int32), (index_bytes, n, cp.uint32),
+                                (2*index_bytes, bucket_count(n), cp.int32),
                                 (workspace.cursor_offset, bucket_count(n), cp.int32)]:
         view = workspace.view('scratch', (capacity,width), dtype, offset)
         assert view.data.ptr % np.dtype(dtype).alignment == 0

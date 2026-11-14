@@ -312,21 +312,23 @@ class GPUSearch:
 
         # Phase fold and sort (bucket sort, equal to a stable argsort of the phases)
         inversePeriodsGPU = cp.asarray(1.0 / np.asarray(periods, dtype=np.float64))
-        phasesGPU = workspace.view('scratch', (nPeriods, tSize), cp.float64, index_bytes)
+        phasesGPU = workspace.view('scratch', (nPeriods, tSize), cp.uint32, index_bytes)
         nBuckets = self.nBuckets
-        countsGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, 3*index_bytes)
+        countsGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, 2*index_bytes)
         countsGPU.fill(0)
         grid = ((tSize + 255) // 256, nPeriods)
-        module.get_function("foldBuckets")(
+        module.get_function("foldBucketsPackedPhase")(
             grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize), np.int32(nBuckets)))
         cursorGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, workspace.cursor_offset)
         module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(nBuckets)))
         sortIndexGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32)
-        module.get_function("bucketScatter")(
-            grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize), np.int32(nBuckets)))
-        module.get_function("sortBuckets")(
+        module.get_function("bucketScatterPackedPhase")(
+            grid, (256,), (phasesGPU, self.tGPU, inversePeriodsGPU, cursorGPU, sortIndexGPU,
+                          np.int32(tSize), np.int32(nBuckets)))
+        module.get_function("sortBucketsPackedPhase")(
             ((nBuckets+255)//256, nPeriods), (256,),
-            (phasesGPU, countsGPU, cursorGPU, sortIndexGPU, np.int32(tSize), np.int32(nBuckets)))
+            (phasesGPU, self.tGPU, inversePeriodsGPU, countsGPU, cursorGPU, sortIndexGPU,
+             np.int32(tSize), np.int32(nBuckets)))
         del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
