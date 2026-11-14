@@ -545,8 +545,8 @@ SEARCH_ADJACENT(32,4)
 #undef REUSE_PASS
 
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
-// At index i: (D_z[i+2], D_w[i+2], S_abs_z[i+1], S_w[i+1]).
-extern "C" __global__ void scanScreening(const float2* weighted, double4* prefix, int size) {
+// Two contiguous double2 planes per row: (D_z, D_w), then (S_abs_z, S_w).
+extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
     long long row = (long long)blockIdx.x * size;
     double zCarry = 0, wCarry = 0, absCarry = 0, dzCarry = 0, dwCarry = 0;
     for (int tile = 0; tile < size; tile += blockDim.x) {
@@ -558,7 +558,10 @@ extern "C" __global__ void scanScreening(const float2* weighted, double4* prefix
         double az = absCarry + blockInclusiveScan(fabs((double)v.x), &absTotal);
         double dz = dzCarry + blockInclusiveScan(z, &dzTotal);
         double dw = dwCarry + blockInclusiveScan(w, &dwTotal);
-        if (i < size) prefix[row + i] = make_double4(dz, dw, az, w);
+        if (i < size) {
+            prefix[2*row + i] = make_double2(dz, dw);
+            prefix[2*row + size + i] = make_double2(az, w);
+        }
         zCarry += zTotal;
         wCarry += wTotal;
         absCarry += absTotal;
@@ -568,7 +571,7 @@ extern "C" __global__ void scanScreening(const float2* weighted, double4* prefix
 }
 
 extern "C" __global__ void screenCandidates(
-        float* lower, unsigned long long* upperKeys, const double4* prefix,
+        float* lower, unsigned long long* upperKeys, const double2* prefix,
         const long long* residual, float invScale, const float* overshoot,
         const int* widths, const int* selected, const int* offsets, const int* strides,
         const int* lanes, const bool* mask, const int* positions, const double2* coefficients,
@@ -607,21 +610,21 @@ extern "C" __global__ void screenCandidates(
                 const double* m = metadata + duration*8;
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
-                    const double4* p = prefix + (long long)period*size;
+                    const double2* p = prefix + (long long)period*size*2;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     for (int j = begin; j < begin+terms; ++j) {
                         int k = start + positions[j] - 2;
-                        double4 v = k >= 0 ? p[k] : make_double4(0,0,0,0);
+                        double2 v = k >= 0 ? p[k] : make_double2(0,0);
                         double2 c = coefficients[j];
                         ar = fma(c.x, v.x, ar);
                         a2 = fma(c.y, v.y, a2);
                     }
 #endif
-                    double4 end = p[start+width-1];
-                    double4 first = start ? p[start-1] : make_double4(0,0,0,0);
-                    double az = fmax(0.0, end.z-first.z) + absMassError;
-                    double w = fmax(0.0, end.w-first.w) + weightMassError;
+                    double2 end = p[size+start+width-1];
+                    double2 first = start ? p[size+start-1] : make_double2(0,0);
+                    double az = fmax(0.0, end.x-first.x) + absMassError;
+                    double w = fmax(0.0, end.y-first.y) + weightMassError;
                     int g = lanes[d];
                     int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
                     double gu = steps*0x1p-24;
@@ -658,7 +661,7 @@ extern "C" __global__ void screenCandidates(
                         double ar = 0, a2 = 0;
                         for (int j = begin; j < begin+terms; ++j) {
                             int k = start + positions[j] - 2;
-                            double4 v = k >= 0 ? p[k] : make_double4(0,0,0,0);
+                            double2 v = k >= 0 ? p[k] : make_double2(0,0);
                             double2 c = coefficients[j];
                             ar = fma(c.x, v.x, ar);
                             a2 = fma(c.y, v.y, a2);
