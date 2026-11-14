@@ -507,3 +507,25 @@ Exact phase-fraction checkpoint
   simple fractional extraction provides the better time/complexity tradeoff.
   Follow-up128-bit prefix conversion passed19399 signed/rounding cases, but
   regressed general52.89 ->65.60ms and uniform31.82 ->33.93ms; not adopted.
+
+Compact exact phase-sort checkpoint
+  Store floor(phase*2^32) as a four-byte monotone key. When two keys agree,
+  recompute their original FP64 phases and retain the original index tie break.
+  Compute bucket intervals with integer products, including a conservative FP64
+  product-rounding allowance; ambiguous intervals use the original expression.
+  Scratch sort layout decreases14.667N ->10.667N bytes. Full double exports
+  remain available as independent references; both layouts share a sorting network.
+  5285770 boundary/random bucket cases and seven stable-sort sizes agree exactly.
+  Five752-period mixed batches, relative to543ad02: GPU0 fold/scatter/sort
+  248.193 ->229.034ms; GPU1320.808 ->289.850ms, exact winner keys unchanged.
+  Related regression133 passed, one multi-GPU skip, including forced compact-key
+  collisions, int32-maximum bucket counts, arena reuse and synthetic OOM retry.
+  Sanitizer12.9 default host backtraces retain Python frames/arrays, causing
+  a pool-release assertion despite zero device errors. Weak-reference tracing
+  identifies retained frames; normal GPU1 and --show-backtrace device both pass.
+  NVIDIA documents a Python launch memory-leak fix in2025.4.1 release notes:
+  https://docs.nvidia.com/compute-sanitizer/ReleaseNotes/index.html
+  Keep device memory instrumentation active and disable only host backtraces.
+  Compact-key bucket factors2/4/5/6/8 and integer folding show no consistent
+  gain across period ranges on GPU0; keep factor3 and original bucket multiply.
+  Final device-backtrace memcheck:28 passed, zero memory errors.
