@@ -73,6 +73,42 @@ __device__ __forceinline__ void sortSmallBucket(int* points, const double* phase
     for (int i = 0; i < N; ++i) if (i < count) points[i] = indices[i];
 }
 
+template <bool Packed>
+__device__ __forceinline__ void patchScanImpl(const int* sortIndex, const float2* prepared,
+                                               float2* weighted, long long* cumulative, float scale,
+                                               int tSize, int patchedSize) {
+    long long rowOffset = (long long)blockIdx.x * patchedSize;
+    long long indexOffset = (long long)blockIdx.x * tSize;
+    long long carry = 0;
+    for (int tile = 0; tile < patchedSize; tile += 2 * blockDim.x) {
+        long long local[2], total = 0;
+        #pragma unroll
+        for (int j = 0; j < 2; ++j) {
+            int i = tile + 2 * threadIdx.x + j;
+            if (i < patchedSize) {
+                int source = i;
+                if (source >= tSize) {
+                    source -= tSize;
+                    if (source >= tSize) source %= tSize;
+                }
+                float2 point = prepared[sortIndex[indexOffset + source]];
+                if (Packed) ((float*)weighted)[rowOffset+i] = point.y*point.x;
+                else weighted[rowOffset + i] = make_float2(point.y * point.x, point.y);
+                total += __float2ll_rn(point.x * scale);
+            }
+            local[j] = total;
+        }
+        long long tileTotal;
+        long long before = blockInclusiveScan(total, &tileTotal) - total;
+        #pragma unroll
+        for (int j = 0; j < 2; ++j) {
+            int i = tile + 2 * threadIdx.x + j;
+            if (i < patchedSize) cumulative[rowOffset + i] = carry + before + local[j];
+        }
+        carry += tileTotal;
+    }
+}
+
 extern "C"{
     #define SECONDS_PER_DAY 86400              // Seconds in a day
 
@@ -243,35 +279,13 @@ extern "C"{
     __global__ void patchScan(const int* sortIndex, const float2* prepared,
                              float2* weighted, long long* cumulative, float scale,
                              int tSize, int patchedSize) {
-        long long rowOffset = (long long)blockIdx.x * patchedSize;
-        long long indexOffset = (long long)blockIdx.x * tSize;
-        long long carry = 0;
-        for (int tile = 0; tile < patchedSize; tile += 2 * blockDim.x) {
-            long long local[2], total = 0;
-            #pragma unroll
-            for (int j = 0; j < 2; ++j) {
-                int i = tile + 2 * threadIdx.x + j;
-                if (i < patchedSize) {
-                    int source = i;
-                    if (source >= tSize) {
-                        source -= tSize;
-                        if (source >= tSize) source %= tSize;
-                    }
-                    float2 point = prepared[sortIndex[indexOffset + source]];
-                    weighted[rowOffset + i] = make_float2(point.y * point.x, point.y);
-                    total += __float2ll_rn(point.x * scale);
-                }
-                local[j] = total;
-            }
-            long long tileTotal;
-            long long before = blockInclusiveScan(total, &tileTotal) - total;
-            #pragma unroll
-            for (int j = 0; j < 2; ++j) {
-                int i = tile + 2 * threadIdx.x + j;
-                if (i < patchedSize) cumulative[rowOffset + i] = carry + before + local[j];
-            }
-            carry += tileTotal;
-        }
+        patchScanImpl<false>(sortIndex, prepared, weighted, cumulative, scale, tSize, patchedSize);
+    }
+
+    __global__ void patchScanPacked(const int* sortIndex, const float2* prepared,
+                             float2* weighted, long long* cumulative, float scale,
+                             int tSize, int patchedSize) {
+        patchScanImpl<true>(sortIndex, prepared, weighted, cumulative, scale, tSize, patchedSize);
     }
 
 }  // extern "C"
@@ -308,7 +322,7 @@ __device__ __forceinline__ unsigned int orderedKey(float value) {
  * overlap of neighbouring windows from L1 once the stride is large; G is chosen per duration
  * from the stride (see core.lanes_per_window and bench/window_lanes on branch perf/window-lanes).
  */
-template <int G, bool Compacted = false>
+template <int G, bool Compacted = false, bool Packed = false>
 __device__ __forceinline__ void searchChi2Lanes(
         unsigned long long* best,
         const long long* cumResidual,  // (periods, patchedSize), inclusive, fixed point
@@ -325,7 +339,7 @@ __device__ __forceinline__ void searchChi2Lanes(
         int maxWidth, float transitDepthMin,
         const float* lowerBounds = nullptr, const unsigned long long* upperKeys = nullptr,
         int nBounds = 0, const int* candidates = nullptr, const int* counts = nullptr,
-        int listStride = 0) {
+        int listStride = 0, float uniformWeight = 0) {
     int periodIndex = blockIdx.y;
     int laneInWindow = threadIdx.x % G;
     int workItem = offsets[yBegin] + (blockIdx.x * blockDim.x + threadIdx.x) / G;
@@ -364,11 +378,13 @@ __device__ __forceinline__ void searchChi2Lanes(
             }
         }
         if (active) {
-            const float2* windowWeighted = patchedWeighted + (long long)periodIndex * patchedSize + windowStart;
+            long long windowOffset = (long long)periodIndex * patchedSize + windowStart;
             const float* durationSignal = signal + (long long)durationIndex * maxWidth;
             for (int pointInWindow = laneInWindow; pointInWindow < windowWidth; pointInWindow += G) {
                 float signalValue = durationSignal[pointInWindow];
-                float2 weighted = windowWeighted[pointInWindow];
+                float2 weighted = Packed
+                    ? make_float2(((const float*)patchedWeighted)[windowOffset+pointInWindow], uniformWeight)
+                    : patchedWeighted[windowOffset+pointInWindow];
                 crossTerm = fmaf(signalValue, weighted.x, crossTerm);
                 squareTerm = fmaf(signalValue * signalValue, weighted.y, squareTerm);
             }
@@ -651,7 +667,8 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
 
 // Equal weights make the template-square statistic independent of the window.
 // Only the weighted residual and its absolute mass need prefix storage here.
-extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* prefix, int size) {
+template <bool Packed>
+__device__ __forceinline__ void scanScreeningUniformImpl(const float2* weighted, double* prefix, int size) {
     constexpr int ITEMS = 16;
     long long row = (long long)blockIdx.x*size;
     double zCarry = 0, absCarry = 0, dzCarry = 0;
@@ -660,7 +677,8 @@ extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* 
         double az[ITEMS], dz[ITEMS], sz = 0, sa = 0, sdz = 0;
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
-            float v = begin+q < size ? weighted[row+begin+q].x : 0;
+            float v = begin+q < size ? (Packed ? ((const float*)weighted)[row+begin+q]
+                                                     : weighted[row+begin+q].x) : 0;
             sz += (double)v; sa += fabs((double)v); sdz += sz;
             az[q] = sa; dz[q] = sdz;
         }
@@ -679,6 +697,14 @@ extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* 
         }
         zCarry += zTotal; absCarry += absTotal; dzCarry += dzTotal;
     }
+}
+
+extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* prefix, int size) {
+    scanScreeningUniformImpl<false>(weighted, prefix, size);
+}
+
+extern "C" __global__ void scanScreeningUniformPacked(const float2* weighted, double* prefix, int size) {
+    scanScreeningUniformImpl<true>(weighted, prefix, size);
 }
 
 // Preserve searchChi2Lanes' FP32 FMA sequence and XOR reduction for each G.
@@ -1128,3 +1154,61 @@ extern "C" __global__ void windowStd(const double *x,double *out,int count,int w
     double variance=__ddiv_rn(windowStdPairwise<true>(x+i,width,mean),double(width));
     out[i]=__dsqrt_rn(variance);
 }
+
+// Uniform weights are supplied once; each point stores only its weighted residual.
+#define SEARCH_CHI2_PACKED(G)                                                                            \
+    extern "C" __global__ void searchChi2PackedG##G(                                                    \
+            unsigned long long* best, const long long* cumResidual, float invScale,               \
+            const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths,   \
+            const int* selected, const int* offsets, const int* strides, const bool* periodMask,  \
+            int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth,       \
+            float transitDepthMin, float uniformWeight) {                                                              \
+        searchChi2Lanes<G, false, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths,   \
+                           selected, offsets, strides, periodMask, yBegin, yEnd, nDurations,      \
+                           tSize, patchedSize, maxWidth, transitDepthMin, nullptr, nullptr, 0, nullptr, nullptr, 0, uniformWeight);                        \
+    }
+SEARCH_CHI2_PACKED(1)
+SEARCH_CHI2_PACKED(2)
+SEARCH_CHI2_PACKED(4)
+SEARCH_CHI2_PACKED(8)
+SEARCH_CHI2_PACKED(16)
+SEARCH_CHI2_PACKED(32)
+#undef SEARCH_CHI2_PACKED
+
+#define SCREENED_EXACT_PACKED(G) \
+    extern "C" __global__ void searchChi2PackedScreenedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds, float uniformWeight) { \
+        searchChi2Lanes<G, false, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds, nullptr, nullptr, 0, uniformWeight); \
+    }
+SCREENED_EXACT_PACKED(1)
+SCREENED_EXACT_PACKED(2)
+SCREENED_EXACT_PACKED(4)
+SCREENED_EXACT_PACKED(8)
+SCREENED_EXACT_PACKED(16)
+SCREENED_EXACT_PACKED(32)
+#undef SCREENED_EXACT_PACKED
+#define COMPACTED_EXACT_PACKED(G) \
+    extern "C" __global__ void searchChi2PackedCompactedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds, \
+        const int* candidates, const int* counts, int listStride, float uniformWeight) { \
+        searchChi2Lanes<G, true, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds, candidates, counts, listStride, uniformWeight); \
+    }
+COMPACTED_EXACT_PACKED(1)
+COMPACTED_EXACT_PACKED(2)
+COMPACTED_EXACT_PACKED(4)
+COMPACTED_EXACT_PACKED(8)
+COMPACTED_EXACT_PACKED(16)
+COMPACTED_EXACT_PACKED(32)
+#undef COMPACTED_EXACT_PACKED

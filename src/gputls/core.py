@@ -156,7 +156,7 @@ class GPUSearch:
         size = len(data)
         count = size - width + 1
         with cp.cuda.Device(self.tGPU.device.id):
-            source = self.workspace.view('weighted', (size,), cp.float64)
+            source = self.workspace.view('scratch', (size,), cp.float64)
             output = self.workspace.view('cumulative', (count,), cp.float64)
             source.set(np.ascontiguousarray(data))
             self.module.get_function('windowStd')(
@@ -251,6 +251,7 @@ class GPUSearch:
         self.uniformSquareGPU = (cp.empty(len(self.durations), dtype=cp.float32)
                                  if self.uniformWeight is not None else None)
         self.screenPrefixBytes = 12 if self.uniformWeight is not None else 24
+        self.weightedPointBytes = 4 if self.uniformWeight is not None else 8
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
             self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
 
@@ -260,7 +261,8 @@ class GPUSearch:
             self.workspace = None
             self.workspace = BatchWorkspace(capacity, self.tSize, self.patchedDatasSize,
                                             self.maxScreenStarts, self.screening,
-                                            prefix_bytes=self.screenPrefixBytes)
+                                            prefix_bytes=self.screenPrefixBytes,
+                                            weighted_bytes=self.weightedPointBytes)
         return self.workspace
 
     def duration_mask(self, periods):
@@ -328,10 +330,11 @@ class GPUSearch:
         del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
-        weightedGPU = workspace.view('weighted', (nPeriods, patchedSize, 2), cp.float32)
+        packed = self.uniformWeight is not None
+        weightedGPU = workspace.view('weighted', (nPeriods, patchedSize, 1 if packed else 2), cp.float32)
         cumResidualGPU = workspace.view('cumulative', (nPeriods, patchedSize), cp.int64)
         patchThreads = min(1024, max(32, 1 << ((patchedSize+1)//2-1).bit_length()))
-        module.get_function("patchScan")(
+        module.get_function("patchScanPacked" if packed else "patchScan")(
             (nPeriods,), (patchThreads,),
             (sortIndexGPU, self.preparedGPU, weightedGPU, cumResidualGPU,
              self.fixedScale, np.int32(tSize), np.int32(patchedSize)))
@@ -342,7 +345,7 @@ class GPUSearch:
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
         lanes = lanes_per_window(strides)
         screening = self.screening and margin > 0
-        if not screening and np.any(lanes >= 8):
+        if not screening and not packed and np.any(lanes >= 8):
             adjacent = np.where(lanes == 32, 4, np.where(lanes >= 8, 2, 1))
             group_counts = (np.diff(offsets) + adjacent - 1) // adjacent
             offsets = np.concatenate(([0], np.cumsum(group_counts)))
@@ -369,7 +372,7 @@ class GPUSearch:
                          np.int32(self.maxWidth), self.uniformWeight, self.uniformSquareGPU))
                 self.screenMapKey = mapKey
             prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, self.screenPrefixBytes), cp.uint8)
-            prefixKernel = "scanScreeningUniform" if self.uniformWeight is not None else "scanScreening"
+            prefixKernel = "scanScreeningUniformPacked" if packed else "scanScreening"
             module.get_function(prefixKernel)(
                 (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])
@@ -402,6 +405,8 @@ class GPUSearch:
             nGroups = int(offsets[yEnd] - offsets[yBegin])
             kernel = (f"searchChi2ScreenedG{G}" if screening else
                       f"searchChi2AdjacentG{G}" if G >= 8 else f"searchChi2G{G}")
+            if packed:
+                kernel = f"searchChi2PackedScreenedG{G}" if screening else f"searchChi2PackedG{G}"
             work_items = nGroups
             compact_args = ()
             # Prefix data are dead after screening. Reuse their arena for the
@@ -417,7 +422,7 @@ class GPUSearch:
                      np.int32(offsets[yEnd]), np.int32(nBounds), np.int32(nGroups)))
                 survivors = int(cp.max(countsGPU))
                 if survivors*4 <= nGroups:
-                    kernel = f"searchChi2CompactedG{G}"
+                    kernel = f"searchChi2{'Packed' if packed else ''}CompactedG{G}"
                     work_items = survivors
                     compact_args = (candidatesGPU, countsGPU, np.int32(nGroups))
             if work_items:
@@ -427,7 +432,8 @@ class GPUSearch:
                      self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
                      np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
                      np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min)
-                    + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()) + compact_args)
+                    + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()) + compact_args
+                    + ((self.uniformWeight,) if packed else ()))
             yBegin = yEnd
         return bestGPU
 
@@ -476,7 +482,8 @@ class MultiGPUSearch:
         """
         s = self.primary
         return (workspace_bytes_per_period(s.tSize, s.patchedDatasSize, s.maxScreenStarts, s.screening,
-                                           prefix_bytes=s.screenPrefixBytes)
+                                           prefix_bytes=s.screenPrefixBytes,
+                                           weighted_bytes=s.weightedPointBytes)
                 + len(s.durations) + 128)
 
     @staticmethod

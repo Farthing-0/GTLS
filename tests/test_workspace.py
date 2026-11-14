@@ -10,9 +10,10 @@ from test_candidate_screening import _screened_curve
 
 @pytest.mark.parametrize("screening", [False, True])
 @pytest.mark.parametrize("prefix_bytes", [12, 24])
-def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes):
+@pytest.mark.parametrize("weighted_bytes", [4, 8])
+def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes, weighted_bytes):
     capacity, n, patched, starts = 7, 101, 133, 239
-    workspace = BatchWorkspace(capacity, n, patched, starts, screening, prefix_bytes)
+    workspace = BatchWorkspace(capacity, n, patched, starts, screening, prefix_bytes, weighted_bytes)
     index_bytes = workspace.index_bytes
     ranges = []
     for offset, width, dtype in [(0, n, cp.int32), (index_bytes, n, cp.float64),
@@ -24,14 +25,15 @@ def test_workspace_alignment_and_stage_aliases(screening, prefix_bytes):
     for i, (begin, end) in enumerate(ranges):
         assert all(end <= b or begin >= e for b,e in ranges[i+1:])
     prefix = workspace.view('scratch', (capacity,patched,prefix_bytes), cp.uint8) if screening else None
-    weighted = workspace.view('weighted', (capacity,patched,2), cp.float32)
+    weighted = workspace.view('weighted', (capacity,patched,weighted_bytes//4), cp.float32)
     cumulative = workspace.view('cumulative', (capacity,patched), cp.int64)
     lower = workspace.view('lower', (capacity,starts), cp.float32)
     for value,view in enumerate([x for x in (prefix, weighted, cumulative, lower) if x is not None], 1):
         view.fill(value)
     for value,view in enumerate([x for x in (prefix, weighted, cumulative, lower) if x is not None], 1):
         assert bool(cp.all(view == value))
-    assert workspace.storage.nbytes <= capacity*bytes_per_period(n, patched, starts, screening, prefix_bytes)+LAYOUT_ALLOWANCE
+    assert workspace.storage.nbytes <= capacity*bytes_per_period(
+        n, patched, starts, screening, prefix_bytes, weighted_bytes)+LAYOUT_ALLOWANCE
 
 
 def test_repeated_tail_and_refine_batches_reuse_storage(monkeypatch):

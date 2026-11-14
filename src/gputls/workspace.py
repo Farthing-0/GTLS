@@ -16,15 +16,16 @@ def bucket_count(n):
     return (int(n)+2)//3
 
 
-def bytes_per_period(n, patched, starts=0, screening=False, prefix_bytes=24):
+def bytes_per_period(n, patched, starts=0, screening=False, prefix_bytes=24, weighted_bytes=8):
     # Sort: index(4N), phase(8N), count(4B), cursor(4B), B=ceil(N/3).
-    # Equal weights need only D_z and S_abs_z (12P); general weights need24P.
+    # Equal weights need D_z/S_abs_z in12P and weighted residuals in4P;
+    # general weights use24P prefixes and8P weighted pairs. Integer sums use8P.
     scratch = max(12*n+8*bucket_count(n), prefix_bytes*patched if screening else 0)
-    return scratch + 16*patched + 4*starts
+    return scratch + (8+weighted_bytes)*patched + 4*starts
 
 
 class BatchWorkspace:
-    def __init__(self, capacity, n, patched, starts=0, screening=False, prefix_bytes=24):
+    def __init__(self, capacity, n, patched, starts=0, screening=False, prefix_bytes=24, weighted_bytes=8):
         self.capacity = int(capacity)
         self.n = int(n)
         self.patched = int(patched)
@@ -35,7 +36,7 @@ class BatchWorkspace:
         scratch = max(self.cursor_offset+bucket_bytes, capacity*prefix_bytes*patched if screening else 0)
         self.regions = {}
         total = 0
-        for name, size in [('scratch', scratch), ('weighted', capacity*8*patched),
+        for name, size in [('scratch', scratch), ('weighted', capacity*weighted_bytes*patched),
                            ('cumulative', capacity*8*patched), ('lower', capacity*4*starts)]:
             total = (total+ALIGNMENT-1)//ALIGNMENT*ALIGNMENT
             self.regions[name] = (total, size)
