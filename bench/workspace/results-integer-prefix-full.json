@@ -1,0 +1,1638 @@
+{
+  "mixed": {
+    "result": {
+      "case": {
+        "id": "0730d_100s",
+        "days": 730,
+        "cadence_seconds": 100,
+        "n_points": 630720,
+        "input": "inputs/cadence_100s.npz",
+        "input_sha256": "a1495c55225fb7eafb59d59f3d7ea9e56a66be5225e35caa692b8c19bcc3efe3",
+        "arrays_sha256": {
+          "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+          "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+          "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+        },
+        "grid": "grids/0730d_100s.npy",
+        "grid_file_sha256": "b411366aa1f831254202e080bbd538657b2507b1afc6a62dd61faccea0f00f34",
+        "period_count": 48935,
+        "period_array_sha256": "853da475b81b7271e0ec021bdfe42b3c11f8f0946d1849a09893b026431738b9"
+      },
+      "pattern": "mixed",
+      "baseline": false,
+      "gtls_version": "2.2.0",
+      "cupy_version": "14.2.0",
+      "gpu": "GPU-a8281b40-72b0-f4a1-95ba-d0eeefb61ba4",
+      "source_sha256": {
+        "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+        "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+        "core.py": "4e47368b596b4476360605a851353a29277d7b498a669244c34cab9ea487a9c0",
+        "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+        "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+        "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+        "kernels.cu": "c2f1c6df6f52a05cb0d258af22d1a0706458e026d0143e7f2cd1fa1696c9632e",
+        "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+        "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+        "screening.py": "843c499b1f6a8b8a86a33234f3f9d6029164f6e278532f4cac8d0a753902444f",
+        "stats.py": "3ecc81198e90c210c345b71b1b66029d4908dce0c02df0ef1bb9a4cda21310d0",
+        "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+        "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+        "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+        "workspace.py": "5dd1d3fcc87b412e00ad2275cceaa888e10494bcf4f6a08bb9e5815372d84886"
+      },
+      "branch": "perf/gtls-memory-speed",
+      "commit": "59393fb7328eaf6e58082c04be54356aa2a709a9",
+      "git_status": "",
+      "runner_sha256": "ff0e6ec300e446fd3a604ac6402c52bfa7db6aeed1ded37ad504fff6d197961e",
+      "profiled": true,
+      "phase": "complete",
+      "batch_cap": null,
+      "input_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+      },
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      },
+      "dy_min": 1.0450645712213236e-05,
+      "dy_max": 0.005101645747136833,
+      "initialization_seconds": 11.83108161110431,
+      "warmup_seconds": 8.672713870182633,
+      "times_seconds": [
+        8.723703457042575
+      ],
+      "ok": true,
+      "median_seconds": 8.723703457042575,
+      "field_sha256": "27e15009ec6dc9c54ef98fa0da01a76a373299071547a144e7b126fbf3e5045d",
+      "period": 7.1229777249928725,
+      "sde": 83.29388427734375,
+      "recovered": true,
+      "peak_device_bytes": 23349362688,
+      "thermal_throttled": false,
+      "pool_used_after": 0,
+      "pool_total_after": 0
+    },
+    "comparison": {
+      "all_fields_bitwise_equal": true,
+      "fields": [
+        {
+          "field": "periods",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "periods__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "period",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDuration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "durationPoints",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDurations",
+          "bitwise_equal": true,
+          "shape": [
+            37
+          ]
+        },
+        {
+          "field": "duration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "depth",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "T0",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "SDE",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "chi2",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "chi2__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "transitTimes",
+          "bitwise_equal": true,
+          "shape": [
+            103
+          ]
+        },
+        {
+          "field": "power",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "snr",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFit",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFitPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "raw_power",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "raw_power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "raw_chi2",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "possiblePeriodsIndices",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        },
+        {
+          "field": "possiblePeriods",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        }
+      ],
+      "reference": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/workspace-730-mixed",
+      "candidate": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/integer-prefix-730-mixed/run",
+      "reference_median_seconds": 36.80561357922852,
+      "candidate_median_seconds": 8.723703457042575,
+      "speedup": 4.2190353856555785
+    },
+    "profile": {
+      "kernels": [
+        {
+          "name": "screenCandidatesMappedSparse",
+          "count": 45,
+          "seconds": 2.053688398,
+          "share_percent": 25.98288116939214,
+          "min_seconds": 0.000152832,
+          "max_seconds": 0.089524214
+        },
+        {
+          "name": "bucketScatterPackedPhase",
+          "count": 46,
+          "seconds": 1.546825523,
+          "share_percent": 19.57014695755799,
+          "min_seconds": 2.8672e-05,
+          "max_seconds": 0.041706942
+        },
+        {
+          "name": "patchScan",
+          "count": 46,
+          "seconds": 1.12480414,
+          "share_percent": 14.230811420526084,
+          "min_seconds": 0.000929951,
+          "max_seconds": 0.031277433
+        },
+        {
+          "name": "refineCandidatesMappedSparse",
+          "count": 135,
+          "seconds": 1.016484301,
+          "share_percent": 12.860369094530782,
+          "min_seconds": 6.0032e-05,
+          "max_seconds": 0.015012627
+        },
+        {
+          "name": "sortBucketsPackedPhase",
+          "count": 46,
+          "seconds": 0.734502989,
+          "share_percent": 9.292794320859937,
+          "min_seconds": 1.1296e-05,
+          "max_seconds": 0.022039434
+        },
+        {
+          "name": "foldBucketsPackedPhase",
+          "count": 46,
+          "seconds": 0.669971769,
+          "share_percent": 8.4763574054015,
+          "min_seconds": 1.28e-05,
+          "max_seconds": 0.020082
+        },
+        {
+          "name": "scanScreeningInteger",
+          "count": 45,
+          "seconds": 0.508431142,
+          "share_percent": 6.432575632344951,
+          "min_seconds": 0.003120414,
+          "max_seconds": 0.011807441
+        },
+        {
+          "name": "scanCounts",
+          "count": 46,
+          "seconds": 0.105071249,
+          "share_percent": 1.3293417734381205,
+          "min_seconds": 0.000214112,
+          "max_seconds": 0.002474364
+        },
+        {
+          "name": "searchChi2CompactedG32",
+          "count": 45,
+          "seconds": 0.090737591,
+          "share_percent": 1.14799501562452,
+          "min_seconds": 6.3104e-05,
+          "max_seconds": 0.002972765
+        },
+        {
+          "name": "compactCandidates",
+          "count": 116,
+          "seconds": 0.03043549,
+          "share_percent": 0.3850641220802294,
+          "min_seconds": 2.496e-06,
+          "max_seconds": 0.000638751
+        },
+        {
+          "name": "searchChi2G1",
+          "count": 1,
+          "seconds": 0.016610579,
+          "share_percent": 0.21015393607526262,
+          "min_seconds": 0.016610579,
+          "max_seconds": 0.016610579
+        },
+        {
+          "name": "searchChi2CompactedG16",
+          "count": 15,
+          "seconds": 0.001252829,
+          "share_percent": 0.015850557983513713,
+          "min_seconds": 6.2784e-05,
+          "max_seconds": 0.000125696
+        },
+        {
+          "name": "windowStd",
+          "count": 1,
+          "seconds": 0.001242975,
+          "share_percent": 0.015725887020142378,
+          "min_seconds": 0.001242975,
+          "max_seconds": 0.001242975
+        },
+        {
+          "name": "cupy_any",
+          "count": 46,
+          "seconds": 0.000590495,
+          "share_percent": 0.007470832201740963,
+          "min_seconds": 1.44e-06,
+          "max_seconds": 1.4592e-05
+        },
+        {
+          "name": "durationsGrid",
+          "count": 46,
+          "seconds": 0.000519967,
+          "share_percent": 0.006578525148295317,
+          "min_seconds": 7.104e-06,
+          "max_seconds": 1.2288e-05
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<int, unsigned int, cuda::__4::maximum<void>>::Policy1000, int *, int *, unsigned int, cuda::__4::maximum<void>, int, int, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+          "count": 116,
+          "seconds": 0.000352576,
+          "share_percent": 0.004460725551208768,
+          "min_seconds": 1.376e-06,
+          "max_seconds": 3.392e-06
+        },
+        {
+          "name": "searchChi2CompactedG8",
+          "count": 5,
+          "seconds": 0.000312159,
+          "share_percent": 0.003949377233106559,
+          "min_seconds": 5.5872e-05,
+          "max_seconds": 6.8191e-05
+        },
+        {
+          "name": "cupyx_scipy_ndimage_rank_91_45_1d_nearest_w91",
+          "count": 3,
+          "seconds": 0.000250239,
+          "share_percent": 0.003165976984278371,
+          "min_seconds": 8.1952e-05,
+          "max_seconds": 8.4224e-05
+        },
+        {
+          "name": "cupy_copy__int64_int32",
+          "count": 140,
+          "seconds": 0.000194112,
+          "share_percent": 0.0024558686870241775,
+          "min_seconds": 1.152e-06,
+          "max_seconds": 1.792e-06
+        },
+        {
+          "name": "cupy_copy__uint_uint64",
+          "count": 91,
+          "seconds": 0.000151232,
+          "share_percent": 0.0019133589539855364,
+          "min_seconds": 1.44e-06,
+          "max_seconds": 1.76e-06
+        },
+        {
+          "name": "durationBool",
+          "count": 46,
+          "seconds": 0.00012384,
+          "share_percent": 0.0015668004976563744,
+          "min_seconds": 1.472e-06,
+          "max_seconds": 3.008e-06
+        },
+        {
+          "name": "prepareScreenBudgetsSparse",
+          "count": 25,
+          "seconds": 9.6032e-05,
+          "share_percent": 0.0012149788872007183,
+          "min_seconds": 3.328e-06,
+          "max_seconds": 3.968e-06
+        },
+        {
+          "name": "cupy_right_shift__uint64_uint_uint64",
+          "count": 46,
+          "seconds": 8.7968e-05,
+          "share_percent": 0.0011129546687486753,
+          "min_seconds": 1.344e-06,
+          "max_seconds": 2.016e-06
+        },
+        {
+          "name": "cupy_copy__float64_float32",
+          "count": 48,
+          "seconds": 8.6496e-05,
+          "share_percent": 0.0010943312003010802,
+          "min_seconds": 1.536e-06,
+          "max_seconds": 1.0752e-05
+        },
+        {
+          "name": "cupy_copy__float32_float64",
+          "count": 48,
+          "seconds": 8.1408e-05,
+          "share_percent": 0.0010299587767539577,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.1008e-05
+        },
+        {
+          "name": "cupy_cub_any_pass1",
+          "count": 45,
+          "seconds": 7.9616e-05,
+          "share_percent": 0.0010072867282090593,
+          "min_seconds": 1.408e-06,
+          "max_seconds": 1.888e-06
+        },
+        {
+          "name": "cupy_copy__uint64_uint32",
+          "count": 46,
+          "seconds": 7.664e-05,
+          "share_percent": 0.0009696349333041388,
+          "min_seconds": 1.312e-06,
+          "max_seconds": 1.856e-06
+        },
+        {
+          "name": "cupy_cub_any_pass2",
+          "count": 45,
+          "seconds": 7.2224e-05,
+          "share_percent": 0.0009137645279613533,
+          "min_seconds": 1.408e-06,
+          "max_seconds": 1.728e-06
+        },
+        {
+          "name": "cupy_copy__float64_float64",
+          "count": 47,
+          "seconds": 7.0272e-05,
+          "share_percent": 0.0008890681893678031,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 9.44e-06
+        },
+        {
+          "name": "cupy_where__bool_uint32_uint32_uint32",
+          "count": 46,
+          "seconds": 6.7328e-05,
+          "share_percent": 0.0008518212524726129,
+          "min_seconds": 1.344e-06,
+          "max_seconds": 1.568e-06
+        },
+        {
+          "name": "cupy_greater_equal__uint32_int_bool",
+          "count": 46,
+          "seconds": 6.432e-05,
+          "share_percent": 0.0008137645995579619,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.472e-06
+        },
+        {
+          "name": "cupy_add__float_float64_float64",
+          "count": 46,
+          "seconds": 6.4128e-05,
+          "share_percent": 0.00081133545149958,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.536e-06
+        },
+        {
+          "name": "cupy_copy__uint32_uint32",
+          "count": 46,
+          "seconds": 6.3968e-05,
+          "share_percent": 0.0008093111614509283,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.536e-06
+        },
+        {
+          "name": "cupy_where__bool_float32_float_float32",
+          "count": 45,
+          "seconds": 6.2016e-05,
+          "share_percent": 0.0007846148228573783,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.504e-06
+        },
+        {
+          "name": "cupy_bitwise_and__uint64_uint_uint64",
+          "count": 46,
+          "seconds": 6.0768e-05,
+          "share_percent": 0.0007688253604778954,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.408e-06
+        },
+        {
+          "name": "cupy_copy__uint64_int64",
+          "count": 46,
+          "seconds": 6.048e-05,
+          "share_percent": 0.0007651816383903225,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.408e-06
+        },
+        {
+          "name": "cupy_copy__float32_float32",
+          "count": 45,
+          "seconds": 6.032e-05,
+          "share_percent": 0.0007631573483416708,
+          "min_seconds": 1.216e-06,
+          "max_seconds": 1.504e-06
+        },
+        {
+          "name": "cupy_isfinite__float32_bool",
+          "count": 46,
+          "seconds": 6.016e-05,
+          "share_percent": 0.0007611330582930192,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.44e-06
+        },
+        {
+          "name": "cupy_bitwise_xor__uint32_uint_uint32",
+          "count": 46,
+          "seconds": 6.016e-05,
+          "share_percent": 0.0007611330582930192,
+          "min_seconds": 1.216e-06,
+          "max_seconds": 1.376e-06
+        },
+        {
+          "name": "cupy_invert__uint32_uint32",
+          "count": 46,
+          "seconds": 6e-05,
+          "share_percent": 0.0007591087682443675,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.408e-06
+        },
+        {
+          "name": "cupy_multiply__float64_float64_float64",
+          "count": 1,
+          "seconds": 1.9264e-05,
+          "share_percent": 0.00024372452185765826,
+          "min_seconds": 1.9264e-05,
+          "max_seconds": 1.9264e-05
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, unsigned int, nan_handling_max<float>, float, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)",
+          "count": 3,
+          "seconds": 1.5616e-05,
+          "share_percent": 0.0001975707087484007,
+          "min_seconds": 5.024e-06,
+          "max_seconds": 5.568e-06
+        },
+        {
+          "name": "cupy_multiply__float32_float32_float32",
+          "count": 2,
+          "seconds": 1.4912e-05,
+          "share_percent": 0.00018866383253433346,
+          "min_seconds": 7.296e-06,
+          "max_seconds": 7.616e-06
+        },
+        {
+          "name": "prepareWeights",
+          "count": 1,
+          "seconds": 1.184e-05,
+          "share_percent": 0.00014979746360022184,
+          "min_seconds": 1.184e-05,
+          "max_seconds": 1.184e-05
+        },
+        {
+          "name": "cupy_absolute__float32_float32",
+          "count": 2,
+          "seconds": 1.104e-05,
+          "share_percent": 0.0001396760133569636,
+          "min_seconds": 5.024e-06,
+          "max_seconds": 6.016e-06
+        },
+        {
+          "name": "cupy_true_divide__float_float32_float32",
+          "count": 2,
+          "seconds": 9.728e-06,
+          "share_percent": 0.0001230768349580201,
+          "min_seconds": 4.736e-06,
+          "max_seconds": 4.992e-06
+        },
+        {
+          "name": "cupy_equal__float32_float32_bool",
+          "count": 1,
+          "seconds": 8.128e-06,
+          "share_percent": 0.00010283393447150365,
+          "min_seconds": 8.128e-06,
+          "max_seconds": 8.128e-06
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, unsigned int, cuda::std::__4::plus<void>, double, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)",
+          "count": 1,
+          "seconds": 6.976e-06,
+          "share_percent": 8.825904612121179e-05,
+          "min_seconds": 6.976e-06,
+          "max_seconds": 6.976e-06
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, float *, int, nan_handling_max<float>, float, float, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+          "count": 3,
+          "seconds": 5.408e-06,
+          "share_percent": 6.842100364442565e-05,
+          "min_seconds": 1.632e-06,
+          "max_seconds": 2.016e-06
+        },
+        {
+          "name": "cupy_maximum__float32_float_float32",
+          "count": 1,
+          "seconds": 4.896e-06,
+          "share_percent": 6.194327548874038e-05,
+          "min_seconds": 4.896e-06,
+          "max_seconds": 4.896e-06
+        },
+        {
+          "name": "cupy_fill",
+          "count": 3,
+          "seconds": 3.36e-06,
+          "share_percent": 4.251009102168458e-05,
+          "min_seconds": 1.12e-06,
+          "max_seconds": 1.12e-06
+        },
+        {
+          "name": "cupy_cub_all_pass1",
+          "count": 1,
+          "seconds": 2.688e-06,
+          "share_percent": 3.400807281734766e-05,
+          "min_seconds": 2.688e-06,
+          "max_seconds": 2.688e-06
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, double *, int, cuda::std::__4::plus<void>, double, double, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+          "count": 1,
+          "seconds": 2.272e-06,
+          "share_percent": 2.8744918690853383e-05,
+          "min_seconds": 2.272e-06,
+          "max_seconds": 2.272e-06
+        },
+        {
+          "name": "cupy_cub_all_pass2",
+          "count": 1,
+          "seconds": 1.632e-06,
+          "share_percent": 2.0647758496246796e-05,
+          "min_seconds": 1.632e-06,
+          "max_seconds": 1.632e-06
+        }
+      ],
+      "runtime": [
+        {
+          "name": "cudaMemcpyAsync_v3020",
+          "count": 726,
+          "seconds": 7.867599903,
+          "share_percent": 99.04263479084626,
+          "min_seconds": 7.891e-06,
+          "max_seconds": 0.240081616
+        },
+        {
+          "name": "cuLaunchKernel",
+          "count": 1879,
+          "seconds": 0.016159269,
+          "share_percent": 0.2034237375802209,
+          "min_seconds": 5.126e-06,
+          "max_seconds": 3.2601e-05
+        },
+        {
+          "name": "cudaFreeHost_v3020",
+          "count": 16,
+          "seconds": 0.013949979,
+          "share_percent": 0.17561171036546222,
+          "min_seconds": 3.716e-06,
+          "max_seconds": 0.003756643
+        },
+        {
+          "name": "cudaFree_v3020",
+          "count": 12,
+          "seconds": 0.013554432,
+          "share_percent": 0.17063229891258996,
+          "min_seconds": 0.000133961,
+          "max_seconds": 0.011683843
+        },
+        {
+          "name": "cudaHostAlloc_v3020",
+          "count": 16,
+          "seconds": 0.013200459,
+          "share_percent": 0.16617624891042196,
+          "min_seconds": 1.0186e-05,
+          "max_seconds": 0.006260951
+        },
+        {
+          "name": "cudaMalloc_v3020",
+          "count": 12,
+          "seconds": 0.009499146,
+          "share_percent": 0.1195816334971715,
+          "min_seconds": 8.7108e-05,
+          "max_seconds": 0.00695458
+        },
+        {
+          "name": "cudaMemsetAsync_v3020",
+          "count": 162,
+          "seconds": 0.002183554,
+          "share_percent": 0.027488045151562345,
+          "min_seconds": 6.568e-06,
+          "max_seconds": 2.1293e-05
+        },
+        {
+          "name": "cudaEventQuery_v3020",
+          "count": 1248,
+          "seconds": 0.001707549,
+          "share_percent": 0.021495774325024766,
+          "min_seconds": 4.72e-07,
+          "max_seconds": 2.5148e-05
+        },
+        {
+          "name": "cudaEventRecord_v3020",
+          "count": 461,
+          "seconds": 0.001685506,
+          "share_percent": 0.02121828222761115,
+          "min_seconds": 2.775e-06,
+          "max_seconds": 1.128e-05
+        },
+        {
+          "name": "cudaLaunchKernel_v7000",
+          "count": 124,
+          "seconds": 0.001275528,
+          "share_percent": 0.016057203648768024,
+          "min_seconds": 4.385e-06,
+          "max_seconds": 3.4987e-05
+        },
+        {
+          "name": "cudaEventCreateWithFlags_v3020",
+          "count": 461,
+          "seconds": 0.000869833,
+          "share_percent": 0.01095004235220147,
+          "min_seconds": 1.418e-06,
+          "max_seconds": 6.014e-06
+        },
+        {
+          "name": "cudaStreamIsCapturing_v10000",
+          "count": 726,
+          "seconds": 0.000716808,
+          "share_percent": 0.009023660815808127,
+          "min_seconds": 6.43e-07,
+          "max_seconds": 1.6609e-05
+        },
+        {
+          "name": "cudaStreamSynchronize_v3020",
+          "count": 264,
+          "seconds": 0.000596246,
+          "share_percent": 0.007505945339313084,
+          "min_seconds": 1.444e-06,
+          "max_seconds": 5.516e-06
+        },
+        {
+          "name": "cudaEventDestroy_v3020",
+          "count": 461,
+          "seconds": 0.000590387,
+          "share_percent": 0.007432188309927502,
+          "min_seconds": 4.12e-07,
+          "max_seconds": 8.704e-06
+        },
+        {
+          "name": "cudaMemGetInfo_v3020",
+          "count": 1,
+          "seconds": 3.5589e-05,
+          "share_percent": 0.000448018248643703,
+          "min_seconds": 3.5589e-05,
+          "max_seconds": 3.5589e-05
+        },
+        {
+          "name": "cuProfilerStart",
+          "count": 1,
+          "seconds": 1.9538e-05,
+          "share_percent": 0.00024595747399479246,
+          "min_seconds": 1.9538e-05,
+          "max_seconds": 1.9538e-05
+        },
+        {
+          "name": "cudaDeviceSynchronize_v3020",
+          "count": 1,
+          "seconds": 5.915e-06,
+          "share_percent": 7.446199501889638e-05,
+          "min_seconds": 5.915e-06,
+          "max_seconds": 5.915e-06
+        }
+      ]
+    }
+  },
+  "constant": {
+    "result": {
+      "case": {
+        "id": "0730d_100s",
+        "days": 730,
+        "cadence_seconds": 100,
+        "n_points": 630720,
+        "input": "inputs/cadence_100s.npz",
+        "input_sha256": "a1495c55225fb7eafb59d59f3d7ea9e56a66be5225e35caa692b8c19bcc3efe3",
+        "arrays_sha256": {
+          "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+          "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+          "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+        },
+        "grid": "grids/0730d_100s.npy",
+        "grid_file_sha256": "b411366aa1f831254202e080bbd538657b2507b1afc6a62dd61faccea0f00f34",
+        "period_count": 48935,
+        "period_array_sha256": "853da475b81b7271e0ec021bdfe42b3c11f8f0946d1849a09893b026431738b9"
+      },
+      "pattern": "constant",
+      "baseline": false,
+      "gtls_version": "2.2.0",
+      "cupy_version": "14.2.0",
+      "gpu": "GPU-a8281b40-72b0-f4a1-95ba-d0eeefb61ba4",
+      "source_sha256": {
+        "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+        "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+        "core.py": "4e47368b596b4476360605a851353a29277d7b498a669244c34cab9ea487a9c0",
+        "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+        "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+        "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+        "kernels.cu": "c2f1c6df6f52a05cb0d258af22d1a0706458e026d0143e7f2cd1fa1696c9632e",
+        "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+        "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+        "screening.py": "843c499b1f6a8b8a86a33234f3f9d6029164f6e278532f4cac8d0a753902444f",
+        "stats.py": "3ecc81198e90c210c345b71b1b66029d4908dce0c02df0ef1bb9a4cda21310d0",
+        "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+        "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+        "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+        "workspace.py": "5dd1d3fcc87b412e00ad2275cceaa888e10494bcf4f6a08bb9e5815372d84886"
+      },
+      "branch": "perf/gtls-memory-speed",
+      "commit": "59393fb7328eaf6e58082c04be54356aa2a709a9",
+      "git_status": "",
+      "runner_sha256": "ff0e6ec300e446fd3a604ac6402c52bfa7db6aeed1ded37ad504fff6d197961e",
+      "profiled": true,
+      "phase": "complete",
+      "batch_cap": null,
+      "input_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+      },
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      },
+      "dy_min": 0.00025,
+      "dy_max": 0.00025,
+      "initialization_seconds": 5.454428421333432,
+      "warmup_seconds": 7.795452817343175,
+      "times_seconds": [
+        7.89180070720613
+      ],
+      "ok": true,
+      "median_seconds": 7.89180070720613,
+      "field_sha256": "c4dd95715037b649051809bba6779d31af82e18ddfa6e9583d52d3e5fb7ec577",
+      "period": 7.1229777249928725,
+      "sde": 82.44850158691406,
+      "recovered": true,
+      "peak_device_bytes": 23349362688,
+      "thermal_throttled": false,
+      "pool_used_after": 0,
+      "pool_total_after": 0
+    },
+    "comparison": {
+      "all_fields_bitwise_equal": true,
+      "fields": [
+        {
+          "field": "periods",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "periods__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "period",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDuration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "durationPoints",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDurations",
+          "bitwise_equal": true,
+          "shape": [
+            37
+          ]
+        },
+        {
+          "field": "duration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "depth",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "T0",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "SDE",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "chi2",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "chi2__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "transitTimes",
+          "bitwise_equal": true,
+          "shape": [
+            103
+          ]
+        },
+        {
+          "field": "power",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "snr",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFit",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFitPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "raw_power",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "raw_power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "raw_chi2",
+          "bitwise_equal": true,
+          "shape": [
+            48935
+          ]
+        },
+        {
+          "field": "possiblePeriodsIndices",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        },
+        {
+          "field": "possiblePeriods",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        }
+      ],
+      "reference": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/reference-730-constant",
+      "candidate": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/integer-prefix-730-constant/run",
+      "reference_median_seconds": 56.81036230176687,
+      "candidate_median_seconds": 7.89180070720613,
+      "speedup": 7.198656480249484
+    },
+    "profile": {
+      "kernels": [
+        {
+          "name": "bucketScatterPackedPhase",
+          "count": 40,
+          "seconds": 1.586748954,
+          "share_percent": 22.646006658333388,
+          "min_seconds": 2.8864e-05,
+          "max_seconds": 0.049839716
+        },
+        {
+          "name": "screenCandidatesUniformSparse",
+          "count": 39,
+          "seconds": 1.580217666,
+          "share_percent": 22.552792422292683,
+          "min_seconds": 0.000118912,
+          "max_seconds": 0.084548498
+        },
+        {
+          "name": "patchScanPacked",
+          "count": 40,
+          "seconds": 0.979324008,
+          "share_percent": 13.97686631519515,
+          "min_seconds": 0.000888671,
+          "max_seconds": 0.031816487
+        },
+        {
+          "name": "refineCandidatesUniformSparse",
+          "count": 117,
+          "seconds": 0.919936108,
+          "share_percent": 13.129284991486625,
+          "min_seconds": 4.9792e-05,
+          "max_seconds": 0.017136022
+        },
+        {
+          "name": "sortBucketsPackedPhase",
+          "count": 40,
+          "seconds": 0.738150583,
+          "share_percent": 10.534850503812383,
+          "min_seconds": 1.1808e-05,
+          "max_seconds": 0.025627696
+        },
+        {
+          "name": "foldBucketsPackedPhase",
+          "count": 40,
+          "seconds": 0.688750257,
+          "share_percent": 9.829811367848446,
+          "min_seconds": 1.2512e-05,
+          "max_seconds": 0.02454885
+        },
+        {
+          "name": "scanScreeningUniformInteger",
+          "count": 39,
+          "seconds": 0.272412174,
+          "share_percent": 3.887853772119186,
+          "min_seconds": 0.001988191,
+          "max_seconds": 0.007768442
+        },
+        {
+          "name": "scanCounts",
+          "count": 40,
+          "seconds": 0.106778972,
+          "share_percent": 1.5239444808116724,
+          "min_seconds": 0.000214176,
+          "max_seconds": 0.002952766
+        },
+        {
+          "name": "searchChi2PackedCompactedG32",
+          "count": 39,
+          "seconds": 0.078662821,
+          "share_percent": 1.122672092291978,
+          "min_seconds": 5.3696e-05,
+          "max_seconds": 0.003377245
+        },
+        {
+          "name": "compactCandidates",
+          "count": 101,
+          "seconds": 0.031034094,
+          "share_percent": 0.4429171341740454,
+          "min_seconds": 2.336e-06,
+          "max_seconds": 0.000783104
+        },
+        {
+          "name": "searchChi2PackedG1",
+          "count": 1,
+          "seconds": 0.015596792,
+          "share_percent": 0.22259668398725216,
+          "min_seconds": 0.015596792,
+          "max_seconds": 0.015596792
+        },
+        {
+          "name": "prepareUniformSquare",
+          "count": 25,
+          "seconds": 0.004151967,
+          "share_percent": 0.05925667831080259,
+          "min_seconds": 8.608e-05,
+          "max_seconds": 0.000204192
+        },
+        {
+          "name": "windowStd",
+          "count": 1,
+          "seconds": 0.001242975,
+          "share_percent": 0.017739680908680115,
+          "min_seconds": 0.001242975,
+          "max_seconds": 0.001242975
+        },
+        {
+          "name": "cupy_any",
+          "count": 40,
+          "seconds": 0.000600671,
+          "share_percent": 0.008572748342563441,
+          "min_seconds": 1.44e-06,
+          "max_seconds": 1.712e-05
+        },
+        {
+          "name": "durationsGrid",
+          "count": 40,
+          "seconds": 0.000459936,
+          "share_percent": 0.006564185022558537,
+          "min_seconds": 7.168e-06,
+          "max_seconds": 1.216e-05
+        },
+        {
+          "name": "searchChi2PackedCompactedG16",
+          "count": 10,
+          "seconds": 0.000439616,
+          "share_percent": 0.006274178935497751,
+          "min_seconds": 3.9264e-05,
+          "max_seconds": 4.8416e-05
+        },
+        {
+          "name": "cupyx_scipy_ndimage_rank_91_45_1d_nearest_w91",
+          "count": 3,
+          "seconds": 0.000252031,
+          "share_percent": 0.003596974612599254,
+          "min_seconds": 8.2527e-05,
+          "max_seconds": 8.6048e-05
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<int, unsigned int, cuda::__4::maximum<void>>::Policy1000, int *, int *, unsigned int, cuda::__4::maximum<void>, int, int, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+          "count": 101,
+          "seconds": 0.000250752,
+          "share_percent": 0.0035787207845800247,
+          "min_seconds": 1.376e-06,
+          "max_seconds": 2.72e-06
+        },
+        {
+          "name": "cupy_copy__int64_int32",
+          "count": 122,
+          "seconds": 0.000170048,
+          "share_percent": 0.0024269170813244322,
+          "min_seconds": 1.152e-06,
+          "max_seconds": 1.792e-06
+        },
+        {
+          "name": "cupy_copy__uint_uint64",
+          "count": 79,
+          "seconds": 0.000132352,
+          "share_percent": 0.0018889215371392268,
+          "min_seconds": 1.472e-06,
+          "max_seconds": 1.792e-06
+        },
+        {
+          "name": "durationBool",
+          "count": 40,
+          "seconds": 0.000113472,
+          "share_percent": 0.001619467062547316,
+          "min_seconds": 1.536e-06,
+          "max_seconds": 3.232e-06
+        },
+        {
+          "name": "prepareScreenBudgetsUniformSparse",
+          "count": 25,
+          "seconds": 9.6768e-05,
+          "share_percent": 0.001381068357908371,
+          "min_seconds": 3.456e-06,
+          "max_seconds": 4e-06
+        },
+        {
+          "name": "cupy_right_shift__uint64_uint_uint64",
+          "count": 40,
+          "seconds": 7.8432e-05,
+          "share_percent": 0.0011193778258047015,
+          "min_seconds": 1.312e-06,
+          "max_seconds": 2.112e-06
+        },
+        {
+          "name": "cupy_copy__float64_float32",
+          "count": 42,
+          "seconds": 7.7792e-05,
+          "share_percent": 0.001110243775818535,
+          "min_seconds": 1.536e-06,
+          "max_seconds": 1.0624e-05
+        },
+        {
+          "name": "cupy_copy__float32_float64",
+          "count": 42,
+          "seconds": 7.536e-05,
+          "share_percent": 0.0010755343858711024,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.088e-05
+        },
+        {
+          "name": "cupy_cub_any_pass1",
+          "count": 39,
+          "seconds": 7.184e-05,
+          "share_percent": 0.0010252971109471867,
+          "min_seconds": 1.408e-06,
+          "max_seconds": 1.952e-06
+        },
+        {
+          "name": "cupy_copy__uint64_uint32",
+          "count": 40,
+          "seconds": 6.8064e-05,
+          "share_percent": 0.0009714062160288045,
+          "min_seconds": 1.312e-06,
+          "max_seconds": 1.792e-06
+        },
+        {
+          "name": "cupy_cub_any_pass2",
+          "count": 39,
+          "seconds": 6.4864e-05,
+          "share_percent": 0.0009257359660979721,
+          "min_seconds": 1.344e-06,
+          "max_seconds": 1.76e-06
+        },
+        {
+          "name": "cupy_copy__float64_float64",
+          "count": 41,
+          "seconds": 6.352e-05,
+          "share_percent": 0.0009065544611270226,
+          "min_seconds": 1.216e-06,
+          "max_seconds": 9.344e-06
+        },
+        {
+          "name": "cupy_where__bool_uint32_uint32_uint32",
+          "count": 40,
+          "seconds": 5.9008e-05,
+          "share_percent": 0.0008421594087245489,
+          "min_seconds": 1.312e-06,
+          "max_seconds": 1.6e-06
+        },
+        {
+          "name": "cupy_add__float_float64_float64",
+          "count": 40,
+          "seconds": 5.7664e-05,
+          "share_percent": 0.0008229779037535993,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.536e-06
+        },
+        {
+          "name": "cupy_greater_equal__uint32_int_bool",
+          "count": 40,
+          "seconds": 5.7056e-05,
+          "share_percent": 0.0008143005562667411,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.536e-06
+        },
+        {
+          "name": "cupy_copy__uint32_uint32",
+          "count": 40,
+          "seconds": 5.6736e-05,
+          "share_percent": 0.000809733531273658,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.536e-06
+        },
+        {
+          "name": "cupy_where__bool_float32_float_float32",
+          "count": 39,
+          "seconds": 5.5808e-05,
+          "share_percent": 0.0007964891587937165,
+          "min_seconds": 1.28e-06,
+          "max_seconds": 1.536e-06
+        },
+        {
+          "name": "cupy_bitwise_and__uint64_uint_uint64",
+          "count": 40,
+          "seconds": 5.472e-05,
+          "share_percent": 0.0007809612738172336,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.44e-06
+        },
+        {
+          "name": "cupy_bitwise_xor__uint32_uint_uint32",
+          "count": 40,
+          "seconds": 5.4368e-05,
+          "share_percent": 0.000775937546324842,
+          "min_seconds": 1.216e-06,
+          "max_seconds": 1.408e-06
+        },
+        {
+          "name": "cupy_isfinite__float32_bool",
+          "count": 40,
+          "seconds": 5.4272e-05,
+          "share_percent": 0.000774567438826917,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.44e-06
+        },
+        {
+          "name": "cupy_copy__float32_float32",
+          "count": 39,
+          "seconds": 5.3024e-05,
+          "share_percent": 0.0007567560413538923,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.472e-06
+        },
+        {
+          "name": "cupy_copy__uint64_int64",
+          "count": 40,
+          "seconds": 5.3024e-05,
+          "share_percent": 0.0007567560413538923,
+          "min_seconds": 1.216e-06,
+          "max_seconds": 1.408e-06
+        },
+        {
+          "name": "cupy_invert__uint32_uint32",
+          "count": 40,
+          "seconds": 5.296e-05,
+          "share_percent": 0.0007558426363552757,
+          "min_seconds": 1.248e-06,
+          "max_seconds": 1.376e-06
+        },
+        {
+          "name": "cupy_multiply__float64_float64_float64",
+          "count": 1,
+          "seconds": 1.952e-05,
+          "share_percent": 0.00027858852457807745,
+          "min_seconds": 1.952e-05,
+          "max_seconds": 1.952e-05
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, unsigned int, nan_handling_max<float>, float, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)",
+          "count": 3,
+          "seconds": 1.5392e-05,
+          "share_percent": 0.0002196739021673037,
+          "min_seconds": 4.992e-06,
+          "max_seconds": 5.408e-06
+        },
+        {
+          "name": "cupy_multiply__float32_float32_float32",
+          "count": 2,
+          "seconds": 1.5232e-05,
+          "share_percent": 0.00021739038967076208,
+          "min_seconds": 7.424e-06,
+          "max_seconds": 7.808e-06
+        },
+        {
+          "name": "prepareWeights",
+          "count": 1,
+          "seconds": 1.1808e-05,
+          "share_percent": 0.00016852322224477145,
+          "min_seconds": 1.1808e-05,
+          "max_seconds": 1.1808e-05
+        },
+        {
+          "name": "cupy_absolute__float32_float32",
+          "count": 2,
+          "seconds": 1.1008e-05,
+          "share_percent": 0.00015710565976206336,
+          "min_seconds": 4.928e-06,
+          "max_seconds": 6.08e-06
+        },
+        {
+          "name": "cupy_true_divide__float_float32_float32",
+          "count": 2,
+          "seconds": 9.664e-06,
+          "share_percent": 0.00013792415479111375,
+          "min_seconds": 4.672e-06,
+          "max_seconds": 4.992e-06
+        },
+        {
+          "name": "cupy_equal__float32_float32_bool",
+          "count": 1,
+          "seconds": 8.096e-06,
+          "share_percent": 0.0001155457323250059,
+          "min_seconds": 8.096e-06,
+          "max_seconds": 8.096e-06
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, unsigned int, cuda::std::__4::plus<void>, double, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)",
+          "count": 1,
+          "seconds": 7.04e-06,
+          "share_percent": 0.00010047454984783122,
+          "min_seconds": 7.04e-06,
+          "max_seconds": 7.04e-06
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, float *, int, nan_handling_max<float>, float, float, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+          "count": 3,
+          "seconds": 5.408e-06,
+          "share_percent": 7.718272238310671e-05,
+          "min_seconds": 1.632e-06,
+          "max_seconds": 2.016e-06
+        },
+        {
+          "name": "cupy_maximum__float32_float_float32",
+          "count": 1,
+          "seconds": 4.832e-06,
+          "share_percent": 6.896207739555688e-05,
+          "min_seconds": 4.832e-06,
+          "max_seconds": 4.832e-06
+        },
+        {
+          "name": "cupy_fill",
+          "count": 3,
+          "seconds": 3.36e-06,
+          "share_percent": 4.795376242737399e-05,
+          "min_seconds": 1.088e-06,
+          "max_seconds": 1.152e-06
+        },
+        {
+          "name": "cupy_cub_all_pass1",
+          "count": 1,
+          "seconds": 2.688e-06,
+          "share_percent": 3.836300994189919e-05,
+          "min_seconds": 2.688e-06,
+          "max_seconds": 2.688e-06
+        },
+        {
+          "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, double *, int, cuda::std::__4::plus<void>, double, double, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+          "count": 1,
+          "seconds": 2.272e-06,
+          "share_percent": 3.242587745089098e-05,
+          "min_seconds": 2.272e-06,
+          "max_seconds": 2.272e-06
+        },
+        {
+          "name": "cupy_cub_all_pass2",
+          "count": 1,
+          "seconds": 1.632e-06,
+          "share_percent": 2.3291827464724508e-05,
+          "min_seconds": 1.632e-06,
+          "max_seconds": 1.632e-06
+        }
+      ],
+      "runtime": [
+        {
+          "name": "cudaMemcpyAsync_v3020",
+          "count": 640,
+          "seconds": 6.971140542,
+          "share_percent": 98.92375800313644,
+          "min_seconds": 8.282e-06,
+          "max_seconds": 0.246274923
+        },
+        {
+          "name": "cuLaunchKernel",
+          "count": 1657,
+          "seconds": 0.016457318,
+          "share_percent": 0.23353707092893974,
+          "min_seconds": 5.283e-06,
+          "max_seconds": 6.0119e-05
+        },
+        {
+          "name": "cudaFree_v3020",
+          "count": 12,
+          "seconds": 0.014670037,
+          "share_percent": 0.2081747142152306,
+          "min_seconds": 0.000135565,
+          "max_seconds": 0.012738684
+        },
+        {
+          "name": "cudaHostAlloc_v3020",
+          "count": 16,
+          "seconds": 0.012841877,
+          "share_percent": 0.18223226529436448,
+          "min_seconds": 1.0893e-05,
+          "max_seconds": 0.006795291
+        },
+        {
+          "name": "cudaFreeHost_v3020",
+          "count": 16,
+          "seconds": 0.01188172,
+          "share_percent": 0.1686071865657455,
+          "min_seconds": 4.623e-06,
+          "max_seconds": 0.00405938
+        },
+        {
+          "name": "cudaMalloc_v3020",
+          "count": 12,
+          "seconds": 0.009748658,
+          "share_percent": 0.13833803508007658,
+          "min_seconds": 9.0199e-05,
+          "max_seconds": 0.007019369
+        },
+        {
+          "name": "cudaMemsetAsync_v3020",
+          "count": 141,
+          "seconds": 0.002381319,
+          "share_percent": 0.033792034899455176,
+          "min_seconds": 6.679e-06,
+          "max_seconds": 4.8596e-05
+        },
+        {
+          "name": "cudaEventQuery_v3020",
+          "count": 1099,
+          "seconds": 0.001720134,
+          "share_percent": 0.024409509250856113,
+          "min_seconds": 4.77e-07,
+          "max_seconds": 1.766e-05
+        },
+        {
+          "name": "cudaEventRecord_v3020",
+          "count": 407,
+          "seconds": 0.001650061,
+          "share_percent": 0.023415140473926385,
+          "min_seconds": 2.688e-06,
+          "max_seconds": 2.754e-05
+        },
+        {
+          "name": "cudaLaunchKernel_v7000",
+          "count": 109,
+          "seconds": 0.001570276,
+          "share_percent": 0.022282953856151515,
+          "min_seconds": 4.712e-06,
+          "max_seconds": 4.0276e-05
+        },
+        {
+          "name": "cudaEventCreateWithFlags_v3020",
+          "count": 407,
+          "seconds": 0.000866188,
+          "share_percent": 0.01229161448990634,
+          "min_seconds": 1.513e-06,
+          "max_seconds": 2.5306e-05
+        },
+        {
+          "name": "cudaStreamIsCapturing_v10000",
+          "count": 640,
+          "seconds": 0.000707347,
+          "share_percent": 0.010037586106701756,
+          "min_seconds": 6.3e-07,
+          "max_seconds": 1.6873e-05
+        },
+        {
+          "name": "cudaStreamSynchronize_v3020",
+          "count": 232,
+          "seconds": 0.00068838,
+          "share_percent": 0.009768435469622907,
+          "min_seconds": 1.339e-06,
+          "max_seconds": 2.9282e-05
+        },
+        {
+          "name": "cudaEventDestroy_v3020",
+          "count": 407,
+          "seconds": 0.00058373,
+          "share_percent": 0.008283402825013771,
+          "min_seconds": 4.18e-07,
+          "max_seconds": 2.6195e-05
+        },
+        {
+          "name": "cudaMemGetInfo_v3020",
+          "count": 1,
+          "seconds": 5.6326e-05,
+          "share_percent": 0.0007992923912112204,
+          "min_seconds": 5.6326e-05,
+          "max_seconds": 5.6326e-05
+        },
+        {
+          "name": "cuProfilerStart",
+          "count": 1,
+          "seconds": 1.283e-05,
+          "share_percent": 0.0001820637250868153,
+          "min_seconds": 1.283e-05,
+          "max_seconds": 1.283e-05
+        },
+        {
+          "name": "cudaDeviceSynchronize_v3020",
+          "count": 1,
+          "seconds": 6.391e-06,
+          "share_percent": 9.069129127278538e-05,
+          "min_seconds": 6.391e-06,
+          "max_seconds": 6.391e-06
+        }
+      ]
+    }
+  }
+}

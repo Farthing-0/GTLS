@@ -620,3 +620,8 @@ Certified integer screening prefixes
   Interleaved/padded coefficients improve local screening by under2%, with no
   consistent overall gain. Neither experiment changes production scheduling.
   Full constant/mixed validation is next.
+  Full validation at59393fb: mixed8.723703s and constant7.891801s.
+  Both runs match all24 fields bitwise, have no thermal flags, and release0/0
+  used/total pool bytes without diagnostic GC. Mixed prefix1.516553 ->0.508431s;
+  constant prefix1.017921 ->0.272412s. Looser quantization bounds modestly increase
+  screening time; net API elapsed still improves8.75% mixed and6.04% constant.
