@@ -333,3 +333,15 @@ Fused weighted gather / integer prefix checkpoint
   equal; five-batch512-thread prototype also preserves every candidate key.
   89 tests pass, two single-device/optional skips; synchronization sanitizer
   reports zero errors in four wrap/tail/integer-prefix tests. Full730d next.
+
+A100 comparison completed at source21fc9ae
+  Same source/input/settings as3090: mixed9.739804s vs14.911319s (1.531x);
+  constant10.887720s vs16.826603s (1.545x). Both24 fields bitwise equal,
+  no thermal flags. One measured run per input, after warm-up. A100 GPU
+  stages total8.18s; prefix1.928s, coarse screen1.482s, scatter1.199s.
+  Native AVX512 NumPy changed1920 grid values by1-2ULP and mixed dy; native
+  runs excluded. Disable AVX512 dispatch to reproduce AVX2 CPU math exactly.
+  85 checks pass after installing missing astropy;2 optional/device skips.
+  ArchiveSHA2560d2697bf9b428b00059abaaf04abbe27afab7872697b173729d07e70cf3ea582.
+  Instance60674743 DESTROYED at18:02:48UTC; API confirms no remaining instances.
+  Lease44.50min, estimated$0.308 at quoted rate (not final invoice).

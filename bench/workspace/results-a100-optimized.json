@@ -1,0 +1,536 @@
+{
+  "mixed": {
+    "comparison": {
+      "fields": {
+        "periods": true,
+        "periods__mask": true,
+        "period": true,
+        "rawDuration": true,
+        "durationPoints": true,
+        "rawDurations": true,
+        "duration": true,
+        "depth": true,
+        "T0": true,
+        "SDE": true,
+        "chi2": true,
+        "chi2__mask": true,
+        "transitTimes": true,
+        "power": true,
+        "power__mask": true,
+        "snr": true,
+        "snrPink": true,
+        "snrFit": true,
+        "snrFitPink": true,
+        "raw_power": true,
+        "raw_power__mask": true,
+        "raw_chi2": true,
+        "possiblePeriodsIndices": true,
+        "possiblePeriods": true
+      },
+      "seconds3090": 14.911319111473858,
+      "secondsA100": 9.73980419698637,
+      "speedup": 1.5309670307425305
+    },
+    "commit": "21fc9ae0275b583cfe3085bc488d66ab9e351de2",
+    "source_sha256": {
+      "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+      "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+      "core.py": "0751e2c21107db038b9f4dfcf4473934f30a1899ab356338cea32940d5c808c6",
+      "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+      "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+      "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+      "kernels.cu": "99e4451db63b9aa7ea700ffdf3b26c96d778a1235479cf3009fe808c2a1cab25",
+      "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+      "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+      "screening.py": "db80ba2e38fa4586f0354adb2bacf6ce3f28cf6a2ae8e8fcd40b61a4b207334e",
+      "stats.py": "6b135265230be2a90cd6f054b99bff3112a5020c5bc36da0abeeae04d25ce725",
+      "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+      "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+      "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+      "workspace.py": "b46008594abbb12b127a10cbc3fe41ab174fa374851659438a23d5aab5633b19"
+    },
+    "input_sha256": {
+      "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+      "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+      "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+    },
+    "thermal_throttled": false,
+    "peak_device_bytes": 38759038976,
+    "profiled": true
+  },
+  "constant": {
+    "comparison": {
+      "fields": {
+        "periods": true,
+        "periods__mask": true,
+        "period": true,
+        "rawDuration": true,
+        "durationPoints": true,
+        "rawDurations": true,
+        "duration": true,
+        "depth": true,
+        "T0": true,
+        "SDE": true,
+        "chi2": true,
+        "chi2__mask": true,
+        "transitTimes": true,
+        "power": true,
+        "power__mask": true,
+        "snr": true,
+        "snrPink": true,
+        "snrFit": true,
+        "snrFitPink": true,
+        "raw_power": true,
+        "raw_power__mask": true,
+        "raw_chi2": true,
+        "possiblePeriodsIndices": true,
+        "possiblePeriods": true
+      },
+      "seconds3090": 16.826603426598012,
+      "secondsA100": 10.88771976006683,
+      "speedup": 1.5454662498123233
+    },
+    "commit": "21fc9ae0275b583cfe3085bc488d66ab9e351de2",
+    "source_sha256": {
+      "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+      "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+      "core.py": "0751e2c21107db038b9f4dfcf4473934f30a1899ab356338cea32940d5c808c6",
+      "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+      "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+      "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+      "kernels.cu": "99e4451db63b9aa7ea700ffdf3b26c96d778a1235479cf3009fe808c2a1cab25",
+      "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+      "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+      "screening.py": "db80ba2e38fa4586f0354adb2bacf6ce3f28cf6a2ae8e8fcd40b61a4b207334e",
+      "stats.py": "6b135265230be2a90cd6f054b99bff3112a5020c5bc36da0abeeae04d25ce725",
+      "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+      "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+      "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+      "workspace.py": "b46008594abbb12b127a10cbc3fe41ab174fa374851659438a23d5aab5633b19"
+    },
+    "input_sha256": {
+      "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+      "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+      "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+    },
+    "thermal_throttled": false,
+    "peak_device_bytes": 38759038976,
+    "profiled": false
+  },
+  "rental": {
+    "instance_id": 60674743,
+    "device": "A100 PCIe 40 GB",
+    "cpu": "Xeon Gold 6248R",
+    "destroyed": true,
+    "remaining_instance_ids": [],
+    "hours_until_destroy": 0.7416913602777778,
+    "quote_usd_per_hour": 0.4148148148,
+    "estimated_usd_not_invoice": 0.3076645642523865,
+    "archive_sha256": "0d2697bf9b428b00059abaaf04abbe27afab7872697b173729d07e70cf3ea582"
+  },
+  "environment_alignment": {
+    "reason": "Native AVX512 NumPy dispatch differs from AVX2 host at 1920 period-grid entries by 1-2 ULP; mixed dy also differs. Disable extra CPU dispatch before import; frozen grid and all input hashes then match exactly. Native runs retained as diagnostics, excluded from comparison.",
+    "NPY_DISABLE_CPU_FEATURES": "AVX512F,AVX512CD,AVX512VL,AVX512BW,AVX512DQ,AVX512VNNI,AVX512_SKX,AVX512_CLX,X86_V4"
+  },
+  "checks": {
+    "initial_passed": 84,
+    "initial_skipped": 2,
+    "initial_missing_dependency": "astropy",
+    "dependency_version": "8.0.2",
+    "failed_check_rerun_passed": 1
+  },
+  "mixed_profile": [
+    {
+      "name": "scanScreening",
+      "count": 41,
+      "seconds": 1.927810495,
+      "share_percent": 23.55593978841947,
+      "min_seconds": 0.00453031,
+      "max_seconds": 0.051763947
+    },
+    {
+      "name": "screenCandidates",
+      "count": 41,
+      "seconds": 1.482177784,
+      "share_percent": 18.110748295120676,
+      "min_seconds": 0.000108001,
+      "max_seconds": 0.055479697
+    },
+    {
+      "name": "bucketScatter",
+      "count": 42,
+      "seconds": 1.198594609,
+      "share_percent": 14.645642044981281,
+      "min_seconds": 2.8512e-05,
+      "max_seconds": 0.035741739
+    },
+    {
+      "name": "sortBuckets",
+      "count": 42,
+      "seconds": 0.874575037,
+      "share_percent": 10.686442970125407,
+      "min_seconds": 1.8593e-05,
+      "max_seconds": 0.027881182
+    },
+    {
+      "name": "patchWeighted",
+      "count": 42,
+      "seconds": 0.794250597,
+      "share_percent": 9.704957664860217,
+      "min_seconds": 1.408e-05,
+      "max_seconds": 0.024473732
+    },
+    {
+      "name": "refineCandidates",
+      "count": 123,
+      "seconds": 0.737789171,
+      "share_percent": 9.015054816694478,
+      "min_seconds": 3.4208e-05,
+      "max_seconds": 0.016620004
+    },
+    {
+      "name": "foldBuckets",
+      "count": 42,
+      "seconds": 0.627980344,
+      "share_percent": 7.6732994295556765,
+      "min_seconds": 1.6416e-05,
+      "max_seconds": 0.020541836
+    },
+    {
+      "name": "scanResidual",
+      "count": 42,
+      "seconds": 0.364634612,
+      "share_percent": 4.455474740553114,
+      "min_seconds": 0.001180682,
+      "max_seconds": 0.009520301
+    },
+    {
+      "name": "scanCounts",
+      "count": 42,
+      "seconds": 0.076530284,
+      "share_percent": 0.9351244671456371,
+      "min_seconds": 0.000292642,
+      "max_seconds": 0.002003089
+    },
+    {
+      "name": "searchChi2CompactedG32",
+      "count": 41,
+      "seconds": 0.05050105,
+      "share_percent": 0.6170729416285085,
+      "min_seconds": 0.000171458,
+      "max_seconds": 0.001573325
+    },
+    {
+      "name": "compactCandidates",
+      "count": 106,
+      "seconds": 0.027345604,
+      "share_percent": 0.33413626649125727,
+      "min_seconds": 2.88e-06,
+      "max_seconds": 0.000676838
+    },
+    {
+      "name": "searchChi2G1",
+      "count": 1,
+      "seconds": 0.014945213,
+      "share_percent": 0.18261573866631736,
+      "min_seconds": 0.014945213,
+      "max_seconds": 0.014945213
+    },
+    {
+      "name": "searchChi2CompactedG16",
+      "count": 13,
+      "seconds": 0.002487063,
+      "share_percent": 0.030389452920789234,
+      "min_seconds": 0.000172385,
+      "max_seconds": 0.00020781
+    },
+    {
+      "name": "cupy_any",
+      "count": 42,
+      "seconds": 0.000815175,
+      "share_percent": 0.009960633198557643,
+      "min_seconds": 1.92e-06,
+      "max_seconds": 2.2529e-05
+    },
+    {
+      "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<int, unsigned int, cuda::__4::maximum<void>>::Policy1000, int *, int *, unsigned int, cuda::__4::maximum<void>, int, int, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+      "count": 106,
+      "seconds": 0.000341697,
+      "share_percent": 0.0041751997817003105,
+      "min_seconds": 1.92e-06,
+      "max_seconds": 3.808e-06
+    },
+    {
+      "name": "searchChi2CompactedG8",
+      "count": 2,
+      "seconds": 0.000339555,
+      "share_percent": 0.004149026657755991,
+      "min_seconds": 0.00016925,
+      "max_seconds": 0.000170305
+    },
+    {
+      "name": "cupyx_scipy_ndimage_rank_91_45_1d_nearest_w91",
+      "count": 3,
+      "seconds": 0.000277986,
+      "share_percent": 0.0033967143010203266,
+      "min_seconds": 9.1712e-05,
+      "max_seconds": 9.4497e-05
+    },
+    {
+      "name": "cupy_copy__int64_int32",
+      "count": 128,
+      "seconds": 0.000228736,
+      "share_percent": 0.0027949279544947784,
+      "min_seconds": 1.472e-06,
+      "max_seconds": 2.08e-06
+    },
+    {
+      "name": "durationBool",
+      "count": 42,
+      "seconds": 0.000189281,
+      "share_percent": 0.0023128268316081686,
+      "min_seconds": 2.432e-06,
+      "max_seconds": 5.024e-06
+    },
+    {
+      "name": "cupy_copy__uint_uint64",
+      "count": 83,
+      "seconds": 0.000182307,
+      "share_percent": 0.0022276114411377288,
+      "min_seconds": 1.504e-06,
+      "max_seconds": 2.4e-06
+    },
+    {
+      "name": "durationsGrid",
+      "count": 42,
+      "seconds": 0.000176388,
+      "share_percent": 0.002155287108445653,
+      "min_seconds": 4.032e-06,
+      "max_seconds": 4.48e-06
+    },
+    {
+      "name": "cupy_cub_any_pass1",
+      "count": 41,
+      "seconds": 0.000117472,
+      "share_percent": 0.001435391790843639,
+      "min_seconds": 1.92e-06,
+      "max_seconds": 3.072e-06
+    },
+    {
+      "name": "cupy_right_shift__uint64_uint_uint64",
+      "count": 42,
+      "seconds": 0.000115424,
+      "share_percent": 0.0014103672540378659,
+      "min_seconds": 1.792e-06,
+      "max_seconds": 3.04e-06
+    },
+    {
+      "name": "cupy_copy__float64_float32",
+      "count": 44,
+      "seconds": 0.000105058,
+      "share_percent": 0.001283704974482864,
+      "min_seconds": 1.728e-06,
+      "max_seconds": 6.528e-06
+    },
+    {
+      "name": "cupy_copy__uint64_uint32",
+      "count": 42,
+      "seconds": 0.000104642,
+      "share_percent": 0.0012786218654441915,
+      "min_seconds": 1.824e-06,
+      "max_seconds": 2.784e-06
+    },
+    {
+      "name": "cupy_greater_equal__uint32_int_bool",
+      "count": 42,
+      "seconds": 9.869e-05,
+      "share_percent": 0.0012058943053524136,
+      "min_seconds": 1.664e-06,
+      "max_seconds": 2.56e-06
+    },
+    {
+      "name": "cupy_copy__float32_float64",
+      "count": 44,
+      "seconds": 9.8081e-05,
+      "share_percent": 0.0011984529269760875,
+      "min_seconds": 1.632e-06,
+      "max_seconds": 5.76e-06
+    },
+    {
+      "name": "cupy_copy__uint32_uint32",
+      "count": 42,
+      "seconds": 9.8017e-05,
+      "share_percent": 0.0011976709102009071,
+      "min_seconds": 1.664e-06,
+      "max_seconds": 2.624e-06
+    },
+    {
+      "name": "cupy_copy__float64_float64",
+      "count": 43,
+      "seconds": 9.776e-05,
+      "share_percent": 0.0011945306240880732,
+      "min_seconds": 1.664e-06,
+      "max_seconds": 6.976e-06
+    },
+    {
+      "name": "cupy_where__bool_uint32_uint32_uint32",
+      "count": 42,
+      "seconds": 9.6544e-05,
+      "share_percent": 0.0011796723053596454,
+      "min_seconds": 1.76e-06,
+      "max_seconds": 2.528e-06
+    },
+    {
+      "name": "cupy_cub_any_pass2",
+      "count": 41,
+      "seconds": 9.1074e-05,
+      "share_percent": 0.0011128343091059449,
+      "min_seconds": 1.792e-06,
+      "max_seconds": 2.368e-06
+    },
+    {
+      "name": "cupy_copy__uint64_int64",
+      "count": 42,
+      "seconds": 8.6401e-05,
+      "share_percent": 0.001055734865505663,
+      "min_seconds": 1.632e-06,
+      "max_seconds": 2.24e-06
+    },
+    {
+      "name": "cupy_bitwise_and__uint64_uint_uint64",
+      "count": 42,
+      "seconds": 8.6305e-05,
+      "share_percent": 0.0010545618403428924,
+      "min_seconds": 1.664e-06,
+      "max_seconds": 2.24e-06
+    },
+    {
+      "name": "cupy_add__float_float64_float64",
+      "count": 42,
+      "seconds": 8.6145e-05,
+      "share_percent": 0.0010526067984049413,
+      "min_seconds": 1.633e-06,
+      "max_seconds": 2.208e-06
+    },
+    {
+      "name": "cupy_invert__uint32_uint32",
+      "count": 42,
+      "seconds": 8.5568e-05,
+      "share_percent": 0.0010455564284162055,
+      "min_seconds": 1.632e-06,
+      "max_seconds": 2.208e-06
+    },
+    {
+      "name": "cupy_bitwise_xor__uint32_uint_uint32",
+      "count": 42,
+      "seconds": 8.5505e-05,
+      "share_percent": 0.0010447866306531374,
+      "min_seconds": 1.632e-06,
+      "max_seconds": 2.176e-06
+    },
+    {
+      "name": "cupy_where__bool_float32_float_float32",
+      "count": 41,
+      "seconds": 8.5153e-05,
+      "share_percent": 0.001040485538389645,
+      "min_seconds": 1.696e-06,
+      "max_seconds": 2.24e-06
+    },
+    {
+      "name": "cupy_isfinite__float32_bool",
+      "count": 42,
+      "seconds": 8.4482e-05,
+      "share_percent": 0.001032286581262363,
+      "min_seconds": 1.632e-06,
+      "max_seconds": 2.176e-06
+    },
+    {
+      "name": "cupy_copy__float32_float32",
+      "count": 41,
+      "seconds": 8.3969e-05,
+      "share_percent": 0.0010260182280488076,
+      "min_seconds": 1.632e-06,
+      "max_seconds": 2.208e-06
+    },
+    {
+      "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, unsigned int, nan_handling_max<float>, float, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)",
+      "count": 3,
+      "seconds": 2.2144e-05,
+      "share_percent": 0.00027057780421242114,
+      "min_seconds": 7.264e-06,
+      "max_seconds": 7.584e-06
+    },
+    {
+      "name": "cupy_multiply__float32_float32_float32",
+      "count": 2,
+      "seconds": 1.2608e-05,
+      "share_percent": 0.00015405730471054036,
+      "min_seconds": 6.176e-06,
+      "max_seconds": 6.432e-06
+    },
+    {
+      "name": "cupy_true_divide__float_float32_float32",
+      "count": 2,
+      "seconds": 1.1968e-05,
+      "share_percent": 0.0001462371369587363,
+      "min_seconds": 5.856e-06,
+      "max_seconds": 6.112e-06
+    },
+    {
+      "name": "cupy_absolute__float32_float32",
+      "count": 2,
+      "seconds": 1.1456e-05,
+      "share_percent": 0.00013998100275729302,
+      "min_seconds": 5.696e-06,
+      "max_seconds": 5.76e-06
+    },
+    {
+      "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, float *, int, nan_handling_max<float>, float, float, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+      "count": 3,
+      "seconds": 6.784e-06,
+      "share_percent": 8.289377816912325e-05,
+      "min_seconds": 2.048e-06,
+      "max_seconds": 2.656e-06
+    },
+    {
+      "name": "cupy_multiply__float64_float64_float64",
+      "count": 1,
+      "seconds": 6.24e-06,
+      "share_percent": 7.624663558008978e-05,
+      "min_seconds": 6.24e-06,
+      "max_seconds": 6.24e-06
+    },
+    {
+      "name": "cupy_maximum__float32_float_float32",
+      "count": 1,
+      "seconds": 5.792e-06,
+      "share_percent": 7.077251815382693e-05,
+      "min_seconds": 5.792e-06,
+      "max_seconds": 5.792e-06
+    },
+    {
+      "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, unsigned int, cuda::std::__4::plus<void>, double, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)",
+      "count": 1,
+      "seconds": 5.057e-06,
+      "share_percent": 6.179154425136443e-05,
+      "min_seconds": 5.057e-06,
+      "max_seconds": 5.057e-06
+    },
+    {
+      "name": "cupy_fill",
+      "count": 3,
+      "seconds": 4.288e-06,
+      "share_percent": 5.2395123937087334e-05,
+      "min_seconds": 1.344e-06,
+      "max_seconds": 1.504e-06
+    },
+    {
+      "name": "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, double *, int, cuda::std::__4::plus<void>, double, double, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)",
+      "count": 1,
+      "seconds": 2.048e-06,
+      "share_percent": 2.5024536805773057e-05,
+      "min_seconds": 2.048e-06,
+      "max_seconds": 2.048e-06
+    }
+  ]
+}
