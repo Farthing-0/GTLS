@@ -10,7 +10,7 @@ import tqdm
 from . import constants
 from .grid import duration_limit_masses
 from .helpers import transit_mask
-from .screening import certificates, MIN_WIDTH
+from .screening import certificates, MIN_WIDTH, SCREEN_TOLERANCES
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
 from .workspace import BatchWorkspace, LAYOUT_ALLOWANCE, bytes_per_period as workspace_bytes_per_period
 
@@ -200,11 +200,12 @@ class GPUSearch:
             max_w = float(cp.max(cp.float32(1) / dy2))
             self.screening = bool(np.isfinite(max_z) and np.isfinite(max_w))
             if self.screening:
-                pos, coef, meta, self.screenMassError = certificates(
-                    signal, durations, max_z, max_w, self.patchedDatasSize)
-                self.screenPositions = cp.asarray(pos)
-                self.screenCoefficients = cp.asarray(coef)
-                self.screenMetadata = cp.asarray(meta)
+                self.screenCertificates = []
+                for tolerance in SCREEN_TOLERANCES:
+                    pos, coef, meta, mass_error = certificates(
+                        signal, durations, max_z, max_w, self.patchedDatasSize, tolerance)
+                    self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
+                                                    cp.asarray(meta), *map(np.float64, mass_error)))
         self.workspace = None
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
             self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
@@ -314,13 +315,19 @@ class GPUSearch:
             nBounds = int(offsets[-1])
             lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
-            module.get_function("screenCandidates")(
-                ((nBounds + 255)//256, nPeriods), (256,),
-                (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
-                 self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
-                 cp.asarray(lanes), periodMaskGPU, self.screenPositions, self.screenCoefficients,
-                 self.screenMetadata, *map(np.float64, self.screenMassError), np.int32(len(selected)),
-                 np.int32(len(self.durations)), np.int32(tSize), np.int32(patchedSize), self.transit_depth_min))
+            screen_before = (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
+                             self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
+                             cp.asarray(lanes), periodMaskGPU)
+            screen_after = (np.int32(len(selected)), np.int32(len(self.durations)), np.int32(tSize),
+                            np.int32(patchedSize), self.transit_depth_min)
+            # Tight certificates only visit survivors of the preceding pass. All
+            # passes reuse the same prefix and bound buffers; final FP32 evaluation
+            # and tie ordering are unchanged.
+            for level, certificate in enumerate(self.screenCertificates):
+                kernel = "refineCandidates" if level else "screenCandidates"
+                module.get_function(kernel)(
+                    ((nBounds + 255)//256, nPeriods), (256,),
+                    screen_before + certificate + screen_after)
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):

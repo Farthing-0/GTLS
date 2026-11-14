@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from gputls import core
-from gputls.screening import certificates, template_certificate
+from gputls.screening import certificates, template_certificate, SCREEN_TOLERANCES
 
 
 @pytest.mark.parametrize('size', [1, 127, 128, 129, 511, 512, 513, 1025, 706406])
@@ -48,7 +48,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     signal = (.5*np.maximum(0, 1-x*x)**.3).astype(np.float32)
     if pattern == 'tie':
         signal.fill(0)
-    pos, coef, meta, mass_error = certificates(signal[None], [width], abs(z).max(), weight.max(), size)
+    pos, coef, meta, mass_error = certificates(
+        signal[None], [width], abs(z).max(), weight.max(), size, SCREEN_TOLERANCES[0])
     # Every row is the same folded curve. A diagonal selector below evaluates each
     # candidate separately with the original FMA chain and XOR reduction.
     weighted = cp.asarray(np.tile(np.stack((z, weight), axis=-1), (n, 1, 1)))
@@ -105,17 +106,34 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         best.fill(core.EMPTY_KEY)
         exact(grid, (256,), args+(lower, upper, np.int32(n)))
         np.testing.assert_array_equal(best.get(), expected)
+    # Each refinement keeps existing pruned bounds and independently certifies
+    # the survivors. Check every exact candidate, including overflow and ties.
+    for tolerance in SCREEN_TOLERANCES[1:]:
+        pos, coef, meta, mass_error = certificates(
+            signal[None], [width], abs(z).max(), weight.max(), size, tolerance)
+        before_lower, before_upper = lower.copy(), upper.copy()
+        refined_args = screen_args[:12] + (cp.asarray(pos), cp.asarray(coef), cp.asarray(meta),
+                                           *map(np.float64, mass_error)) + screen_args[17:]
+        module.get_function('refineCandidates')(((n+255)//256, n), (256,), refined_args)
+        assert bool(cp.all(lower >= before_lower))
+        assert bool(cp.all(upper <= before_upper))
+        if pattern != 'overflow':
+            assert np.all(lower[0].get() <= delta)
+        best.fill(core.EMPTY_KEY)
+        exact(grid, (256,), args+(lower, upper, np.int32(n)))
+        np.testing.assert_array_equal(best.get(), expected)
     if pattern == 'tie':
         assert int(expected[0] & np.uint64(0xffffffff)) == 0
 
 
-def test_sparse_certificate_reconstructs_target_within_bound():
+@pytest.mark.parametrize('tolerance', SCREEN_TOLERANCES)
+def test_sparse_certificate_reconstructs_target_within_bound(tolerance):
     rng = np.random.default_rng(991)
     for width in [512, 1031, 8193]:
         x = np.linspace(-1, 1, width)
         s = (.5*np.maximum(0, 1-x*x)**.3).astype(np.float32)
         s += rng.uniform(-1e-5, 1e-5, width).astype(np.float32)
-        pos, coef, error, _ = template_certificate(s)
+        pos, coef, error, _ = template_certificate(s, tolerance)
         # Direct definition of the represented discrete template, independent of scans.
         j = np.arange(width, dtype=np.longdouble)
         represented = np.maximum(pos[:,None]-1-j[None], 0).T @ coef.astype(np.longdouble)
