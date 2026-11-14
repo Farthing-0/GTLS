@@ -280,3 +280,15 @@ Compressed mass-prefix checkpoint
   Broad22-configuration hierarchy trial retained the existing four levels.
   CUB segmented24-bit radix sorting63.256 ->54.288ms with exact phase fixup;
   further work required before considering its dependency and scratch costs.
+  Full compressed-FP32 validation: mixed16.790174s, constant18.821096s,
+  both24 fields bitwise equal and no thermal throttling, but a regression from
+  the preceding15.563/17.544s. Prefix rises2.620 ->4.074s. A controlled scan
+  probe confirms FP32 conversion costs and a larger-batch throughput cliff;
+  changing plane layout alone does not fix it. Testing direct high-word storage
+  to avoid FP64-to-FP32 conversion before deciding whether to retain compression.
+  Direct FP64 high-word storage removes conversion instructions and keeps
+  the full FP64 exponent range. Add2^-19*(|end|+|first|)+2^-1020 to each
+  mass bound, conservatively covering truncated low bits and FP64 arithmetic.
+  67 checks pass; one multi-GPU check skipped. A controlled scan at752 rows
+  improves58.254 ->36.451ms; old FP64 storage44.530ms at the same row count.
+  Full validation of the revised representation is next.

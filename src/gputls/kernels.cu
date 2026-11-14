@@ -551,7 +551,7 @@ SEARCH_ADJACENT(32,4)
 #undef REUSE_PASS
 
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
-// All FP64 (D_z, D_w) rows, followed by FP32 (S_abs_z, S_w) rows.
+// All FP64 (D_z, D_w) rows, followed by the high32 bits of (S_abs_z, S_w).
 // Mass storage roundoff is bounded when loading each window; the dot-product
 // prefixes and the final statistic retain their existing precision.
 // One-warp specialization with exactly the additions of blockInclusiveScan.
@@ -593,9 +593,9 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
             if (begin+q < size) {
                 prefix[row+begin+q] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
                                                     beforeDW + (dw[q]+(q+1)*beforeW));
-                float2* mass = (float2*)(prefix+(long long)gridDim.x*size);
-                mass[row+begin+q] = make_float2(__double2float_rn(beforeA+az[q]),
-                                              __double2float_rn(beforeW+w[q]));
+                uint2* mass = (uint2*)(prefix+(long long)gridDim.x*size);
+                mass[row+begin+q] = make_uint2(__double2hiint(beforeA+az[q]),
+                                             __double2hiint(beforeW+w[q]));
             }
         }
         zCarry += zTotal; wCarry += wTotal; absCarry += absTotal;
@@ -688,16 +688,17 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                         ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
                     }
 #endif
-                    const float2* mass = (const float2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
-                    float2 endf=mass[start+width-1], firstf=start?mass[start-1]:make_float2(0,0);
-                    double2 end=make_double2(endf.x,endf.y), first=make_double2(firstf.x,firstf.y);
-                    // A finite rounded float f has error <= u/(1-u)*|f|+2^-149.
-                    // Using 2*u for both endpoints also covers the much smaller
-                    // FP64 subtraction/addition errors; allow extra subnormal
-                    // slack. Overflow gives an infinite allowance and keeps
-                    // the original exact candidate path.
-                    double absStorageError=0x1p-23*(fabs(end.x)+fabs(first.x))+0x1p-125;
-                    double weightStorageError=0x1p-23*(fabs(end.y)+fabs(first.y))+0x1p-125;
+                    const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
+                    uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
+                    double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
+                    double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
+                    // Dropping the low32 bits keeps the full FP64 exponent and
+                    // avoids slow FP64-to-FP32 conversions. For nonnegative stored
+                    // h, truncation error is <= 2^-20*h+2^-1042. Twice that relative
+                    // allowance for both endpoints covers FP64 arithmetic too.
+                    // Nonfinite inputs still fall back to the original exact path.
+                    double absStorageError=0x1p-19*(fabs(end.x)+fabs(first.x))+0x1p-1020;
+                    double weightStorageError=0x1p-19*(fabs(end.y)+fabs(first.y))+0x1p-1020;
                     double az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
                     double w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
                     int g = lanes[d];
