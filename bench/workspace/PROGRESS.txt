@@ -529,3 +529,7 @@ Compact exact phase-sort checkpoint
   Compact-key bucket factors2/4/5/6/8 and integer folding show no consistent
   gain across period ranges on GPU0; keep factor3 and original bucket multiply.
   Final device-backtrace memcheck:28 passed, zero memory errors.
+  Full packed-phase validation at071e95a: constant9.581133s, mixed10.590583s; both24 fields bitwise equal.
+  Both runs release all pool memory. Thermal flags are retained in the result
+  JSON. Constant coarse prefix launches45 ->43, fold0.936 ->0.701s and
+  sort0.863 ->0.737s. Constant9.964720 ->9.581133s.
