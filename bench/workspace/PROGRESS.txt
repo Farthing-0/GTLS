@@ -95,3 +95,18 @@ A100 extension authorized by user
   User explicitly requires DESTROY after saving artifacts, not merely stop.
   Lease 60654842: NVIDIA A100 PCIe 40GB, Japan, actual quoted $0.61985185/hour
   including 40GB disk. Local lease/access records stay outside the Git repository.
+
+Attempt: 1024-thread screening scan (not retained)
+  All 24 varying-dy full-run fields remain bitwise equal; single-GPU regression
+  passes 42 tests with 2 multi-GPU skips. Median 37.214074s vs 36.805614s; thermal
+  flags occurred. No demonstrated improvement, so restore the 512-thread launch.
+  Artifact source and patch: scan1024-730-mixed; compact evidence: results-scan1024.json.
+
+Device-specific cheap-bound candidate
+  A100 experiment: mixed-dy median 14.942229s with the cheap bound vs 15.436590s
+  without (1.03309x). Median SM clocks 1320 vs 1350MHz; no thermal flags.
+  Compile the bound only when CUDA reports an FP32:FP64 throughput ratio <=2.
+  RTX 3090 (ratio 64) retains the original kernel; unknown devices default to it.
+  C preprocessor output is byte-identical to each already-measured implementation
+  when selecting 0/1. Final candidate regression: 68 passed with both 3090s visible.
+  A100 final mixed/constant confirmation and artifact retrieval remain in progress.
