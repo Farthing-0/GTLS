@@ -214,3 +214,20 @@ Hierarchical certificate checkpoint (full verification in progress)
   prefix3.084s. Host setup is now a material remaining overhead.
   After hierarchical pruning, native-batch G32 compaction probe improves
   16.687103ms ->1.202176ms including compaction, keys bitwise equal.
+
+Compaction and CPU certificate checkpoint
+  Compact surviving work items per lane group into the now-dead prefix arena.
+  Read the largest row count to launch only the necessary original FP32 windows.
+  Keep the original dense path when survivors exceed25% or the scratch view
+  would not fit. No extra large allocation and no change in FMA or tie order.
+  Five629-period mixed batches: exact+compaction118.627ms ->6.857ms; warmed
+  measured wall1.3982s ->1.2877s. Every batch's packed keys unchanged.
+  The first prototype indexed-only wall included CuPy compilation; not a timing
+  result. Reproduction script now warms the reduction path before measuring.
+  Profiled CPU certificate cost2.2s, mostly per-segment temporary array reductions.
+  Strict Numba knot selection:2.20045 ->0.58983s; all148 certificates' positions,
+  coefficients, errors and peaks bitwise equal. Fastmath is disabled; preserve
+  first-maximum and NaN behavior. Keep existing long-double reconstruction.
+  Extended compaction checks cover every exact candidate, allG, empty rows,
+  strict ties, NaN/infinite bounds, subrange and nonmultiple tails.81 tests pass.
+  Full combined730-day validation is the next step.

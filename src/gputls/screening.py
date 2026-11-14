@@ -4,12 +4,54 @@ The two targets are the stored FP32 signal and its FP32 square, separately.
 The approximation never supplies a final chi2 or a fitted parameter.
 """
 import numpy as np
+from numba import njit
 
 
 MIN_WIDTH = 512
 RELATIVE_TOLERANCE = 0.01
 # Loose-to-tight certificates reduce exact work without changing the statistic.
 SCREEN_TOLERANCES = (0.05, 0.015, 0.005, 0.00025)
+
+
+@njit(cache=True, fastmath=False)
+def _adaptive_knots(target, scale, tolerance):
+    """Original knot selection without temporary arrays for each segment.
+
+    Keep separate multiply/add operations and first-maximum tie handling.
+    The actual sparse coefficients are still reconstructed and certified below.
+    """
+    n = len(target)
+    chosen = np.zeros(n, dtype=np.bool_)
+    chosen[0] = True
+    chosen[n-1] = True
+    pending = [(0, n-1)]
+    while pending:
+        left, right = pending.pop()
+        if right-left <= 1:
+            continue
+        delta0 = target[right, 0]-target[left, 0]
+        delta1 = target[right, 1]-target[left, 1]
+        max_error = -1.0
+        middle = left+1
+        for index in range(left+1, right):
+            fraction = float(index-left)/float(right-left)
+            approx0 = target[left, 0]+fraction*delta0
+            approx1 = target[left, 1]+fraction*delta1
+            e0 = abs(target[index, 0]-approx0)/scale[0]
+            e1 = abs(target[index, 1]-approx1)/scale[1]
+            if np.isnan(e0) or np.isnan(e1):
+                # NumPy argmax selects the first NaN; NaN > tolerance is false.
+                max_error = np.nan
+                break
+            error = max(e0, e1)
+            if error > max_error:
+                max_error = error
+                middle = index
+        if max_error > tolerance:
+            chosen[middle] = True
+            pending.append((left, middle))
+            pending.append((middle, right))
+    return np.flatnonzero(chosen)
 
 
 def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
@@ -19,21 +61,7 @@ def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
     n = len(signal)
     maxima = np.max(np.abs(target), axis=0)
     scale = np.maximum(maxima, np.finfo(float).tiny)
-    knots = {0, n - 1}
-    pending = [(0, n - 1)]
-    while pending:
-        left, right = pending.pop()
-        if right - left <= 1:
-            continue
-        fraction = np.arange(1, right - left, dtype=float) / (right - left)
-        approx = target[left] + fraction[:, None] * (target[right] - target[left])
-        error = np.max(np.abs(target[left + 1:right] - approx) / scale, axis=1)
-        offset = int(np.argmax(error))
-        if error[offset] > tolerance:
-            middle = left + 1 + offset
-            knots.add(middle)
-            pending.extend(((left, middle), (middle, right)))
-    knots = np.array(sorted(knots))
+    knots = _adaptive_knots(target, scale, tolerance)
     slopes = np.diff(target[knots], axis=0) / np.diff(knots)[:, None]
     positions = np.r_[0, 1, knots[1:-1] + 1, n, n + 1].astype(np.int32)
     coefficients = np.vstack((target[0], slopes[0] - target[0], np.diff(slopes, axis=0),

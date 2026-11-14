@@ -262,7 +262,7 @@ __device__ __forceinline__ unsigned int orderedKey(float value) {
  * overlap of neighbouring windows from L1 once the stride is large; G is chosen per duration
  * from the stride (see core.lanes_per_window and bench/window_lanes on branch perf/window-lanes).
  */
-template <int G>
+template <int G, bool Compacted = false>
 __device__ __forceinline__ void searchChi2Lanes(
         unsigned long long* best,
         const long long* cumResidual,  // (periods, patchedSize), inclusive, fixed point
@@ -278,10 +278,16 @@ __device__ __forceinline__ void searchChi2Lanes(
         int yBegin, int yEnd, int nDurations, int tSize, int patchedSize,
         int maxWidth, float transitDepthMin,
         const float* lowerBounds = nullptr, const unsigned long long* upperKeys = nullptr,
-        int nBounds = 0) {
+        int nBounds = 0, const int* candidates = nullptr, const int* counts = nullptr,
+        int listStride = 0) {
     int periodIndex = blockIdx.y;
     int laneInWindow = threadIdx.x % G;
     int workItem = offsets[yBegin] + (blockIdx.x * blockDim.x + threadIdx.x) / G;
+    if (Compacted) {
+        int task = (blockIdx.x * blockDim.x + threadIdx.x) / G;
+        workItem = task < counts[periodIndex]
+            ? candidates[(long long)periodIndex*listStride+task] : offsets[yEnd];
+    }
     unsigned long long key = 0xffffffffffffffffull;
     float crossTerm = 0.0f;
     float squareTerm = 0.0f;
@@ -778,3 +784,42 @@ SCREENED_EXACT(8)
 SCREENED_EXACT(16)
 SCREENED_EXACT(32)
 #undef SCREENED_EXACT
+
+// Keep the strict original bound comparison, including NaN/overflow fallbacks.
+// One atomic reserves each surviving warp's output slice; ordering within the
+// compact list does not affect packed-key minima or exact per-window arithmetic.
+extern "C" __global__ void compactCandidates(
+        const float* lower, const unsigned long long* upperKeys, int* candidates, int* counts,
+        int begin, int end, int nBounds, int listStride) {
+    int item = begin + blockIdx.x*blockDim.x + threadIdx.x;
+    int period = blockIdx.y;
+    unsigned int high = upperKeys[period] >> 32;
+    float upper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
+    bool keep = item < end && !(lower[(long long)period*nBounds+item] > upper);
+    unsigned int kept = __ballot_sync(0xffffffff, keep);
+    int lane = threadIdx.x & 31;
+    int base = 0;
+    if (lane == 0 && kept) base = atomicAdd(counts+period, __popc(kept));
+    base = __shfl_sync(0xffffffff, base, 0);
+    if (keep) candidates[(long long)period*listStride+base+__popc(kept & ((1u << lane)-1))] = item;
+}
+
+#define COMPACTED_EXACT(G) \
+    extern "C" __global__ void searchChi2CompactedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds, \
+        const int* candidates, const int* counts, int listStride) { \
+        searchChi2Lanes<G, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds, candidates, counts, listStride); \
+    }
+COMPACTED_EXACT(1)
+COMPACTED_EXACT(2)
+COMPACTED_EXACT(4)
+COMPACTED_EXACT(8)
+COMPACTED_EXACT(16)
+COMPACTED_EXACT(32)
+#undef COMPACTED_EXACT

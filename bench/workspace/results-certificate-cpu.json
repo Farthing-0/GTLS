@@ -1,0 +1,17 @@
+{
+  "numba": {
+    "first_numba_call_seconds": 0.8410235391929746,
+    "times_seconds": {
+      "numpy": 2.2004496855661273,
+      "numba": 0.5898288683965802
+    },
+    "all_certificate_arrays_bitwise_equal": true,
+    "speedup": 3.730657828851168
+  },
+  "column_comparison": {
+    "original": 2.2318184692412615,
+    "columns": 1.0082319462671876,
+    "numba": 0.5940091535449028
+  },
+  "float64_reconstruction_attempt": "Only 3.6% faster, rejected; retain long-double reconstruction."
+}
