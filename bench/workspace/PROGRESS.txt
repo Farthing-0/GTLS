@@ -464,3 +464,29 @@ Register bucket-sort checkpoint
   falls1.344655 ->0.862432s; total time10.633588 ->10.276813s. Related regression
   suite:116 passed, one multi-GPU skip. The new source is committed separately
   from this measurement checkpoint.
+
+Packed uniform-weight workspace checkpoint
+  Once this search confirms identical prepared FP32 weights, store only w*r in
+  four bytes per point. Supply the common weight to the unchanged per-lane FMA
+  order in dense, screened and compacted exact kernels. Do not change G selection.
+  General variable weights keep the existing eight-byte pair layout. Budget the
+  actual four/eight-byte allocation, so native uniform batch capacity can grow.
+  Share scan/exact implementations through compile-time layout flags; retain old
+  kernel exports for independent reference checks. Postprocessing now uses dead
+  scratch storage for its FP64 input because the weighted region is smaller.
+  Five1019-period batches: GPU0 patch/prefix/exact344.323 ->317.700ms;
+  GPU1353.736 ->321.868ms. Exact winner keys agree in every batch.
+  Related regression120 passed, one multi-GPU skip; packed prefixes match the
+  original uniform columns bitwise, and all G1..32 exact variants match original
+  weighted-pair kernels. Compute-sanitizer40 checks pass with zero memory errors.
+  Full constant-dy validation follows. Variable-dy timings remain the previous
+  validated measurement; this layout change affects only confirmed equal weights.
+
+Other probes rejected during this checkpoint
+  Adding exact uniform A2 and a positive-residual mass bound to the cheap screen
+  passes12 candidate checks but increases five-batch screens264.6 ->265.5..271.3ms.
+  Applying the stronger bound only after the original shortcut also regresses.
+  L2 set-aside across the whole pipeline severely hurts later prefix screening;
+  scoped reserve/reset and streaming cache hints give no useful net gain.
+  Direct index gathers avoid a weighted buffer but increase mixed patch/prefix/
+  exact356.8 ->499.8ms even with cache hints. Keep the contiguous weighted buffer.

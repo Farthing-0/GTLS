@@ -47,6 +47,10 @@ def test_chunked_prefixes_fit_high_precision_error_budget(size):
         (1,), (core.SCREEN_SCAN_THREADS,), (weighted, uniform, np.int32(size)))
     assert uniform[:8*size].view(cp.float64).get().tobytes() == actual_d[:, 0].astype(np.float64).tobytes()
     np.testing.assert_array_equal(uniform[8*size:].view(cp.uint32).get(), mass_bits[:, 0])
+    packed_prefix = cp.empty_like(uniform)
+    core.load_module().get_function('scanScreeningUniformPacked')(
+        (1,), (core.SCREEN_SCAN_THREADS,), (cp.asarray(z), packed_prefix, np.int32(size)))
+    assert packed_prefix.get().tobytes() == uniform.get().tobytes()
 
 
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
@@ -157,6 +161,15 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     best.fill(core.EMPTY_KEY)
     module.get_function(f'searchChi2G{g}')(grid, (256,), args)
     expected = best.get()
+    if pattern == 'uniform':
+        packed_args = args[:3] + (weighted[:, :, 0].copy(),) + args[4:]
+        best.fill(core.EMPTY_KEY)
+        module.get_function(f'searchChi2PackedG{g}')(grid, (256,), packed_args+(weight[0],))
+        np.testing.assert_array_equal(best.get(), expected)
+        best.fill(core.EMPTY_KEY)
+        module.get_function(f'searchChi2PackedScreenedG{g}')(grid, (256,),
+            packed_args+(lower, upper, np.int32(n), weight[0]))
+        np.testing.assert_array_equal(best.get(), expected)
     best.fill(core.EMPTY_KEY)
     exact(grid, (256,), args+(lower, upper, np.int32(n)))
     np.testing.assert_array_equal(best.get(), expected)
@@ -199,6 +212,11 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     np.testing.assert_array_equal(best.get(), expected)
     if pattern == 'tie':
         assert int(expected[0] & np.uint64(0xffffffff)) == 0
+    if pattern == 'uniform' and maximum:
+        best.fill(core.EMPTY_KEY)
+        module.get_function(f'searchChi2PackedCompactedG{g}')(((maximum*g+255)//256, n), (256,),
+            packed_args+(lower, upper, np.int32(n), candidates, counts, np.int32(n), weight[0]))
+        np.testing.assert_array_equal(best.get(), expected)
 
 
 @pytest.mark.parametrize('tolerance', SCREEN_TOLERANCES)

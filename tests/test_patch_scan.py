@@ -30,3 +30,10 @@ def test_patch_scan_matches_weight_formula_and_integer_prefix(n, patched):
          np.int32(n), np.int32(patched)))
     assert weighted.get().tobytes() == expected.tobytes()
     np.testing.assert_array_equal(cumulative.get(), np.cumsum(fixed, axis=1))
+    packed = cp.empty((3, patched), cp.float32)
+    cumulative.fill(0)
+    module.get_function('patchScanPacked')((3,), (threads,),
+        (cp.asarray(indices), prepared, packed, cumulative, np.float32(1024),
+         np.int32(n), np.int32(patched)))
+    assert packed.get().tobytes() == expected[:, :, 0].tobytes()
+    np.testing.assert_array_equal(cumulative.get(), np.cumsum(fixed, axis=1))
