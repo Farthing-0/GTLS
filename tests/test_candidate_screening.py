@@ -42,11 +42,42 @@ def test_chunked_prefixes_fit_high_precision_error_budget(size):
     assert np.all(np.max(abs(actual_d-expected[0]), axis=0) <= budgets[0])
     storage_radius = 2.0**-19*abs(actual_mass)+2.0**-1020
     assert np.all(abs(actual_mass-expected[1]) <= budgets[1]+storage_radius)
+    uniform = cp.empty(12*size, dtype=cp.uint8)
+    core.load_module().get_function('scanScreeningUniform')(
+        (1,), (core.SCREEN_SCAN_THREADS,), (weighted, uniform, np.int32(size)))
+    assert uniform[:8*size].view(cp.float64).get().tobytes() == actual_d[:, 0].astype(np.float64).tobytes()
+    np.testing.assert_array_equal(uniform[8*size:].view(cp.uint32).get(), mass_bits[:, 0])
+
+
+@pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
+def test_uniform_square_uses_original_fma_and_reduction_order(g):
+    widths = np.array([1, 7, 513, 1025], dtype=np.int32)
+    rng = np.random.default_rng(909)
+    signal = rng.uniform(-.5, .5, (4, widths.max())).astype(np.float32)
+    signal[0] = 0
+    weight = np.float32(.27)
+    size = int(widths.max()+1)
+    module = core.load_module()
+    widths_gpu, selected = cp.asarray(widths), cp.arange(4, dtype=cp.int32)
+    signal_gpu, square = cp.asarray(signal), cp.empty(4, cp.float32)
+    module.get_function('prepareUniformSquare')((4,), (32,),
+        (signal_gpu, widths_gpu, selected, cp.full(4, g, cp.int32), np.int32(widths.max()), weight, square))
+    # With zero AR and unit amplitude, the unchanged exact search returns A2.
+    weighted = cp.zeros((4, size, 2), cp.float32)
+    weighted[:, :, 1] = weight
+    best = cp.full(4, core.EMPTY_KEY, cp.uint64)
+    args = (best, cp.tile(cp.arange(1, size+1, dtype=cp.int64), (4, 1)), np.float32(1),
+            weighted, signal_gpu, cp.full(4, .5, cp.float32), widths_gpu, selected,
+            cp.arange(5, dtype=cp.int32), cp.ones(4, cp.int32), cp.eye(4, dtype=cp.bool_),
+            np.int32(0), np.int32(4), np.int32(4), np.int32(1), np.int32(size),
+            np.int32(widths.max()), np.float32(0))
+    module.get_function(f'searchChi2G{g}')(((4*g+255)//256, 4), (256,), args)
+    assert square.get().tobytes() == core.decode_keys(best, 0)[0].get().tobytes()
 
 
 @pytest.mark.parametrize('cheap_bound', [False, True])
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
-@pytest.mark.parametrize('pattern', ['random', 'outlier', 'tie', 'overflow'])
+@pytest.mark.parametrize('pattern', ['random', 'outlier', 'tie', 'overflow', 'uniform'])
 def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     rng = np.random.default_rng(318)
     n, width = 131, 513
@@ -59,6 +90,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     if pattern == 'outlier':
         dy[-3] = 1e-9  # variance floor; small windows after a very large weighted sample
     weight = np.resize(np.float32(1)/np.maximum(dy*dy, np.float32(1e-10)), size)
+    if pattern == 'uniform':
+        weight.fill(np.float32(.27))
     z = weight*residual
     x = np.linspace(-1, 1, width)
     signal = (.5*np.maximum(0, 1-x*x)**.3).astype(np.float32)
@@ -73,7 +106,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     prefix = cp.empty(n*size*24, dtype=cp.uint8)
     module = cp.RawModule(code=core.KERNEL_SOURCE.read_text(),
                           options=(f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}",))
-    module.get_function('scanScreening')((n,), (core.SCREEN_SCAN_THREADS,), (weighted, prefix, np.int32(size)))
+    prefix_kernel = 'scanScreeningUniform' if pattern == 'uniform' else 'scanScreening'
+    module.get_function(prefix_kernel)((n,), (core.SCREEN_SCAN_THREADS,), (weighted, prefix, np.int32(size)))
     widths = cp.asarray([width], dtype=cp.int32)
     selected = cp.asarray([0], dtype=cp.int32)
     offsets = cp.asarray([0, n], dtype=cp.int32)
@@ -90,8 +124,16 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     budgets = cp.empty((3, 4), dtype=cp.float64)
     module.get_function('prepareScreenBudgets')((1,), (64,),
         (widths, selected, screen_args[10], screen_args[14], budgets, np.int32(1), np.int32(1)))
-    module.get_function('screenCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
-                                                  screen_args+(block_map, budgets))
+    extra = (block_map, budgets)
+    suffix = 'Mapped'
+    if pattern == 'uniform':
+        square = cp.empty(1, cp.float32)
+        module.get_function('prepareUniformSquare')((1,), (32,),
+            (cp.asarray(signal), widths, selected, screen_args[10], np.int32(width), weight[0], square))
+        extra += (square, weight[0])
+        suffix = 'Uniform'
+    module.get_function('screenCandidates'+suffix)((len(block_map), n), (core.SCREEN_THREADS,),
+                                                   screen_args+extra)
     best = cp.full(n, core.EMPTY_KEY, dtype=cp.uint64)
     args = (best, cum, inv_scale, weighted, cp.asarray(signal), overshoot,
             widths, selected, offsets, strides, mask, np.int32(0), np.int32(1),
@@ -122,8 +164,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         # Seed the best exact value as a valid upper bound, so the early-bound
         # path is exercised even when the entire row fits in a single block.
         upper.fill(np.uint64(int(expected[0]) & 0xffffffff00000000))
-        module.get_function('screenCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
-                                                      screen_args+(block_map, budgets))
+        module.get_function('screenCandidates'+suffix)((len(block_map), n), (core.SCREEN_THREADS,),
+                                                       screen_args+extra)
         assert np.all(lower[0].get() <= delta)
         best.fill(core.EMPTY_KEY)
         exact(grid, (256,), args+(lower, upper, np.int32(n)))
@@ -136,8 +178,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         before_lower, before_upper = lower.copy(), upper.copy()
         refined_args = screen_args[:12] + (cp.asarray(pos), cp.asarray(coef), cp.asarray(meta),
                                            *map(np.float64, mass_error)) + screen_args[17:]
-        module.get_function('refineCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
-                                                      refined_args+(block_map, budgets))
+        module.get_function('refineCandidates'+suffix)((len(block_map), n), (core.SCREEN_THREADS,),
+                                                       refined_args+extra)
         assert bool(cp.all(lower >= before_lower))
         assert bool(cp.all(upper <= before_upper))
         if pattern != 'overflow':

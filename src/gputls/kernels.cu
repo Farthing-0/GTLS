@@ -605,6 +605,53 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
     }
 }
 
+// Equal weights make the template-square statistic independent of the window.
+// Only the weighted residual and its absolute mass need prefix storage here.
+extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* prefix, int size) {
+    constexpr int ITEMS = 16;
+    long long row = (long long)blockIdx.x*size;
+    double zCarry = 0, absCarry = 0, dzCarry = 0;
+    for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {
+        int begin = tile+ITEMS*threadIdx.x;
+        double az[ITEMS], dz[ITEMS], sz = 0, sa = 0, sdz = 0;
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            float v = begin+q < size ? weighted[row+begin+q].x : 0;
+            sz += (double)v; sa += fabs((double)v); sdz += sz;
+            az[q] = sa; dz[q] = sdz;
+        }
+        double zTotal, absTotal, dzTotal;
+        double beforeZ = zCarry+(warpInclusiveScan(sz, &zTotal)-sz);
+        double beforeA = absCarry+(warpInclusiveScan(sa, &absTotal)-sa);
+        double blockDZ = sdz+ITEMS*beforeZ;
+        double beforeDZ = dzCarry+(warpInclusiveScan(blockDZ, &dzTotal)-blockDZ);
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            if (begin+q < size) {
+                prefix[row+begin+q] = beforeDZ+(dz[q]+(q+1)*beforeZ);
+                ((unsigned int*)(prefix+(long long)gridDim.x*size))[row+begin+q]
+                    = __double2hiint(beforeA+az[q]);
+            }
+        }
+        zCarry += zTotal; absCarry += absTotal; dzCarry += dzTotal;
+    }
+}
+
+// Preserve searchChi2Lanes' FP32 FMA sequence and XOR reduction for each G.
+extern "C" __global__ void prepareUniformSquare(const float* signal, const int* widths,
+    const int* selected, const int* lanes, int maxWidth, float weight, float* squares) {
+    int duration = selected[blockIdx.x], g = lanes[blockIdx.x], lane = threadIdx.x;
+    float sum = 0;
+    if (lane < g) {
+        for (int i = lane; i < widths[duration]; i += g) {
+            float v = signal[(long long)duration*maxWidth+i];
+            sum = fmaf(v*v, weight, sum);
+        }
+    }
+    for (int offset = g/2; offset; offset >>= 1) sum += __shfl_xor_sync(0xffffffff, sum, offset);
+    if (lane == 0) squares[duration] = sum;
+}
+
 #define SCREEN_ARGS \
     float* lower, unsigned long long* upperKeys, const double2* prefix, \
     const long long* residual, float invScale, const float* overshoot, \
@@ -613,6 +660,7 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
     const double* metadata, double absMassError, double weightMassError, \
     int nSelected, int nDurations, int tSize, int size, float depthMin
 
+template <bool Uniform>
 __device__ __forceinline__ double2 screenSparseDot(const double2* p, int start,
     const int* positions, const double2* coefficients, int begin, int terms) {
     double ar = 0, a2 = 0;
@@ -629,7 +677,7 @@ __device__ __forceinline__ double2 screenSparseDot(const double2* p, int start,
         #pragma unroll
         for (int q=0;q<PREFETCH;++q) {
             int k=start+positions[j+q]-2;
-            values[q]=k>=0?p[k]:make_double2(0,0);
+            values[q]=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
             weights[q]=coefficients[j+q];
         }
 #if __CUDA_ARCH__ >= 700
@@ -641,14 +689,14 @@ __device__ __forceinline__ double2 screenSparseDot(const double2* p, int start,
         #pragma unroll
         for (int q=0;q<PREFETCH;++q) {
             ar=fma(weights[q].x,values[q].x,ar);
-            a2=fma(weights[q].y,values[q].y,a2);
+            if (!Uniform) a2=fma(weights[q].y,values[q].y,a2);
         }
     }
     for (;j<begin+terms;++j) {
         int k=start+positions[j]-2;
-        double2 v=k>=0?p[k]:make_double2(0,0);
+        double2 v=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
         double2 c=coefficients[j];
-        ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
+        ar=fma(c.x,v.x,ar);if (!Uniform) a2=fma(c.y,v.y,a2);
     }
     return make_double2(ar, a2);
 }
@@ -707,8 +755,9 @@ __device__ __forceinline__ float cheapScreenLower32(float amplitude, double az, 
     return finite && isfinite(a) ? low : -__int_as_float(0x7f800000);
 }
 
-template <bool Refine, bool Mapped = false>
-__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr) {
+template <bool Refine, bool Mapped = false, bool Uniform = false>
+__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr,
+    const float* uniformSquare = nullptr, float uniformWeight = 0) {
     int period = blockIdx.y;
     int d = 0;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
@@ -745,27 +794,40 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
                     double4 rounding = Mapped ? budgets[duration] : screenRoundingBudget(width,lanes[d]);
-                    const double2* p = prefix + (long long)period*size;
+                    const double2* p = Uniform
+                        ? (const double2*)((const double*)prefix+(long long)period*size)
+                        : prefix+(long long)period*size;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     if (Refine) {
-                        double2 dot = screenSparseDot(p, start, positions, coefficients, begin, terms);
-                        ar = dot.x; a2 = dot.y;
+                        double2 dot = screenSparseDot<Uniform>(p, start, positions, coefficients, begin, terms);
+                        ar = dot.x; a2 = Uniform ? (double)uniformSquare[duration] : dot.y;
                     }
 #endif
-                    const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
-                    uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
-                    double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
-                    double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
-                    // Dropping the low32 bits keeps the full FP64 exponent and
-                    // avoids slow FP64-to-FP32 conversions. For nonnegative stored
-                    // h, truncation error is <= 2^-20*h+2^-1042. Twice that relative
-                    // allowance for both endpoints covers FP64 arithmetic too.
-                    // Nonfinite inputs still fall back to the original exact path.
-                    double absStorageError=0x1p-19*(fabs(end.x)+fabs(first.x))+0x1p-1020;
-                    double weightStorageError=0x1p-19*(fabs(end.y)+fabs(first.y))+0x1p-1020;
-                    double az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
-                    double w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
+                    double az, w;
+                    if (Uniform) {
+                        const unsigned int* mass = (const unsigned int*)((const double*)prefix
+                            +(long long)gridDim.y*size)+(long long)period*size;
+                        double end = __hiloint2double(mass[start+width-1], 0);
+                        double first = start ? __hiloint2double(mass[start-1], 0) : 0;
+                        double storageError = 0x1p-19*(fabs(end)+fabs(first))+0x1p-1020;
+                        az = fmax(0.0, end-first)+absMassError+storageError;
+                        w = __dmul_ru((double)uniformWeight, (double)width);
+                    } else {
+                        const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
+                        uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
+                        double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
+                        double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
+                        // Dropping the low32 bits keeps the full FP64 exponent and
+                        // avoids slow FP64-to-FP32 conversions. For nonnegative stored
+                        // h, truncation error is <= 2^-20*h+2^-1042. Twice that relative
+                        // allowance for both endpoints covers FP64 arithmetic too.
+                        // Nonfinite inputs still fall back to the original exact path.
+                        double absStorageError=0x1p-19*(fabs(end.x)+fabs(first.x))+0x1p-1020;
+                        double weightStorageError=0x1p-19*(fabs(end.y)+fabs(first.y))+0x1p-1020;
+                        az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
+                        w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
+                    }
                     bool discarded = false;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     // The first pass benefits from the cheap FP32 shortcut on
@@ -784,15 +846,15 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                     if (!discarded) {
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     if (!Refine) {
-                        double2 dot = screenSparseDot(p, start, positions, coefficients, begin, terms);
-                        ar = dot.x; a2 = dot.y;
+                        double2 dot = screenSparseDot<Uniform>(p, start, positions, coefficients, begin, terms);
+                        ar = dot.x; a2 = Uniform ? (double)uniformSquare[duration] : dot.y;
                     }
 #endif
                     double tiny = rounding.y;
                     double4 factors = Mapped ? budgets[nDurations+duration] : screenFactors(m, rounding);
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double eAr = m[2]*az + m[6] + factors.z*az + tiny;
-                    double eA2 = m[3]*w + m[7] + factors.w*w + tiny;
+                    double eA2 = Uniform ? 0 : m[3]*w + m[7] + factors.w*w + tiny;
 #endif
                     float amplitude = depth*overshoot[duration]*2.0f;
                     double a = amplitude, aa = fabs(a);
@@ -826,23 +888,24 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                             #pragma unroll
                             for (int q=0;q<4;++q) {
                                 int k=start+positions[j+q]-2;
-                                values[q]=k>=0?p[k]:make_double2(0,0);
+                                values[q]=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
                                 weights[q]=coefficients[j+q];
                             }
                             #pragma unroll
                             for (int q=0;q<4;++q) {
                                 ar=fma(weights[q].x,values[q].x,ar);
-                                a2=fma(weights[q].y,values[q].y,a2);
+                                if (!Uniform) a2=fma(weights[q].y,values[q].y,a2);
                             }
                         }
                         for (;j<begin+terms;++j) {
                             int k=start+positions[j]-2;
-                            double2 v=k>=0?p[k]:make_double2(0,0);
+                            double2 v=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
                             double2 c=coefficients[j];
-                            ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
+                            ar=fma(c.x,v.x,ar);if (!Uniform) a2=fma(c.y,v.y,a2);
                         }
+                        if (Uniform) a2 = (double)uniformSquare[duration];
                         double eAr = m[2]*az + m[6] + factors.z*az + tiny;
-                        double eA2 = m[3]*w + m[7] + factors.w*w + tiny;
+                        double eA2 = Uniform ? 0 : m[3]*w + m[7] + factors.w*w + tiny;
                         double proxy = a*(a*a2 - 2*ar);
                         double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
                         double hi = proxy+error;
@@ -894,6 +957,21 @@ extern "C" __global__ void refineCandidatesMapped(SCREEN_ARGS, const int2* block
     screenCandidatesImpl<true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
         absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
+}
+extern "C" __global__ void screenCandidatesUniform(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<false, true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void refineCandidatesUniform(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<true, true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
 }
 #undef SCREEN_ARGS
 
