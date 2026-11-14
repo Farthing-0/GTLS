@@ -7,6 +7,27 @@ from gputls import core
 from gputls.screening import certificates, template_certificate
 
 
+@pytest.mark.parametrize('size', [1, 127, 128, 129, 511, 512, 513, 1025, 706406])
+def test_chunked_prefixes_fit_high_precision_error_budget(size):
+    rng = np.random.default_rng(734)
+    weight = np.exp(rng.uniform(-10, 10, size)).astype(np.float32)
+    z = (weight*rng.normal(0, .01, size)).astype(np.float32)
+    weighted = cp.asarray(np.column_stack((z, weight))[None])
+    prefix = cp.empty((1, 2, size, 2), dtype=cp.float64)
+    core.load_module().get_function('scanScreening')(
+        (1,), (128,), (weighted, prefix, np.int32(size)))
+    z_long, w_long = z.astype(np.longdouble), weight.astype(np.longdouble)
+    expected = np.stack((
+        np.column_stack((np.cumsum(np.cumsum(z_long)), np.cumsum(np.cumsum(w_long)))),
+        np.column_stack((np.cumsum(abs(z_long)), np.cumsum(w_long)))))
+    steps = 2*((size+511)//512+24)
+    gamma = steps*2.0**-53/(1-steps*2.0**-53)
+    maxima = np.array([abs(z_long).max(), w_long.max()])
+    budgets = 4*gamma*np.array([size*size, size])[:, None]*maxima
+    error = np.max(abs(prefix[0].get().astype(np.longdouble)-expected), axis=1)
+    assert np.all(error <= budgets)
+
+
 @pytest.mark.parametrize('cheap_bound', [False, True])
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
 @pytest.mark.parametrize('pattern', ['random', 'outlier', 'tie', 'overflow'])
@@ -35,7 +56,7 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     prefix = cp.empty((n, size, 4), dtype=cp.float64)
     module = cp.RawModule(code=core.KERNEL_SOURCE.read_text(),
                           options=(f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}",))
-    module.get_function('scanScreening')((n,), (512,), (weighted, prefix, np.int32(size)))
+    module.get_function('scanScreening')((n,), (128,), (weighted, prefix, np.int32(size)))
     widths = cp.asarray([width], dtype=cp.int32)
     selected = cp.asarray([0], dtype=cp.int32)
     offsets = cp.asarray([0, n], dtype=cp.int32)

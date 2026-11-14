@@ -309,7 +309,7 @@ class GPUSearch:
         if screening:
             prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 4), cp.float64)
             module.get_function("scanScreening")(
-                (nPeriods,), (SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
+                (nPeriods,), (128,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])
             lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)

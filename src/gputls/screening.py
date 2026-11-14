@@ -53,8 +53,10 @@ def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
 def certificates(signal, widths, max_weighted_residual, max_weight, patched_size):
     """Flatten templates and include the FP64 scan/evaluation error budgets.
 
-    Each 512-point scan has <= 12 additions along a path, plus one carry per tile.
-    Two prefix levels have <= 2*(ceil(P/512)+16) such additions. A factor of four
+    Each 512-point tile uses four sequential samples per thread and a block scan.
+    Local prefixes, exclusive offsets and reconstruction use <= 24 rounding
+    operations per prefix level, plus one carry per tile. Two levels therefore
+    have <= 2*(ceil(P/512)+24) operations along a path. A factor of four
     covers propagation, evaluation, and outward rounding of the host budgets.
     P*max|x| bounds every prefix mass, including wrap-around and extreme weights.
     """
@@ -62,7 +64,7 @@ def certificates(signal, widths, max_weighted_residual, max_weight, patched_size
     offset = 0
     p = int(patched_size)
     u = 2.0**-53
-    steps = 2 * ((p + 511)//512 + 16)
+    steps = 2 * ((p + 511)//512 + 24)
     gamma = steps*u/(1-steps*u)
     maxima = np.array([max_weighted_residual, max_weight], dtype=float)
     for row, width in zip(signal, widths):

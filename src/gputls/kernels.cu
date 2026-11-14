@@ -547,26 +547,38 @@ SEARCH_ADJACENT(32,4)
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
 // Two contiguous double2 planes per row: (D_z, D_w), then (S_abs_z, S_w).
 extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
+    constexpr int ITEMS = 4;
     long long row = (long long)blockIdx.x * size;
     double zCarry = 0, wCarry = 0, absCarry = 0, dzCarry = 0, dwCarry = 0;
-    for (int tile = 0; tile < size; tile += blockDim.x) {
-        int i = tile + threadIdx.x;
-        float2 v = i < size ? weighted[row + i] : make_float2(0, 0);
-        double zTotal, wTotal, absTotal, dzTotal, dwTotal;
-        double z = zCarry + blockInclusiveScan((double)v.x, &zTotal);
-        double w = wCarry + blockInclusiveScan((double)v.y, &wTotal);
-        double az = absCarry + blockInclusiveScan(fabs((double)v.x), &absTotal);
-        double dz = dzCarry + blockInclusiveScan(z, &dzTotal);
-        double dw = dwCarry + blockInclusiveScan(w, &dwTotal);
-        if (i < size) {
-            prefix[2*row + i] = make_double2(dz, dw);
-            prefix[2*row + size + i] = make_double2(az, w);
+    for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {
+        int begin = tile + ITEMS*threadIdx.x;
+        double z[ITEMS], w[ITEMS], az[ITEMS], dz[ITEMS], dw[ITEMS];
+        double sz = 0, sw = 0, sa = 0, sdz = 0, sdw = 0;
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            float2 v = begin+q < size ? weighted[row+begin+q] : make_float2(0,0);
+            sz += (double)v.x; sw += (double)v.y; sa += fabs((double)v.x);
+            sdz += sz; sdw += sw;
+            z[q] = sz; w[q] = sw; az[q] = sa; dz[q] = sdz; dw[q] = sdw;
         }
-        zCarry += zTotal;
-        wCarry += wTotal;
-        absCarry += absTotal;
-        dzCarry += dzTotal;
-        dwCarry += dwTotal;
+        double zTotal, wTotal, absTotal, dzTotal, dwTotal;
+        double beforeZ = zCarry + (blockInclusiveScan(sz, &zTotal)-sz);
+        double beforeW = wCarry + (blockInclusiveScan(sw, &wTotal)-sw);
+        double beforeA = absCarry + (blockInclusiveScan(sa, &absTotal)-sa);
+        double blockDZ = sdz + ITEMS*beforeZ;
+        double blockDW = sdw + ITEMS*beforeW;
+        double beforeDZ = dzCarry + (blockInclusiveScan(blockDZ, &dzTotal)-blockDZ);
+        double beforeDW = dwCarry + (blockInclusiveScan(blockDW, &dwTotal)-blockDW);
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            if (begin+q < size) {
+                prefix[2*row+begin+q] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
+                                                    beforeDW + (dw[q]+(q+1)*beforeW));
+                prefix[2*row+size+begin+q] = make_double2(beforeA+az[q], beforeW+w[q]);
+            }
+        }
+        zCarry += zTotal; wCarry += wTotal; absCarry += absTotal;
+        dzCarry += dzTotal; dwCarry += dwTotal;
     }
 }
 
