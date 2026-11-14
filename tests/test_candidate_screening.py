@@ -25,9 +25,10 @@ def test_chunked_prefixes_fit_high_precision_error_budget(size):
     maxima = np.array([abs(z_long).max(), w_long.max()])
     budgets = 4*gamma*np.array([size*size, size])[:, None]*maxima
     actual_d = prefix[:16*size].view(cp.float64).reshape(size, 2).get().astype(np.longdouble)
-    actual_mass = prefix[16*size:].view(cp.float32).reshape(size, 2).get().astype(np.longdouble)
+    mass_bits = prefix[16*size:].view(cp.uint32).reshape(size, 2).get()
+    actual_mass = (mass_bits.astype(np.uint64) << 32).view(np.float64).astype(np.longdouble)
     assert np.all(np.max(abs(actual_d-expected[0]), axis=0) <= budgets[0])
-    storage_radius = 2.0**-23*abs(actual_mass)+2.0**-125
+    storage_radius = 2.0**-19*abs(actual_mass)+2.0**-1020
     assert np.all(abs(actual_mass-expected[1]) <= budgets[1]+storage_radius)
 
 
@@ -40,7 +41,7 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     size = n + width
     integers = rng.integers(-11, 17, n)
     integers[0] = 100
-    inv_scale = np.float32(2.0**110 if pattern == 'overflow' else 2.0**-14)
+    inv_scale = np.float32(2.0**111 if pattern == 'overflow' else 2.0**-14)
     residual = np.resize(integers, size).astype(np.float32)*inv_scale
     dy = np.exp(rng.uniform(-3, 3, n)).astype(np.float32)
     if pattern == 'outlier':
