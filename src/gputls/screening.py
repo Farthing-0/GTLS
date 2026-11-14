@@ -8,6 +8,8 @@ import numpy as np
 
 MIN_WIDTH = 512
 RELATIVE_TOLERANCE = 0.01
+# Loose-to-tight certificates reduce exact work without changing the statistic.
+SCREEN_TOLERANCES = (0.05, 0.015, 0.005, 0.00025)
 
 
 def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
@@ -50,7 +52,8 @@ def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
     return positions, coefficients, error, maxima
 
 
-def certificates(signal, widths, max_weighted_residual, max_weight, patched_size):
+def certificates(signal, widths, max_weighted_residual, max_weight, patched_size,
+                 tolerance=RELATIVE_TOLERANCE):
     """Flatten templates and include the FP64 scan/evaluation error budgets.
 
     Each 512-point tile uses 16 sequential samples per thread and a block scan.
@@ -71,7 +74,7 @@ def certificates(signal, widths, max_weighted_residual, max_weight, patched_size
         if width < MIN_WIDTH:
             metadata.append([offset, 0, 0, 0, 0, 0, 0, 0])
             continue
-        pos, coeff, error, peaks = template_certificate(row[:width])
+        pos, coeff, error, peaks = template_certificate(row[:width], tolerance)
         count = len(pos)
         evaluation_gamma = (count + 8)*u/(1-(count + 8)*u)
         prefix_error = 4*(gamma + evaluation_gamma)*p*p*maxima*np.sum(np.abs(coeff), axis=0)

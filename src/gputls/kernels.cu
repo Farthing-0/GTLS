@@ -582,29 +582,36 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
     }
 }
 
-extern "C" __global__ void screenCandidates(
-        float* lower, unsigned long long* upperKeys, const double2* prefix,
-        const long long* residual, float invScale, const float* overshoot,
-        const int* widths, const int* selected, const int* offsets, const int* strides,
-        const int* lanes, const bool* mask, const int* positions, const double2* coefficients,
-        const double* metadata, double absMassError, double weightMassError,
-        int nSelected, int nDurations, int tSize, int size, float depthMin) {
+#define SCREEN_ARGS \
+    float* lower, unsigned long long* upperKeys, const double2* prefix, \
+    const long long* residual, float invScale, const float* overshoot, \
+    const int* widths, const int* selected, const int* offsets, const int* strides, \
+    const int* lanes, const bool* mask, const int* positions, const double2* coefficients, \
+    const double* metadata, double absMassError, double weightMassError, \
+    int nSelected, int nDurations, int tSize, int size, float depthMin
+
+template <bool Refine>
+__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
     int period = blockIdx.y;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
     int count = offsets[nSelected];
 #if GTLS_CHEAP_SCREEN_BOUNDS
-    // A valid upper bound can only decrease. Sample it once per block so a cheap
-    // absolute-mass bound can skip the sparse template dot products. An empty
-    // key decodes to NaN and disables this shortcut for the first wave of blocks.
-    __shared__ unsigned long long earlierUpperKey;
-    if (threadIdx.x == 0) earlierUpperKey = atomicAdd(upperKeys + period, 0ull);
-    __syncthreads();
-    unsigned int earlierHigh = (unsigned int)(earlierUpperKey >> 32);
-    float earlierUpper = __uint_as_float(earlierHigh >= 0x80000000u
-                                         ? earlierHigh ^ 0x80000000u : ~earlierHigh);
+    constexpr bool readUpper = true;
+#else
+    constexpr bool readUpper = Refine;
 #endif
+    // Upper bounds only decrease. A stale atomic snapshot can retain extra work,
+    // but can never discard a winner. The first pass starts with an empty key.
+    float earlierUpper = __int_as_float(0x7fffffff);
+    if (readUpper) {
+        __shared__ unsigned long long earlierUpperKey;
+        if (threadIdx.x == 0) earlierUpperKey = atomicAdd(upperKeys + period, 0ull);
+        __syncthreads();
+        unsigned int high = (unsigned int)(earlierUpperKey >> 32);
+        earlierUpper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
+    }
     unsigned long long key = 0xffffffffffffffffull;
-    if (item < count) {
+    if (item < count && (!Refine || !(lower[(long long)period*count+item] > earlierUpper))) {
         float lo = -__int_as_float(0x7f800000);
         int d = 0;
         while (offsets[d + 1] <= item) ++d;
@@ -688,28 +695,28 @@ extern "C" __global__ void screenCandidates(
                     } else {
                         double ar = 0, a2 = 0;
                         // Fetch four independent prefixes before the dependent FMA chain.
-                    // Accumulate in the original order, including the scalar tail.
-                    int j = begin;
-                    for (; j+4 <= begin+terms; j += 4) {
-                        double2 values[4], weights[4];
-                        #pragma unroll
-                        for (int q=0;q<4;++q) {
-                            int k=start+positions[j+q]-2;
-                            values[q]=k>=0?p[k]:make_double2(0,0);
-                            weights[q]=coefficients[j+q];
+                        // Accumulate in the original order, including the scalar tail.
+                        int j = begin;
+                        for (; j+4 <= begin+terms; j += 4) {
+                            double2 values[4], weights[4];
+                            #pragma unroll
+                            for (int q=0;q<4;++q) {
+                                int k=start+positions[j+q]-2;
+                                values[q]=k>=0?p[k]:make_double2(0,0);
+                                weights[q]=coefficients[j+q];
+                            }
+                            #pragma unroll
+                            for (int q=0;q<4;++q) {
+                                ar=fma(weights[q].x,values[q].x,ar);
+                                a2=fma(weights[q].y,values[q].y,a2);
+                            }
                         }
-                        #pragma unroll
-                        for (int q=0;q<4;++q) {
-                            ar=fma(weights[q].x,values[q].x,ar);
-                            a2=fma(weights[q].y,values[q].y,a2);
+                        for (;j<begin+terms;++j) {
+                            int k=start+positions[j]-2;
+                            double2 v=k>=0?p[k]:make_double2(0,0);
+                            double2 c=coefficients[j];
+                            ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
                         }
-                    }
-                    for (;j<begin+terms;++j) {
-                        int k=start+positions[j]-2;
-                        double2 v=k>=0?p[k]:make_double2(0,0);
-                        double2 c=coefficients[j];
-                        ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
-                    }
                         double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
                         double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
                         double proxy = a*(a*a2 - 2*ar);
@@ -733,10 +740,25 @@ extern "C" __global__ void screenCandidates(
                 }
             }
         }
-        lower[(long long)period*count+item] = lo;
+        // Every pass is independently conservative; retain the tighter lower bound.
+        long long address = (long long)period*count+item;
+        lower[address] = Refine ? fmaxf(lower[address], lo) : lo;
     }
     storeAdjacentBest(key, upperKeys, period);
 }
+
+extern "C" __global__ void screenCandidates(SCREEN_ARGS) {
+    screenCandidatesImpl<false>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin);
+}
+
+extern "C" __global__ void refineCandidates(SCREEN_ARGS) {
+    screenCandidatesImpl<true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin);
+}
+#undef SCREEN_ARGS
 
 #define SCREENED_EXACT(G) \
     extern "C" __global__ void searchChi2ScreenedG##G( \

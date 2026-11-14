@@ -193,3 +193,24 @@ Sparse prefix prefetch checkpoint
   70 focused tests passed. Profile: screen10.148s, exactG32 6.156s, prefix3.122s.
   Relative to workspace mixed reference36.805614s: 1.268x, with prior reference
   containing a small number of thermal flags; this is one new-code validation.
+
+Hierarchical certificate checkpoint (full verification in progress)
+  Four tolerances 0.05 -> 0.015 -> 0.005 -> 0.00025 reuse the same prefix
+  and lower-bound arrays. Later passes only evaluate surviving candidates and
+  retain max(previous lower, new lower); all upper bounds remain conservative.
+  Exact FP32 chains and strict tie-preserving pruning are unchanged.
+  Same real batches, five groups of629 periods:
+    Mixed screening+exact: 1019.823ms -> 591.300ms; total1675.391 ->1239.104ms.
+    Constant screening+exact: 2008.409ms ->763.715ms; total2798.084 ->1553.543ms.
+  Every packed candidate key bitwise equal across tested configurations.
+  Existing tests extended to certify every candidate at each refinement stage
+  and check monotonic bounds, both hardware branches, overflow and ties.
+  80 tests pass on both GPUs (one existing flat-SDE warning).
+  Initial candidate compaction with loose screening did not help due to the
+  sequential work per persistent warp; retrying after tighter certificates.
+  Full verification completed: mixed22.937620s (1.605x workspace reference),
+  constant25.547004s (2.163x workspace reference), all24 fields bitwise equal.
+  Mixed nsys: coarse-screen6.038s, refinement-screen1.333s, exactG32 1.261s,
+  prefix3.084s. Host setup is now a material remaining overhead.
+  After hierarchical pruning, native-batch G32 compaction probe improves
+  16.687103ms ->1.202176ms including compaction, keys bitwise equal.

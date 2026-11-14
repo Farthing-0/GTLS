@@ -8,7 +8,7 @@ from validate import cp, np, core, gtls_main, gputls
 if len(sys.argv) > 2:
     import gputls.screening as screening
     fit = screening.template_certificate
-    screening.template_certificate = lambda signal: fit(signal, float(sys.argv[2]))
+    screening.template_certificate = lambda signal, tolerance=None: fit(signal, float(sys.argv[2]))
 
 protocol=json.loads((bench.EXPERIMENT/'protocol.json').read_text())
 arrays,_=bench.inputs(protocol, '0365d_100s', 'mixed')
