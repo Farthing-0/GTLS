@@ -459,3 +459,8 @@ Register bucket-sort checkpoint
   Fixed-point screening prefixes passed independent long-double error coverage,
   but their additional registers/conversions regress general scans53 ->64.6ms;
   uniform31.2 ->31.3ms. Keep the existing FP64 prefixes.
+  Full register-sort validation at2b6067a: constant10.276813s, mixed10.968826s;
+  both24 fields bitwise equal, neither run thermally throttled. Constant sort
+  falls1.344655 ->0.862432s; total time10.633588 ->10.276813s. Related regression
+  suite:116 passed, one multi-GPU skip. The new source is committed separately
+  from this measurement checkpoint.
