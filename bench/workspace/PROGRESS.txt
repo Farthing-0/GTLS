@@ -21,7 +21,7 @@ Evidence before changes
 Milestones
   [done] Create branch and record constraints / original failure.
   [done] Preallocate/reuse workspace; single-GPU regression: 42 passed, 2 skipped.
-  [pending] Complete 730-day / 100-second run and save full reference comparisons.
+  [done] Complete 730-day / 100-second run; all 24 result fields/masks bitwise equal.
   [pending] Profile warmed search with nsys; optimize dominant cost and remeasure.
   [pending] Final correctness, variable-dy checks, results and reproducible commands.
 
@@ -48,3 +48,15 @@ Workspace implementation checkpoint
   run.py freezes the selected source and all input/settings hashes in each output;
   compare.py checks every result field/mask bitwise. The old source uses batch cap
   256 to obtain a complete numerical reference despite its native-batch OOM.
+
+730-day result checkpoint
+  Workspace times: 54.611403, 55.381574, 55.248526 seconds; median 55.248526.
+  Frozen 2.2.0 with cap=256: median 56.810362 seconds; ratio 1.02827x.
+  Period 7.1229777249928725 d; SDE 82.44850158691406; no thermal throttling.
+  All 24 saved fields/masks match bitwise, including every one of 48935 periods.
+  Compact evidence: results-workspace.json. Full artifacts: workspace-730-constant
+  and reference-730-constant under the experiment root.
+  Export-only fix: cast the recovery flag to Python bool. The first run's final
+  metadata was reconstructed from the already-saved fields/telemetry after NumPy
+  bool JSON serialization failed; all three timing and repeat checks completed.
+  Its unpersisted final pool counters are explicitly null, not inferred.

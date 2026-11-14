@@ -1,0 +1,236 @@
+{
+  "reference-730-constant": {
+    "gtls_version": "2.2.0",
+    "cupy_version": "14.2.0",
+    "commit": "7375e0ff5a7be7378d545c4cab35d21519967c3d",
+    "batch_cap": 256,
+    "times_seconds": [
+      56.839921651408076,
+      56.81036230176687,
+      56.77012257929891
+    ],
+    "median_seconds": 56.81036230176687,
+    "peak_device_bytes": 13201244160,
+    "thermal_throttled": true,
+    "period": 7.1229777249928725,
+    "sde": 82.44850158691406,
+    "field_sha256": "c4dd95715037b649051809bba6779d31af82e18ddfa6e9583d52d3e5fb7ec577",
+    "input_sha256": {
+      "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+      "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+      "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+    },
+    "source_sha256": {
+      "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+      "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+      "core.py": "423b980984c34f5850fa7c0e3264b233ff498b56a132eb221ac9c0e3ad8c037c",
+      "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+      "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+      "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+      "kernels.cu": "36f566d3eaa212a8d979fe8590a777c57cd1f9dca4874f58dd5d81e41f45fdff",
+      "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+      "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+      "screening.py": "4789bc6317022185f151e1b116c0716517acaa1509dea4be63f7a3ea88fe9445",
+      "stats.py": "6b135265230be2a90cd6f054b99bff3112a5020c5bc36da0abeeae04d25ce725",
+      "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+      "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+      "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1"
+    }
+  },
+  "workspace-730-constant": {
+    "gtls_version": "2.2.0",
+    "cupy_version": "14.2.0",
+    "commit": "7375e0ff5a7be7378d545c4cab35d21519967c3d",
+    "batch_cap": null,
+    "times_seconds": [
+      54.61140326410532,
+      55.38157419767231,
+      55.248525619506836
+    ],
+    "median_seconds": 55.248525619506836,
+    "peak_device_bytes": 23324196864,
+    "thermal_throttled": false,
+    "period": 7.1229777249928725,
+    "sde": 82.44850158691406,
+    "field_sha256": "c4dd95715037b649051809bba6779d31af82e18ddfa6e9583d52d3e5fb7ec577",
+    "input_sha256": {
+      "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+      "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+      "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+    },
+    "source_sha256": {
+      "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+      "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+      "core.py": "769da1010e1ab987e6eed474e1853d694734646b640bffb64fa5585290e6469c",
+      "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+      "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+      "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+      "kernels.cu": "36f566d3eaa212a8d979fe8590a777c57cd1f9dca4874f58dd5d81e41f45fdff",
+      "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+      "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+      "screening.py": "4789bc6317022185f151e1b116c0716517acaa1509dea4be63f7a3ea88fe9445",
+      "stats.py": "6b135265230be2a90cd6f054b99bff3112a5020c5bc36da0abeeae04d25ce725",
+      "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+      "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+      "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+      "workspace.py": "182b47b6ba091f80c23bb9b93c2ba8f3e3d04bbd7e09c1b9f855928c457f0942"
+    },
+    "metadata_recovery": "All three measurements and exact repeat checks completed; fields.npz and telemetry.json were saved. Final JSON failed on numpy.bool serialization. Reconstructed only from those saved artifacts; post-run pool counters were not persisted."
+  },
+  "comparison": {
+    "all_fields_bitwise_equal": true,
+    "fields": [
+      {
+        "field": "periods",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "periods__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "period",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDuration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "durationPoints",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDurations",
+        "bitwise_equal": true,
+        "shape": [
+          37
+        ]
+      },
+      {
+        "field": "duration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "depth",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "T0",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "SDE",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "chi2__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "transitTimes",
+        "bitwise_equal": true,
+        "shape": [
+          103
+        ]
+      },
+      {
+        "field": "power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "snr",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFit",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFitPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "raw_power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "possiblePeriodsIndices",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      },
+      {
+        "field": "possiblePeriods",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      }
+    ],
+    "reference": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/reference-730-constant",
+    "candidate": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/workspace-730-constant",
+    "reference_median_seconds": 56.81036230176687,
+    "candidate_median_seconds": 55.248525619506836,
+    "speedup": 1.0282692916190435
+  }
+}

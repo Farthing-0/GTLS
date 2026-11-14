@@ -118,7 +118,7 @@ try:
     write('telemetry.json',states)
     result.update(ok=True,phase='complete',median_seconds=statistics.median(times),
                   field_sha256=digest(out/'fields.npz'),period=float(answer.period),sde=float(answer.SDE),
-                  recovered=abs(answer.period/p['injection']['period_days']-1)<.01,
+                  recovered=bool(abs(answer.period/p['injection']['period_days']-1)<.01),
                   peak_device_bytes=max(v['used_bytes'] for v in states),
                   thermal_throttled=any(v['throttle_bits']&0x60 for v in states),
                   pool_used_after=cp.get_default_memory_pool().used_bytes(),
