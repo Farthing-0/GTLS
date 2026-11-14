@@ -316,3 +316,8 @@ FP32 cheap-bound checkpoint
   original refinement ordering via an inline shared dot helper. Five629-period
   probe improves refinement91.688 ->69.725ms, exact keys equal;63 checks pass.
   Current node is ready for a fresh A100 comparison with no active rental yet.
+  Restored-order full validation at21fc9ae: mixed14.911319s, constant
+  16.826603s; all24 fields bitwise equal, neither run thermal-throttled.
+  Mixed nsys refinement1.153s, restoring the preceding load overlap.
+  A100 comparison lease60674743 created17:18:18UTC Nov14; PCIe40GB,
+  quote0.4148148USD/h including40GB disk. Temporary; destroy after retrieval.
