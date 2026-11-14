@@ -39,13 +39,13 @@ extern "C"{
     #define SECONDS_PER_DAY 86400              // Seconds in a day
 
     /**
-     * Phase sort, stage 1: fold and count the points of each bucket floor(phase * tSize)
-     * (about one point per bucket). phase = time / period - floor(time / period), with the
+     * Phase sort, stage 1: fold and count the points of each bucket floor(phase * nBuckets)
+     * (about three points per bucket). phase = time / period - floor(time / period), with the
      * division done as a multiplication by the correctly rounded 1 / period (float64 division
      * is a long instruction sequence, multiplication a single instruction).
      */
     __global__ void foldBuckets(const double* time, const double* inversePeriods, double* phase,
-                                int* counts, int tSize) {
+                                int* counts, int tSize, int nBuckets) {
         int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
         int periodIndex = blockIdx.y;
         if (pointIndex >= tSize) {
@@ -55,8 +55,8 @@ extern "C"{
         double pointPhase = cycles - (int)(cycles);
         long long rowOffset = (long long)periodIndex * tSize;
         phase[rowOffset + pointIndex] = pointPhase;
-        int bucket = min((int)(pointPhase * tSize), tSize - 1);
-        atomicAdd(counts + rowOffset + bucket, 1);
+        int bucket = min((int)(pointPhase * nBuckets), nBuckets - 1);
+        atomicAdd(counts + (long long)periodIndex*nBuckets + bucket, 1);
     }
 
     /**
@@ -82,15 +82,15 @@ extern "C"{
      * Phase sort, stage 2: scatter the point indices into their buckets. cursor holds the
      * first position of each bucket on entry and one past its last position on exit.
      */
-    __global__ void bucketScatter(const double* phase, int* cursor, int* sortIndex, int tSize) {
+    __global__ void bucketScatter(const double* phase, int* cursor, int* sortIndex, int tSize, int nBuckets) {
         int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
         int periodIndex = blockIdx.y;
         if (pointIndex >= tSize) {
             return;
         }
         long long rowOffset = (long long)periodIndex * tSize;
-        int bucket = min((int)(phase[rowOffset + pointIndex] * tSize), tSize - 1);
-        sortIndex[rowOffset + atomicAdd(cursor + rowOffset + bucket, 1)] = pointIndex;
+        int bucket = min((int)(phase[rowOffset + pointIndex] * nBuckets), nBuckets - 1);
+        sortIndex[rowOffset + atomicAdd(cursor + (long long)periodIndex*nBuckets + bucket, 1)] = pointIndex;
     }
 
     /**
@@ -98,18 +98,18 @@ extern "C"{
      * with phase, so the result equals a stable argsort of the phases.
      */
     __global__ void sortBuckets(const double* phase, const int* counts, const int* bucketEnds,
-                                int* sortIndex, int tSize) {
+                                int* sortIndex, int tSize, int nBuckets) {
         int bucket = blockIdx.x * blockDim.x + threadIdx.x;
         int periodIndex = blockIdx.y;
-        if (bucket >= tSize) {
+        if (bucket >= nBuckets) {
             return;
         }
         long long rowOffset = (long long)periodIndex * tSize;
-        int bucketSize = counts[rowOffset + bucket];
+        int bucketSize = counts[(long long)periodIndex*nBuckets + bucket];
         if (bucketSize < 2) {
             return;
         }
-        int* bucketPoints = sortIndex + rowOffset + bucketEnds[rowOffset + bucket] - bucketSize;
+        int* bucketPoints = sortIndex + rowOffset + bucketEnds[(long long)periodIndex*nBuckets + bucket] - bucketSize;
         const double* rowPhase = phase + rowOffset;
         for (int next = 1; next < bucketSize; next++) {
             int keyPoint = bucketPoints[next];
@@ -552,6 +552,17 @@ SEARCH_ADJACENT(32,4)
 
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
 // Two contiguous double2 planes per row: (D_z, D_w), then (S_abs_z, S_w).
+// One-warp specialization with exactly the additions of blockInclusiveScan.
+__device__ __forceinline__ double warpInclusiveScan(double value, double* total) {
+    int lane = threadIdx.x & 31;
+    for (int offset = 1; offset < 32; offset <<= 1) {
+        double neighbor = __shfl_up_sync(0xffffffff, value, offset);
+        if (lane >= offset) value += neighbor;
+    }
+    *total = __shfl_sync(0xffffffff, value, 31);
+    return value;
+}
+
 extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
     constexpr int ITEMS = 16;
     long long row = (long long)blockIdx.x * size;
@@ -568,13 +579,13 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
             z[q] = sz; w[q] = sw; az[q] = sa; dz[q] = sdz; dw[q] = sdw;
         }
         double zTotal, wTotal, absTotal, dzTotal, dwTotal;
-        double beforeZ = zCarry + (blockInclusiveScan(sz, &zTotal)-sz);
-        double beforeW = wCarry + (blockInclusiveScan(sw, &wTotal)-sw);
-        double beforeA = absCarry + (blockInclusiveScan(sa, &absTotal)-sa);
+        double beforeZ = zCarry + (warpInclusiveScan(sz, &zTotal)-sz);
+        double beforeW = wCarry + (warpInclusiveScan(sw, &wTotal)-sw);
+        double beforeA = absCarry + (warpInclusiveScan(sa, &absTotal)-sa);
         double blockDZ = sdz + ITEMS*beforeZ;
         double blockDW = sdw + ITEMS*beforeW;
-        double beforeDZ = dzCarry + (blockInclusiveScan(blockDZ, &dzTotal)-blockDZ);
-        double beforeDW = dwCarry + (blockInclusiveScan(blockDW, &dwTotal)-blockDW);
+        double beforeDZ = dzCarry + (warpInclusiveScan(blockDZ, &dzTotal)-blockDZ);
+        double beforeDW = dwCarry + (warpInclusiveScan(blockDW, &dwTotal)-blockDW);
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
             if (begin+q < size) {
@@ -638,19 +649,30 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                     const double2* p = prefix + (long long)period*size*2;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
-                    // Fetch four independent prefixes before the dependent FMA chain.
+                    // Prefetch independent prefixes before the dependent FMA chain.
                     // Accumulate in the original order, including the scalar tail.
+#if __CUDA_ARCH__ >= 700
+                    constexpr int PREFETCH = 13;
+#else
+                    constexpr int PREFETCH = 4;
+#endif
                     int j = begin;
-                    for (; j+4 <= begin+terms; j += 4) {
-                        double2 values[4], weights[4];
+                    for (; j+PREFETCH <= begin+terms; j += PREFETCH) {
+                        double2 values[PREFETCH], weights[PREFETCH];
                         #pragma unroll
-                        for (int q=0;q<4;++q) {
+                        for (int q=0;q<PREFETCH;++q) {
                             int k=start+positions[j+q]-2;
                             values[q]=k>=0?p[k]:make_double2(0,0);
                             weights[q]=coefficients[j+q];
                         }
+#if __CUDA_ARCH__ >= 700
+                        // Keep the independent reads ahead of the FMA chain.
+                        // This mask names only the currently executing lanes;
+                        // no value or reduction is shared between lanes here.
+                        __syncwarp(__activemask());
+#endif
                         #pragma unroll
-                        for (int q=0;q<4;++q) {
+                        for (int q=0;q<PREFETCH;++q) {
                             ar=fma(weights[q].x,values[q].x,ar);
                             a2=fma(weights[q].y,values[q].y,a2);
                         }

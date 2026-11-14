@@ -1,33 +1,36 @@
 """Repeated batches must reuse physical storage, including variable-weight searches."""
 import cupy as cp
 import numpy as np
+import pytest
 
 from gputls import core, gtls
-from gputls.workspace import BatchWorkspace, LAYOUT_ALLOWANCE, bytes_per_period
+from gputls.workspace import BatchWorkspace, LAYOUT_ALLOWANCE, bytes_per_period, bucket_count
 from test_candidate_screening import _screened_curve
 
 
-def test_workspace_alignment_and_stage_aliases():
+@pytest.mark.parametrize("screening", [False, True])
+def test_workspace_alignment_and_stage_aliases(screening):
     capacity, n, patched, starts = 7, 101, 133, 239
-    workspace = BatchWorkspace(capacity, n, patched, starts, True)
+    workspace = BatchWorkspace(capacity, n, patched, starts, screening)
     index_bytes = workspace.index_bytes
     ranges = []
-    for offset, dtype in [(0, cp.int32), (index_bytes, cp.float64),
-                          (3*index_bytes, cp.int32), (4*index_bytes, cp.int32)]:
-        view = workspace.view('scratch', (capacity,n), dtype, offset)
+    for offset, width, dtype in [(0, n, cp.int32), (index_bytes, n, cp.float64),
+                                (3*index_bytes, bucket_count(n), cp.int32),
+                                (workspace.cursor_offset, bucket_count(n), cp.int32)]:
+        view = workspace.view('scratch', (capacity,width), dtype, offset)
         assert view.data.ptr % np.dtype(dtype).alignment == 0
         ranges.append((view.data.ptr, view.data.ptr+view.nbytes))
     for i, (begin, end) in enumerate(ranges):
         assert all(end <= b or begin >= e for b,e in ranges[i+1:])
-    prefix = workspace.view('scratch', (capacity,patched,4), cp.float64)
+    prefix = workspace.view('scratch', (capacity,patched,4), cp.float64) if screening else None
     weighted = workspace.view('weighted', (capacity,patched,2), cp.float32)
     cumulative = workspace.view('cumulative', (capacity,patched), cp.int64)
     lower = workspace.view('lower', (capacity,starts), cp.float32)
-    for value,view in enumerate((prefix, weighted, cumulative, lower), 1):
+    for value,view in enumerate([x for x in (prefix, weighted, cumulative, lower) if x is not None], 1):
         view.fill(value)
-    for value,view in enumerate((prefix, weighted, cumulative, lower), 1):
+    for value,view in enumerate([x for x in (prefix, weighted, cumulative, lower) if x is not None], 1):
         assert bool(cp.all(view == value))
-    assert workspace.storage.nbytes <= capacity*bytes_per_period(n, patched, starts, True)+LAYOUT_ALLOWANCE
+    assert workspace.storage.nbytes <= capacity*bytes_per_period(n, patched, starts, screening)+LAYOUT_ALLOWANCE
 
 
 def test_repeated_tail_and_refine_batches_reuse_storage(monkeypatch):

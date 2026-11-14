@@ -12,7 +12,8 @@ from .grid import duration_limit_masses
 from .helpers import transit_mask
 from .screening import certificates, MIN_WIDTH, SCREEN_TOLERANCES
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
-from .workspace import BatchWorkspace, LAYOUT_ALLOWANCE, bytes_per_period as workspace_bytes_per_period
+from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
+                        bytes_per_period as workspace_bytes_per_period)
 
 KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
 
@@ -157,6 +158,7 @@ class GPUSearch:
         self.maxDuration = maxDuration
 
         self.tSize = len(t)
+        self.nBuckets = bucket_count(self.tSize)
         self.patchedDatasSize = int(self.tSize + maxDuration)
 
         self.tGPU = cp.asarray(t).astype(cp.float64)
@@ -266,18 +268,20 @@ class GPUSearch:
         # Phase fold and sort (bucket sort, equal to a stable argsort of the phases)
         inversePeriodsGPU = cp.asarray(1.0 / np.asarray(periods, dtype=np.float64))
         phasesGPU = workspace.view('scratch', (nPeriods, tSize), cp.float64, index_bytes)
-        countsGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32, 3*index_bytes)
+        nBuckets = self.nBuckets
+        countsGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, 3*index_bytes)
         countsGPU.fill(0)
         grid = ((tSize + 255) // 256, nPeriods)
         module.get_function("foldBuckets")(
-            grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
-        cursorGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32, 4*index_bytes)
-        module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(tSize)))
+            grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize), np.int32(nBuckets)))
+        cursorGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, workspace.cursor_offset)
+        module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(nBuckets)))
         sortIndexGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32)
         module.get_function("bucketScatter")(
-            grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
+            grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize), np.int32(nBuckets)))
         module.get_function("sortBuckets")(
-            grid, (256,), (phasesGPU, countsGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
+            ((nBuckets+255)//256, nPeriods), (256,),
+            (phasesGPU, countsGPU, cursorGPU, sortIndexGPU, np.int32(tSize), np.int32(nBuckets)))
         del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
