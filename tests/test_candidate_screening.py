@@ -7,9 +7,10 @@ from gputls import core
 from gputls.screening import certificates, template_certificate
 
 
+@pytest.mark.parametrize('cheap_bound', [False, True])
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
 @pytest.mark.parametrize('pattern', ['random', 'outlier', 'tie', 'overflow'])
-def test_screen_bounds_cover_every_exact_candidate(g, pattern):
+def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     rng = np.random.default_rng(318)
     n, width = 131, 513
     size = n + width
@@ -32,7 +33,8 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern):
     weighted = cp.asarray(np.tile(np.stack((z, weight), axis=-1), (n, 1, 1)))
     cum = cp.asarray(np.tile(np.cumsum(np.resize(integers, size)), (n, 1)))
     prefix = cp.empty((n, size, 4), dtype=cp.float64)
-    module = core.load_module()
+    module = cp.RawModule(code=core.KERNEL_SOURCE.read_text(),
+                          options=(f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}",))
     module.get_function('scanScreening')((n,), (512,), (weighted, prefix, np.int32(size)))
     widths = cp.asarray([width], dtype=cp.int32)
     selected = cp.asarray([0], dtype=cp.int32)
@@ -42,11 +44,11 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern):
     mask = cp.ones((n, 1), dtype=cp.bool_)
     lower = cp.empty((n, n), dtype=cp.float32)
     upper = cp.full(n, core.EMPTY_KEY, dtype=cp.uint64)
-    module.get_function('screenCandidates')(((n+255)//256, n), (256,),
-        (lower, upper, prefix, cum, inv_scale, overshoot, widths, selected,
+    screen_args = (lower, upper, prefix, cum, inv_scale, overshoot, widths, selected,
          offsets, strides, cp.asarray([g], dtype=cp.int32), mask, cp.asarray(pos), cp.asarray(coef),
          cp.asarray(meta), *map(np.float64, mass_error), np.int32(1), np.int32(1),
-         np.int32(n), np.int32(size), np.float32(-1)))
+         np.int32(n), np.int32(size), np.float32(-1))
+    module.get_function('screenCandidates')(((n+255)//256, n), (256,), screen_args)
     best = cp.full(n, core.EMPTY_KEY, dtype=cp.uint64)
     args = (best, cum, inv_scale, weighted, cp.asarray(signal), overshoot,
             widths, selected, offsets, strides, mask, np.int32(0), np.int32(1),
@@ -73,6 +75,15 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern):
     best.fill(core.EMPTY_KEY)
     exact(grid, (256,), args+(lower, upper, np.int32(n)))
     np.testing.assert_array_equal(best.get(), expected)
+    if pattern != 'overflow':
+        # Seed the best exact value as a valid upper bound, so the early-bound
+        # path is exercised even when the entire row fits in a single block.
+        upper.fill(np.uint64(int(expected[0]) & 0xffffffff00000000))
+        module.get_function('screenCandidates')(((n+255)//256, n), (256,), screen_args)
+        assert np.all(lower[0].get() <= delta)
+        best.fill(core.EMPTY_KEY)
+        exact(grid, (256,), args+(lower, upper, np.int32(n)))
+        np.testing.assert_array_equal(best.get(), expected)
     if pattern == 'tie':
         assert int(expected[0] & np.uint64(0xffffffff)) == 0
 

@@ -577,6 +577,17 @@ extern "C" __global__ void screenCandidates(
     int period = blockIdx.y;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
     int count = offsets[nSelected];
+#if GTLS_CHEAP_SCREEN_BOUNDS
+    // A valid upper bound can only decrease. Sample it once per block so a cheap
+    // absolute-mass bound can skip the sparse template dot products. An empty
+    // key decodes to NaN and disables this shortcut for the first wave of blocks.
+    __shared__ unsigned long long earlierUpperKey;
+    if (threadIdx.x == 0) earlierUpperKey = atomicAdd(upperKeys + period, 0ull);
+    __syncthreads();
+    unsigned int earlierHigh = (unsigned int)(earlierUpperKey >> 32);
+    float earlierUpper = __uint_as_float(earlierHigh >= 0x80000000u
+                                         ? earlierHigh ^ 0x80000000u : ~earlierHigh);
+#endif
     unsigned long long key = 0xffffffffffffffffull;
     if (item < count) {
         float lo = -__int_as_float(0x7f800000);
@@ -597,6 +608,7 @@ extern "C" __global__ void screenCandidates(
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
                     const double4* p = prefix + (long long)period*size;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     for (int j = begin; j < begin+terms; ++j) {
                         int k = start + positions[j] - 2;
@@ -605,6 +617,7 @@ extern "C" __global__ void screenCandidates(
                         ar = fma(c.x, v.x, ar);
                         a2 = fma(c.y, v.y, a2);
                     }
+#endif
                     double4 end = p[start+width-1];
                     double4 first = start ? p[start-1] : make_double4(0,0,0,0);
                     double az = fmax(0.0, end.z-first.z) + absMassError;
@@ -615,25 +628,60 @@ extern "C" __global__ void screenCandidates(
                     double gamma = gu < 0.5 ? gu/(1-gu) : __int_as_float(0x7f800000);
                     // The original FMA chains + XOR tree, including subnormal rounding.
                     double tiny = (double)width*(steps+8)*0x1p-149;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
                     double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
                     double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
+#endif
                     float amplitude = depth*overshoot[duration]*2.0f;
                     double a = amplitude, aa = fabs(a);
                     double arBound = (1+gamma)*m[4]*az + tiny;
                     double a2Bound = (1+gamma)*m[5]*w + tiny;
                     double finalRound = 0x1p-21*(a*a*a2Bound + 2*aa*arBound) + tiny;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
                     double proxy = a*(a*a2 - 2*ar);
                     double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
                     double hi = proxy+error;
                     double low = proxy-error;
+#endif
                     double innerBound = aa*a2Bound + 2*arBound;
                     bool noOverflow = arBound <= 0x1.fffffep+126 && a2Bound <= 0x1.fffffep+127
                         && innerBound <= 0x1.fffffep+127 && aa*innerBound <= 0x1.fffffep+127;
+#if GTLS_CHEAP_SCREEN_BOUNDS
+                    // A2 is nonnegative for arbitrary positive weights. Discard
+                    // that term and bound |AR| with the same original-FP32 error
+                    // allowance. Outward slack also covers the FP64 operations.
+                    double cheap = (-2*aa*arBound-finalRound)*1.0000000001-0x1p-140;
+                    float cheapLower = __double2float_rd(cheap);
+                    if (noOverflow && isfinite(amplitude) && cheapLower > earlierUpper) {
+                        lo = cheapLower;
+                    } else {
+                        double ar = 0, a2 = 0;
+                        for (int j = begin; j < begin+terms; ++j) {
+                            int k = start + positions[j] - 2;
+                            double4 v = k >= 0 ? p[k] : make_double4(0,0,0,0);
+                            double2 c = coefficients[j];
+                            ar = fma(c.x, v.x, ar);
+                            a2 = fma(c.y, v.y, a2);
+                        }
+                        double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
+                        double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
+                        double proxy = a*(a*a2 - 2*ar);
+                        double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
+                        double hi = proxy+error;
+                        double low = proxy-error;
+                        // Unbounded/nonfinite certificates keep the original exact path.
+                        if (noOverflow && isfinite(hi) && isfinite(low) && isfinite(amplitude)) {
+                            lo = __double2float_rd(low);
+                            float upper = __double2float_ru(hi);
+                            key = ((unsigned long long)orderedKey(upper) << 32) | (unsigned int)item;
+                        }
+#else
                     // Unbounded/nonfinite certificates keep the original exact path.
                     if (noOverflow && isfinite(hi) && isfinite(low) && isfinite(amplitude)) {
                         lo = __double2float_rd(low);
                         float upper = __double2float_ru(hi);
                         key = ((unsigned long long)orderedKey(upper) << 32) | (unsigned int)item;
+#endif
                     }
                 }
             }

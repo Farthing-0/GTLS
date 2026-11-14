@@ -19,7 +19,11 @@ KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
 
 def load_module():
     """Compile the CUDA kernels."""
-    return cp.RawModule(code=KERNEL_SOURCE.read_text())
+    # The extra FP64 bound pays off on A100-class devices; the 3090's 1:64 FP64
+    # rate showed no gain. Compile out the shortcut on those devices entirely.
+    ratio = cp.cuda.Device().attributes.get("SingleToDoublePrecisionPerfRatio", 64)
+    options = (f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(ratio <= 2)}",)
+    return cp.RawModule(code=KERNEL_SOURCE.read_text(), options=options)
 
 
 def foldCPU(time, flux, dy, period):
