@@ -438,3 +438,7 @@ Rejected prefix and uniform-knot experiments
   the extra weighted read and carry stage regress53.07 ->57.96ms on GPU1.
   Uniform AR-only knot selection reduces some term counts but weakens the useful
   approximation: three-batch screen165.74 ->187.31..204.26ms. Keep joint knots.
+  Full stats validation atb940584: constant10.633588s, mixed11.419133s;
+  all24 fields match bitwise in both runs. See results-stats-full.json for
+  per-run thermal flags. Constant final-fit GPU windowStd takes0.001243s.
+  Related regression suite:116 passed, one multi-GPU skip.
