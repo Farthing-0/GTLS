@@ -236,27 +236,30 @@ class GPUSearch:
             max_z = float(cp.max(cp.abs(weightedResidual)))
             max_w = float(cp.max(cp.float32(1) / dy2))
             self.screening = bool(np.isfinite(max_z) and np.isfinite(max_w))
-            if self.screening:
-                self.screenPrefixStride = GENERAL_PREFIX_STRIDE
-                # Check this call's actual FP32 weights, including the variance
-                # floor. No uniform-weight assumption survives across searches.
-                if bool(cp.all(self.preparedGPU[:, 1] == self.preparedGPU[0, 1])):
-                    self.uniformWeight = np.float32(self.preparedGPU[0, 1].get())
-                    self.screenPrefixStride = UNIFORM_PREFIX_STRIDE
-                stride = self.screenPrefixStride
-                certificateSize = (self.patchedDatasSize+stride-1)//stride*stride
-                self.screenCertificates = []
-                for tolerance in SCREEN_TOLERANCES:
-                    pos, coef, meta, mass_error = certificates(
-                        signal, durations, max_z, max_w, certificateSize, tolerance)
-                    if self.uniformWeight is not None:
-                        pos, coef, meta = uniform_sparse_certificate(
-                            pos, coef, meta, stride, certificateSize, max_z)
-                    else:
-                        pos, coef, meta = sparse_certificate(
-                            pos, coef, meta, stride, certificateSize, max_z, max_w)
-                    self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
-                                                    cp.asarray(meta), *map(np.float64, mass_error)))
+        # First-time Numba compilation can retain its caller frame until GC.
+        # Drop temporary device arrays before entering that compiler.
+        del dy2, weightedResidual
+        if self.screening:
+            self.screenPrefixStride = GENERAL_PREFIX_STRIDE
+            # Check this call's actual FP32 weights, including the variance
+            # floor. No uniform-weight assumption survives across searches.
+            if bool(cp.all(self.preparedGPU[:, 1] == self.preparedGPU[0, 1])):
+                self.uniformWeight = np.float32(self.preparedGPU[0, 1].get())
+                self.screenPrefixStride = UNIFORM_PREFIX_STRIDE
+            stride = self.screenPrefixStride
+            certificateSize = (self.patchedDatasSize+stride-1)//stride*stride
+            self.screenCertificates = []
+            for tolerance in SCREEN_TOLERANCES:
+                pos, coef, meta, mass_error = certificates(
+                    signal, durations, max_z, max_w, certificateSize, tolerance)
+                if self.uniformWeight is not None:
+                    pos, coef, meta = uniform_sparse_certificate(
+                        pos, coef, meta, stride, certificateSize, max_z)
+                else:
+                    pos, coef, meta = sparse_certificate(
+                        pos, coef, meta, stride, certificateSize, max_z, max_w)
+                self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
+                                                cp.asarray(meta), *map(np.float64, mass_error)))
         self.workspace = None
         self.screenMapKey = None
         self.screenMapGPU = None
@@ -269,6 +272,15 @@ class GPUSearch:
         self.weightedPointBytes = 4 if self.uniformWeight is not None else 8
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
             self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
+
+    def close(self):
+        """Release device resources even if a compiler/debugger retains this object."""
+        self.workspace = None
+        if hasattr(self, 'screenCertificates'):
+            self.screenCertificates.clear()
+        for name, value in vars(self).items():
+            if isinstance(value, cp.ndarray):
+                setattr(self, name, None)
 
     def reserve_workspace(self, capacity):
         """Keep the largest batch allocation for the search, including short tail/refit calls."""
@@ -578,7 +590,7 @@ class MultiGPUSearch:
     def close(self):
         """Release the GPU arrays and return the cached memory to the driver."""
         while self.searches:
-            self.searches.pop().workspace = None
+            self.searches.pop().close()
         for device_id in self.device_ids:
             with cp.cuda.Device(device_id):
                 cp.get_default_memory_pool().free_all_blocks()

@@ -586,3 +586,15 @@ Sparse general-prefix checkpoint
   Observed pool2,043,392bytes belongs to the25920-point initialization search;
   diagnostic found retained __init__ frames. Explicit GC releases all bytes.
   This is a reference-cycle investigation, not an additional arena allocation.
+
+Explicit device-resource release
+  Cold Numba compilation retains GPUSearch.__init__ through compiler frame cycles.
+  Reproduced with GC disabled: the short25920-point initialization holds2,043,392B.
+  Drop temporary device arrays before entering Numba and explicitly clear device
+  attributes/certificates when closing each GPUSearch. The same fresh-compilation
+  diagnostic now reports0 used bytes while the compiler frames are still retained.
+  Targeted retained-frame, batch-reuse and OOM-recovery checks pass. No numerical
+  calculation changed, and no global/periodic GC call was added to the search.
+  Segmented sparse-prefix experiment: baseline124.276ms;1/8/32/128 tiles per
+  segment135.379/135.022/135.289/137.766ms on GPU0. Extra carry-add memory traffic
+  outweighs local scan savings; no segmented path enters production.
