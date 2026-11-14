@@ -15,6 +15,39 @@ UNIFORM_PREFIX_STRIDE = 16
 GENERAL_PREFIX_STRIDE = 8
 
 
+def prefix_quantization(patched_size, max_weighted_residual, max_weight):
+    """Power-of-two scales with a certified int64 double-prefix range.
+
+    Pad to the complete scan tile, including internal carry calculations. Every
+    quantized point is bounded by limit; the sum of its triangular multiplicities
+    is therefore below 2**61. Scaling binary32 by a normal power of two is exact
+    unless it underflows, in which case rounding to an integer still gives zero.
+    Thus each reconstructed point differs by at most half a quantization step.
+    """
+    size = (int(patched_size)+511)//512*512
+    limit = (2**61)//(size*(size+1)//2)-2 if size else 0
+    if limit <= 0:
+        return None
+    maxima = np.array([max_weighted_residual, max_weight], dtype=np.float64)
+    if not np.all(np.isfinite(maxima)) or np.any(maxima < 0):
+        return None
+    exponents = []
+    for maximum in maxima:
+        exponent = min(126, int(np.floor(np.log2(limit/maximum)))) if maximum else 0
+        if exponent < -126:
+            return None
+        # Resolve a possible rounded log2 at an exact power-of-two boundary.
+        while np.ldexp(maximum, exponent) > limit:
+            exponent -= 1
+        if exponent < -126:
+            return None
+        exponents.append(exponent)
+    scale = np.exp2(exponents).astype(np.float32)
+    inverse = np.exp2(-np.array(exponents, dtype=np.float64))
+    radius = np.where(maxima == 0, 0., np.nextafter(.5*inverse, np.inf))
+    return scale, inverse, radius
+
+
 @njit(cache=True, fastmath=False)
 def _adaptive_knots(target, scale, tolerance):
     """Original knot selection without temporary arrays for each segment.
@@ -110,7 +143,7 @@ def template_certificate(signal, tolerance=RELATIVE_TOLERANCE):
 
 
 def certificates(signal, widths, max_weighted_residual, max_weight, patched_size,
-                 tolerance=RELATIVE_TOLERANCE):
+                 tolerance=RELATIVE_TOLERANCE, point_error=None):
     """Flatten templates and include the FP64 scan/evaluation error budgets.
 
     Each 512-point tile uses 16 sequential samples per thread and a block scan.
@@ -127,6 +160,8 @@ def certificates(signal, widths, max_weighted_residual, max_weight, patched_size
     steps = 2 * ((p + 511)//512 + 48)
     gamma = steps*u/(1-steps*u)
     maxima = np.array([max_weighted_residual, max_weight], dtype=float)
+    if point_error is not None:
+        maxima = np.nextafter(maxima+point_error, np.inf)
     for row, width in zip(signal, widths):
         if width < MIN_WIDTH:
             metadata.append([offset, 0, 0, 0, 0, 0, 0, 0])
@@ -135,13 +170,22 @@ def certificates(signal, widths, max_weighted_residual, max_weight, patched_size
         count = len(pos)
         evaluation_gamma = (count + 8)*u/(1-(count + 8)*u)
         prefix_error = 4*(gamma + evaluation_gamma)*p*p*maxima*np.sum(np.abs(coeff), axis=0)
+        if point_error is not None:
+            # Apply the original template to the pointwise quantization error.
+            # This is separate from its piecewise-linear approximation error.
+            prefix_error += width*peaks*point_error*1.0000000001
         metadata.append([offset, count, *error, *peaks, *np.nextafter(prefix_error, np.inf)])
         offset += count
         positions.extend(pos)
         coefficients.extend(coeff)
     # Window masses use differences of first-level prefixes. Add a global absolute
     # allowance, which remains valid after cancellation following a large outlier.
-    mass_error = np.nextafter(4*gamma*p*maxima, np.inf)
+    mass_error = 4*gamma*p*maxima
+    if point_error is not None:
+        # Outward sparse endpoints already include the complete quantized
+        # window. Only its width, not the preceding prefix, needs this radius.
+        mass_error += max(widths)*point_error*1.0000000001
+    mass_error = np.nextafter(mass_error, np.inf)
     return (np.asarray(positions, np.int32), np.asarray(coefficients, np.float64).reshape(-1, 2),
             np.asarray(metadata, np.float64), mass_error)
 

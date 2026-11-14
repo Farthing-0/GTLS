@@ -6,7 +6,7 @@ import pytest
 from gputls import core
 from gputls.screening import (certificates, template_certificate, SCREEN_TOLERANCES,
                              uniform_sparse_certificate, sparse_certificate,
-                             UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE)
+                             UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE, prefix_quantization)
 
 
 def test_screen_schedule_covers_candidates_once_in_time_order():
@@ -148,8 +148,15 @@ def test_uniform_square_uses_original_fma_and_reduction_order(g):
 @pytest.mark.parametrize('g', [1, 2, 4, 8, 16, 32])
 @pytest.mark.parametrize('pattern', ['random', 'outlier', 'tie', 'overflow', 'uniform',
                                      'sparse', 'sparse-outlier', 'sparse-tie', 'sparse-overflow',
-                                     'coarse-random', 'coarse-outlier', 'coarse-tie', 'coarse-overflow'])
+                                     'coarse-random', 'coarse-outlier', 'coarse-tie', 'coarse-overflow',
+                                     'integer-coarse-random', 'integer-coarse-outlier',
+                                     'integer-coarse-tie', 'integer-coarse-overflow',
+                                     'integer-sparse', 'integer-sparse-outlier',
+                                     'integer-sparse-tie', 'integer-sparse-overflow'])
 def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
+    integer = pattern.startswith('integer-')
+    if integer:
+        pattern = pattern[len('integer-'):]
     sparse = pattern.startswith(('sparse', 'coarse'))
     uniform = pattern == 'uniform' or pattern.startswith('sparse')
     pattern = pattern.split('-', 1)[1] if '-' in pattern else pattern
@@ -173,15 +180,18 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
     signal = (.5*np.maximum(0, 1-x*x)**.3).astype(np.float32)
     if pattern == 'tie':
         signal.fill(0)
+    quantization = prefix_quantization(size, float(abs(z).max()), float(weight.max())) if integer else None
+    point_error = None if quantization is None else quantization[2]
+    prefix_maxima = (np.array([abs(z).max(), weight.max()]) if point_error is None else
+                     np.nextafter(np.array([abs(z).max(), weight.max()])+point_error, np.inf))
     def make_certificate(tolerance):
         stride = (UNIFORM_PREFIX_STRIDE if uniform else GENERAL_PREFIX_STRIDE) if sparse else 1
         padded_size = (size+stride-1)//stride*stride
         pos, coef, meta, mass_error = certificates(
-            signal[None], [width], abs(z).max(), weight.max(), padded_size, tolerance)
+            signal[None], [width], abs(z).max(), weight.max(), padded_size, tolerance, point_error)
         if sparse:
             pos, coef, meta = sparse_certificate(
-                pos, coef, meta, stride, padded_size, float(abs(z).max()),
-                float(weight.max()), uniform)
+                pos, coef, meta, stride, padded_size, *prefix_maxima, uniform)
         return pos, coef, meta, mass_error
 
     pos, coef, meta, mass_error = make_certificate(SCREEN_TOLERANCES[0])
@@ -194,8 +204,11 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
                           options=(f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}",))
     prefix_kernel = 'scanScreening' + ('Uniform' if uniform else '') + ('Sparse' if sparse else '')
     prefix_input = weighted[:, :, 0].copy() if sparse and uniform else weighted
-    module.get_function(prefix_kernel)((n,), (core.SCREEN_SCAN_THREADS,),
-                                       (prefix_input, prefix, np.int32(size)))
+    prefix_args = (prefix_input, prefix, np.int32(size))
+    if integer:
+        prefix_kernel = 'scanScreeningUniformInteger' if uniform else 'scanScreeningInteger'
+        prefix_args += (*quantization[0], *quantization[1])
+    module.get_function(prefix_kernel)((n,), (core.SCREEN_SCAN_THREADS,), prefix_args)
     widths = cp.asarray([width], dtype=cp.int32)
     selected = cp.asarray([0], dtype=cp.int32)
     offsets = cp.asarray([0, n], dtype=cp.int32)
@@ -433,3 +446,95 @@ def test_candidate_compaction_keeps_ties_nonfinite_bounds_and_tail():
         assert counts[row] == len(expected)
         np.testing.assert_array_equal(np.sort(candidates[row, :counts[row]]), expected)
         assert np.all(candidates[row, counts[row]:] == -1)
+
+
+@pytest.mark.parametrize('maximum', [0., float(np.finfo(np.float32).smallest_subnormal),
+                                    float(np.finfo(np.float32).tiny), .27, 1.e9,
+                                    float(np.finfo(np.float32).max)])
+@pytest.mark.parametrize('size', [8192, 706406, 10000000])
+def test_integer_prefix_scale_range_and_quantization_radius(maximum, size):
+    scale, inverse, radius = prefix_quantization(size, maximum, maximum)
+    padded = (size+511)//512*512
+    limit = (2**61)//(padded*(padded+1)//2)-2
+    rng = np.random.default_rng(2189)
+    values = (rng.uniform(-1, 1, 2048)*maximum).astype(np.float32)
+    values[:3] = [-maximum, maximum, 0.]
+    quantized = np.rint((values*scale[0]).astype(np.float64)).astype(np.int64)
+    assert np.max(abs(quantized)) <= limit
+    assert np.all(abs(quantized.astype(np.longdouble)*inverse[0]-values.astype(np.longdouble)) <= radius[0])
+    assert prefix_quantization(2**31, maximum, maximum) is None
+
+
+@pytest.mark.parametrize('uniform', [False, True])
+@pytest.mark.parametrize('size', [1, 7, 8, 9, 15, 16, 17, 511, 512, 513, 1025, 706406])
+def test_integer_screen_prefix_matches_independent_integer_reference(size, uniform):
+    stride, columns = (16, 1) if uniform else (8, 2)
+    rng = np.random.default_rng(size)
+    w = np.exp(rng.uniform(-10, 10, size)).astype(np.float32)
+    z = (w*rng.normal(0, .01, size)).astype(np.float32)
+    inputs = np.column_stack((z, w))
+    padded_size = (size+stride-1)//stride*stride
+    prefix_size = padded_size//stride+1
+    scale, inverse, radius = prefix_quantization(padded_size, float(abs(z).max()), float(w.max()))
+    padded = np.zeros((padded_size, 2), np.float32)
+    padded[:size] = inputs
+    quantized = np.rint((padded*scale).astype(np.float64)).astype(np.int64)
+    assert np.all(abs(quantized.astype(np.longdouble)*inverse-padded.astype(np.longdouble)) <= radius)
+    zero = np.zeros((1, 2), np.int64)
+    d = np.vstack((zero, np.cumsum(np.cumsum(quantized, axis=0), axis=0)))
+    mass = np.vstack((zero, np.cumsum(abs(quantized), axis=0)))
+    prefix = cp.empty((12 if uniform else 24)*prefix_size, cp.uint8)
+    kernel = 'scanScreeningUniformInteger' if uniform else 'scanScreeningInteger'
+    core.load_module().get_function(kernel)((1,), (core.SCREEN_SCAN_THREADS,),
+        (cp.asarray(z if uniform else inputs), prefix, np.int32(size), *scale, *inverse))
+    actual_d = prefix[:8*columns*prefix_size].view(cp.float64).reshape(prefix_size, columns).get()
+    actual_mass = prefix[8*columns*prefix_size:].view(cp.uint32).reshape(prefix_size, columns).get()
+    nodes = np.arange(prefix_size)*stride
+    expected = d[nodes, :columns].astype(np.float64)*inverse[:columns]
+    assert actual_d.tobytes() == expected.tobytes()
+    exact_mass = mass[nodes, :columns].astype(np.float64)*inverse[:columns]
+    np.testing.assert_array_equal(actual_mass, (exact_mass.view(np.uint64) >> 32).astype(np.uint32))
+    original_d = np.vstack((zero, np.cumsum(np.cumsum(padded.astype(np.longdouble), axis=0), axis=0)))
+    rounding = 2.**-51*abs(expected.astype(np.longdouble))
+    error = radius[:columns]*(padded_size*(padded_size+1)/2)
+    assert np.all(abs(actual_d.astype(np.longdouble)-original_d[nodes, :columns]) <= error+rounding)
+
+
+@pytest.mark.parametrize('uniform', [False, True])
+@pytest.mark.parametrize('outlier', [False, True])
+def test_quantized_certificate_covers_long_curve_dot(uniform, outlier):
+    size, width = 706406, 513
+    stride, columns = (16, 1) if uniform else (8, 2)
+    padded_size = (size+stride-1)//stride*stride
+    prefix_size = padded_size//stride+1
+    rng = np.random.default_rng(6642)
+    w = np.exp(rng.normal(0, 1, size)).astype(np.float32)*np.float32(1.e6)
+    z = (w*rng.normal(0, .001, size)).astype(np.float32)
+    if outlier:
+        w[0], z[0] = 1.e10, 1.e8
+    scale, inverse, radius = prefix_quantization(padded_size, float(abs(z).max()), float(w.max()))
+    x = np.linspace(-1, 1, width)
+    signal = (.5*np.maximum(0, 1-x*x)**.3).astype(np.float32)
+    pos, coef, meta, _ = certificates(signal[None], [width], abs(z).max(), w.max(),
+                                       padded_size, point_error=radius)
+    maxima = np.nextafter(np.array([abs(z).max(), w.max()])+radius, np.inf)
+    pos, coef, meta = sparse_certificate(pos, coef, meta, stride, padded_size, *maxima, uniform)
+    inputs = np.column_stack((z, w))
+    prefix = cp.empty((12 if uniform else 24)*prefix_size, cp.uint8)
+    kernel = 'scanScreeningUniformInteger' if uniform else 'scanScreeningInteger'
+    core.load_module().get_function(kernel)((1,), (core.SCREEN_SCAN_THREADS,),
+        (cp.asarray(z if uniform else inputs), prefix, np.int32(size), *scale, *inverse))
+    values = prefix[:8*columns*prefix_size].view(cp.float64).reshape(prefix_size, columns).get().astype(np.longdouble)
+    for region in [0, size//2, size-width-2*stride]:
+        for start in range(region, region+stride):
+            row = meta[start % stride]
+            begin, count = map(int, row[:2])
+            nodes = start//stride+pos[begin:begin+count]-2
+            at = np.maximum(nodes, 0)
+            for column in range(columns):
+                template = signal if column == 0 else signal*signal
+                estimate = np.sum(values[at, column]*coef[begin:begin+count, column].astype(np.longdouble))
+                window = inputs[start:start+width, column].astype(np.longdouble)
+                target = np.sum(window*template.astype(np.longdouble))
+                bound = row[2+column]*(np.sum(abs(window))+width*radius[column])+row[6+column]
+                assert abs(estimate-target) <= bound

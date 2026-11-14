@@ -598,3 +598,25 @@ Explicit device-resource release
   Segmented sparse-prefix experiment: baseline124.276ms;1/8/32/128 tiles per
   segment135.379/135.022/135.289/137.766ms on GPU0. Extra carry-add memory traffic
   outweighs local scan savings; no segmented path enters production.
+
+Certified integer screening prefixes
+  On slow-FP64 devices, quantize screening inputs with per-search binary scales
+  and scan exact int64 first/double prefixes. The original weighted buffers and
+  final candidate kernels remain unchanged. Each reconstructed point is within
+  half a quantization step; add width*template_peak*radius to dot certificates,
+  maximum_window_width*radius to mass bounds, and use rounded-input maxima for
+  interpolation/FP64 conversion bounds. All additions include outward slack.
+  Scales bound every triangular prefix below2**61, including full512-point tiles.
+  Unsafe scales/sizes fall back to FP64; fast-FP64 GPUs retain their existing path.
+  Five752-period batches on GPU0: mixed prefix124.953 ->38.620ms, overall
+  target362.516 ->288.438ms; constant prefix68.653 ->17.846ms, target266.551
+  ->219.965ms. A tighter window-mass radius on GPU1 gives123.768 ->37.959ms,
+  target359.794 ->282.257ms. All exact keys equal.
+  Independent int64 prefix bits and long-double quantization bounds pass24 cases,
+  including706406 points. Regression399 passed, one multi-GPU skip;22 final
+  range/long-curve-dot checks passed; sanitizer142 checks passed with zero errors.
+  Sparse hierarchy tuning tried14 schedules: original four levels remain best
+  for uniform weights; removing one level helps mixed screening only modestly.
+  Interleaved/padded coefficients improve local screening by under2%, with no
+  consistent overall gain. Neither experiment changes production scheduling.
+  Full constant/mixed validation is next.
