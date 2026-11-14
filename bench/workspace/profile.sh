@@ -17,4 +17,4 @@ fi
 "$WORKSPACE_NSYS" export --type=sqlite --output="$WORKSPACE_TRACE/trace.sqlite" \
     "$WORKSPACE_TRACE/trace.nsys-rep" > "$WORKSPACE_TRACE/export.log" 2>&1
 "$WORKSPACE_NSYS" stats --report cuda_gpu_kern_sum,cuda_api_sum --format csv \
-    "$WORKSPACE_TRACE/trace.nsys-rep" > "$WORKSPACE_TRACE/stats.csv" 2> "$WORKSPACE_TRACE/stats.log"
+    "$WORKSPACE_TRACE/trace.sqlite" > "$WORKSPACE_TRACE/stats.csv" 2> "$WORKSPACE_TRACE/stats.log"

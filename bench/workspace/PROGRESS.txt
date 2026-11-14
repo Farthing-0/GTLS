@@ -23,11 +23,12 @@ Milestones
   [done] Preallocate/reuse workspace; single-GPU regression: 42 passed, 2 skipped.
   [done] Complete 730-day / 100-second run; all 24 result fields/masks bitwise equal.
   [pending] Profile warmed search with nsys; optimize dominant cost and remeasure.
-  [pending] Final correctness, variable-dy checks, results and reproducible commands.
+  [pending] Final correctness, results and reproducible commands using shared varying dy.
 
 Acceptance
   Preserve raw_chi2, chi2, power, masks and fitted/statistical fields against the
-  frozen baseline, including nonconstant, extreme and smooth-varying dy.
+  frozen baseline. Per user clarification, use one shared varying-dy input for
+  subsequent main measurements; do not expand a separate dy validation matrix.
   Exercise consecutive batches, tail batches, refinement, final every-point fit,
   multiple GPUs where available, and memory release after successful/failed search.
   Keep floating-point reduction/FMA order unless exact equality is demonstrated.
@@ -60,3 +61,14 @@ Workspace implementation checkpoint
   metadata was reconstructed from the already-saved fields/telemetry after NumPy
   bool JSON serialization failed; all three timing and repeat checks completed.
   Its unpersisted final pool counters are explicitly null, not inferred.
+
+nsys checkpoint (before further optimization)
+  Constant dy: GPU kernels total ~53.44s, of which coarse search ~53.32s,
+  200-period refinement ~0.085s, aliases ~0.017s, final fit ~0.019s.
+  searchChi2ScreenedG32 is an exact window evaluation kernel used inside both
+  coarse and refinement searches; its aggregate time does not mean stage 2 time.
+  Shared mixed dy input (user requested simplifying dy validation):
+    screenCandidates 13.849s (39.58%), scanScreening 7.059s (20.17%),
+    searchChi2ScreenedG32 6.098s (17.43%). Profiled API time 36.594s.
+  Profiled times are diagnostic only; upcoming speed comparisons use untraced repeats.
+  Traces: nsys-workspace-730 and nsys-workspace-730-mixed under experiment root.

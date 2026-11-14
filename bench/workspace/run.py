@@ -41,6 +41,20 @@ import cupy as cp
 import gputls
 from gputls import core
 
+if args.profile:
+    original_chi2=core.MultiGPUSearch.chi2
+    original_fit=core.search_single_period
+    def traced_chi2(self, periods, capacity, refine, pbar=None):
+        cp.cuda.nvtx.RangePush('GTLS_refine' if refine else 'GTLS_coarse')
+        try:return original_chi2(self,periods,capacity,refine,pbar)
+        finally:cp.cuda.nvtx.RangePop()
+    def traced_fit(*values,**kwargs):
+        cp.cuda.nvtx.RangePush('GTLS_final_fit')
+        try:return original_fit(*values,**kwargs)
+        finally:cp.cuda.nvtx.RangePop()
+    core.MultiGPUSearch.chi2=traced_chi2
+    core.search_single_period=traced_fit
+
 spec=importlib.util.spec_from_file_location('_campaign_monitor',EXPERIMENT/'benchmark.py')
 campaign=importlib.util.module_from_spec(spec);spec.loader.exec_module(campaign)
 
