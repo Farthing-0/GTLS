@@ -175,3 +175,21 @@ Long optimization authorization, 2026-11-14 14:49:51 UTC
   Lookback scan passed ten independent high-precision sizes but was 5.5% slower
   at block 128 and 17% slower at block 256; block 512 exceeded register resources.
   Keep that experiment outside production and pursue fixed-point prefix scans.
+
+Sparse prefix prefetch checkpoint
+  NCU: screenCandidates 74.5% long-scoreboard stalls, DRAM 382.64 GB/s,
+  81.48% achieved occupancy but only 0.03 eligible warps per scheduler.
+  Prefetch four double2 values/coefficients, then retain the original sequential
+  FMA accumulation, including the scalar tail. Both hardware-bound paths use it.
+  GPU0 batch64: 14.027264ms -> 12.695520ms (1.105x); actual batch629:
+  134.170113ms -> 121.044479ms (1.108x). Bounds/upper keys bitwise identical.
+  Block128 is another 0.7% faster but keep256 until other workloads justify it.
+  Fixed-point prefix scans (including exact bounded magic conversion) passed
+  independent checks but did not outperform FP64 scan16; remain external probes.
+  Tolerance sweep indicates data-dependent screening/exact tradeoffs; no fixed
+  tolerance change merged. Prior sweep per-kernel dictionaries were accidentally
+  mutated by the next warmup; scalar totals/survivor counts remain valid.
+  One full nsys validation: 29.028012s, every result field bitwise equal;
+  70 focused tests passed. Profile: screen10.148s, exactG32 6.156s, prefix3.122s.
+  Relative to workspace mixed reference36.805614s: 1.268x, with prior reference
+  containing a small number of thermal flags; this is one new-code validation.
