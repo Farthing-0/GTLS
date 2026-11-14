@@ -292,3 +292,20 @@ Compressed mass-prefix checkpoint
   67 checks pass; one multi-GPU check skipped. A controlled scan at752 rows
   improves58.254 ->36.451ms; old FP64 storage44.530ms at the same row count.
   Full validation of the revised representation is next.
+  Full high-word validation15.660368s, all24 fields bitwise equal; no thermal
+  throttling. Prefix2.728s; similar total speed to15.563s before compression,
+  with25% smaller prefix storage. Retain pending combined optimization results.
+
+FP32 cheap-bound checkpoint
+  First-pass nonnegative bound operands are rounded upward in FP32, then
+  negated for a lower bound. Check original-statistic overflow limits before
+  discarding. Keep the existing FP64 cheap path on fast-FP64 devices.
+  Later refinement passes retain their existing bound calculation.
+  Five629-period mixed batches: screen351.282 ->316.846ms,1.109x; exact
+  winner keys unchanged.63 candidate/prefix checks pass, multi-GPU skipped.
+  Seeding exact box winners adds complexity for only8.2ms extra improvement;
+  retain outside production. FP64 shortcut on3090 remains slower.
+  CUB90-configuration search:59 compilable layouts all indices equal; GPU1
+  best1.222x, but GPU0 at752 periods regresses61.908 ->68.106ms. Not adopted.
+  Register/write-order tuning also differs between devices: GPU0 gains under
+  3%, so keep current scan. No new dependency or register restriction added.

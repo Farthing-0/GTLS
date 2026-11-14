@@ -611,26 +611,42 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
     const double* metadata, double absMassError, double weightMassError, \
     int nSelected, int nDurations, int tSize, int size, float depthMin
 
+// Drop the nonnegative A2 term for a cheap lower bound. All nonnegative
+// quantities are rounded upward, then negated. If FP32 intermediates cannot
+// certify that the original statistic is finite, retain the full bound path.
+__device__ __forceinline__ float cheapScreenLower32(float amplitude, int width, int g,
+                                                   const double* meta, double az, double w) {
+    float a = fabsf(amplitude);
+    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
+    float gu = __fmul_ru(__int2float_ru(steps), 0x1p-24f);
+    float gamma = gu < .5f ? __fdiv_ru(gu, __fsub_rd(1.0f, gu)) : __int_as_float(0x7f800000);
+    float tiny = __fmul_ru(__fmul_ru(__int2float_ru(width), __int2float_ru(steps+8)), 0x1p-149f);
+    float factor = __fadd_ru(1.0f, gamma);
+    float ar = __fadd_ru(__fmul_ru(__fmul_ru(factor, __double2float_ru(meta[4])),
+                                  __double2float_ru(az)), tiny);
+    float a2 = __fadd_ru(__fmul_ru(__fmul_ru(factor, __double2float_ru(meta[5])),
+                                  __double2float_ru(w)), tiny);
+    float inner = __fadd_ru(__fmul_ru(a, a2), __fmul_ru(2.0f, ar));
+    float rounding = __fadd_ru(__fmul_ru(0x1p-21f, __fmul_ru(a, inner)), tiny);
+    float low = -__fadd_ru(__fmul_ru(__fadd_ru(__fmul_ru(__fmul_ru(2.0f, a), ar), rounding),
+                                    0x1.000004p0f), 0x1p-140f);
+    bool finite = ar <= 0x1.fffffep+126f && a2 <= 0x1.fffffep+127f
+        && inner <= 0x1.fffffep+127f && __fmul_ru(a, inner) <= 0x1.fffffep+127f;
+    return finite && isfinite(a) ? low : -__int_as_float(0x7f800000);
+}
+
 template <bool Refine>
 __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
     int period = blockIdx.y;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
     int count = offsets[nSelected];
-#if GTLS_CHEAP_SCREEN_BOUNDS
-    constexpr bool readUpper = true;
-#else
-    constexpr bool readUpper = Refine;
-#endif
     // Upper bounds only decrease. A stale atomic snapshot can retain extra work,
     // but can never discard a winner. The first pass starts with an empty key.
-    float earlierUpper = __int_as_float(0x7fffffff);
-    if (readUpper) {
-        __shared__ unsigned long long earlierUpperKey;
-        if (threadIdx.x == 0) earlierUpperKey = atomicAdd(upperKeys + period, 0ull);
-        __syncthreads();
-        unsigned int high = (unsigned int)(earlierUpperKey >> 32);
-        earlierUpper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
-    }
+    __shared__ unsigned long long earlierUpperKey;
+    if (threadIdx.x == 0) earlierUpperKey = atomicAdd(upperKeys + period, 0ull);
+    __syncthreads();
+    unsigned int high = (unsigned int)(earlierUpperKey >> 32);
+    float earlierUpper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
     unsigned long long key = 0xffffffffffffffffull;
     if (item < count && (!Refine || !(lower[(long long)period*count+item] > earlierUpper))) {
         float lo = -__int_as_float(0x7f800000);
@@ -651,6 +667,30 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
                     const double2* p = prefix + (long long)period*size;
+                    const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
+                    uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
+                    double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
+                    double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
+                    // Dropping the low32 bits keeps the full FP64 exponent and
+                    // avoids slow FP64-to-FP32 conversions. For nonnegative stored
+                    // h, truncation error is <= 2^-20*h+2^-1042. Twice that relative
+                    // allowance for both endpoints covers FP64 arithmetic too.
+                    // Nonfinite inputs still fall back to the original exact path.
+                    double absStorageError=0x1p-19*(fabs(end.x)+fabs(first.x))+0x1p-1020;
+                    double weightStorageError=0x1p-19*(fabs(end.y)+fabs(first.y))+0x1p-1020;
+                    double az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
+                    double w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
+                    bool discarded = false;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
+                    // The first pass benefits from the cheap FP32 shortcut on
+                    // slow-FP64 devices. Later passes already visit few candidates.
+                    if (!Refine) {
+                        float cheap = cheapScreenLower32(depth*overshoot[duration]*2.0f,
+                                                         width, lanes[d], m, az, w);
+                        if (cheap > earlierUpper) { lo = cheap; discarded = true; }
+                    }
+#endif
+                    if (!discarded) {
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     // Prefetch independent prefixes before the dependent FMA chain.
@@ -688,19 +728,6 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                         ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
                     }
 #endif
-                    const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
-                    uint2 endBits=mass[start+width-1], firstBits=start?mass[start-1]:make_uint2(0,0);
-                    double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
-                    double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
-                    // Dropping the low32 bits keeps the full FP64 exponent and
-                    // avoids slow FP64-to-FP32 conversions. For nonnegative stored
-                    // h, truncation error is <= 2^-20*h+2^-1042. Twice that relative
-                    // allowance for both endpoints covers FP64 arithmetic too.
-                    // Nonfinite inputs still fall back to the original exact path.
-                    double absStorageError=0x1p-19*(fabs(end.x)+fabs(first.x))+0x1p-1020;
-                    double weightStorageError=0x1p-19*(fabs(end.y)+fabs(first.y))+0x1p-1020;
-                    double az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
-                    double w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
                     int g = lanes[d];
                     int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
                     double gu = steps*0x1p-24;
@@ -777,6 +804,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                         float upper = __double2float_ru(hi);
                         key = ((unsigned long long)orderedKey(upper) << 32) | (unsigned int)item;
 #endif
+                    }
                     }
                 }
             }
