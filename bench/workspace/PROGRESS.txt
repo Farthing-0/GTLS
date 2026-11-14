@@ -321,3 +321,15 @@ FP32 cheap-bound checkpoint
   Mixed nsys refinement1.153s, restoring the preceding load overlap.
   A100 comparison lease60674743 created17:18:18UTC Nov14; PCIe40GB,
   quote0.4148148USD/h including40GB disk. Temporary; destroy after retrieval.
+
+Fused weighted gather / integer prefix checkpoint
+  Prepare (residual,weight) once per GPUSearch, rebuilding from the supplied dy.
+  Fuse the sorted gather, weighted output and integer scan; two points/thread,
+  up to1024 threads/row. Preserve FP32 multiply/divide and exact int64 prefixes.
+  No patched-residual scratch remains. No dy-dependent cache was introduced.
+  GPU0 genuine752-row probe: patch+scan26.735 ->16.720ms; one row1.409 ->1.035ms.
+  A100 short probe also improves19.447 ->11.043ms. More than two points/thread
+  regresses, so retain two. Across these probes sampled row outputs are bitwise
+  equal; five-batch512-thread prototype also preserves every candidate key.
+  89 tests pass, two single-device/optional skips; synchronization sanitizer
+  reports zero errors in four wrap/tail/integer-prefix tests. Full730d next.

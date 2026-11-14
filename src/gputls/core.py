@@ -170,13 +170,19 @@ class GPUSearch:
         self.transit_depth_min = np.float32(transit_depth_min)
         self.constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
 
-        # chi2 without transit, sum of w r^2 as searchChi2 weights the points (patchWeighted):
+        # Rebuild from this call's dy; only the per-period permutation is repeated.
+        self.preparedGPU = cp.empty((self.tSize, 2), dtype=cp.float32)
+        module.get_function("prepareWeights")(
+            ((self.tSize + 255) // 256,), (256,),
+            (self.residualGPU, self.dyGPU, self.preparedGPU, np.int32(self.tSize)))
+
+        # chi2 without transit, sum of w r^2 as searchChi2 weights the points:
         # it does not depend on the order of the points, so it is the same for every period
         dy2 = cp.maximum(self.dyGPU * self.dyGPU, cp.float32(1e-10))
         weightedResidual = (cp.float32(1.0) / dy2) * self.residualGPU
         self.base = float(cp.sum(weightedResidual.astype(cp.float64) * self.residualGPU.astype(cp.float64)))
 
-        # Fixed-point scale 2^E of the residual prefix sums (scanResidual): the largest E with
+        # Fixed-point scale 2^E of the residual prefix sums: the largest E with
         # patchedDatasSize * max|r| * 2^E < 2^62, so no prefix sum can overflow int64
         bound = self.patchedDatasSize * float(cp.max(cp.abs(self.residualGPU)))
         exponent = 62 - int(np.ceil(np.log2(bound))) if bound > 0 else 62
@@ -285,20 +291,14 @@ class GPUSearch:
         del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
-        residualGPU = workspace.view('scratch', (nPeriods, patchedSize), cp.float32, index_bytes)
         weightedGPU = workspace.view('weighted', (nPeriods, patchedSize, 2), cp.float32)
-        module.get_function("patchWeighted")(
-            ((patchedSize + 255) // 256, nPeriods), (256,),
-            (sortIndexGPU, self.residualGPU, self.dyGPU, residualGPU, weightedGPU,
-             np.int32(tSize), np.int32(patchedSize)))
-        del sortIndexGPU
-
-        # Fixed-point prefix sums of the residuals
         cumResidualGPU = workspace.view('cumulative', (nPeriods, patchedSize), cp.int64)
-        module.get_function("scanResidual")(
-            (nPeriods,), (SCAN_THREADS,),
-            (residualGPU, cumResidualGPU, self.fixedScale, np.int32(patchedSize)))
-        del residualGPU
+        patchThreads = min(1024, max(32, 1 << ((patchedSize+1)//2-1).bit_length()))
+        module.get_function("patchScan")(
+            (nPeriods,), (patchThreads,),
+            (sortIndexGPU, self.preparedGPU, weightedGPU, cumResidualGPU,
+             self.fixedScale, np.int32(tSize), np.int32(patchedSize)))
+        del sortIndexGPU
 
         # Adjacent windows share input loads for the longer windows. Group within each
         # duration, so an incomplete group never consumes starts from the next duration.
