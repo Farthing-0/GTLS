@@ -625,12 +625,28 @@ extern "C" __global__ void screenCandidates(
                     const double2* p = prefix + (long long)period*size*2;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
-                    for (int j = begin; j < begin+terms; ++j) {
-                        int k = start + positions[j] - 2;
-                        double2 v = k >= 0 ? p[k] : make_double2(0,0);
-                        double2 c = coefficients[j];
-                        ar = fma(c.x, v.x, ar);
-                        a2 = fma(c.y, v.y, a2);
+                    // Fetch four independent prefixes before the dependent FMA chain.
+                    // Accumulate in the original order, including the scalar tail.
+                    int j = begin;
+                    for (; j+4 <= begin+terms; j += 4) {
+                        double2 values[4], weights[4];
+                        #pragma unroll
+                        for (int q=0;q<4;++q) {
+                            int k=start+positions[j+q]-2;
+                            values[q]=k>=0?p[k]:make_double2(0,0);
+                            weights[q]=coefficients[j+q];
+                        }
+                        #pragma unroll
+                        for (int q=0;q<4;++q) {
+                            ar=fma(weights[q].x,values[q].x,ar);
+                            a2=fma(weights[q].y,values[q].y,a2);
+                        }
+                    }
+                    for (;j<begin+terms;++j) {
+                        int k=start+positions[j]-2;
+                        double2 v=k>=0?p[k]:make_double2(0,0);
+                        double2 c=coefficients[j];
+                        ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
                     }
 #endif
                     double2 end = p[size+start+width-1];
@@ -671,13 +687,29 @@ extern "C" __global__ void screenCandidates(
                         lo = cheapLower;
                     } else {
                         double ar = 0, a2 = 0;
-                        for (int j = begin; j < begin+terms; ++j) {
-                            int k = start + positions[j] - 2;
-                            double2 v = k >= 0 ? p[k] : make_double2(0,0);
-                            double2 c = coefficients[j];
-                            ar = fma(c.x, v.x, ar);
-                            a2 = fma(c.y, v.y, a2);
+                        // Fetch four independent prefixes before the dependent FMA chain.
+                    // Accumulate in the original order, including the scalar tail.
+                    int j = begin;
+                    for (; j+4 <= begin+terms; j += 4) {
+                        double2 values[4], weights[4];
+                        #pragma unroll
+                        for (int q=0;q<4;++q) {
+                            int k=start+positions[j+q]-2;
+                            values[q]=k>=0?p[k]:make_double2(0,0);
+                            weights[q]=coefficients[j+q];
                         }
+                        #pragma unroll
+                        for (int q=0;q<4;++q) {
+                            ar=fma(weights[q].x,values[q].x,ar);
+                            a2=fma(weights[q].y,values[q].y,a2);
+                        }
+                    }
+                    for (;j<begin+terms;++j) {
+                        int k=start+positions[j]-2;
+                        double2 v=k>=0?p[k]:make_double2(0,0);
+                        double2 c=coefficients[j];
+                        ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
+                    }
                         double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
                         double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
                         double proxy = a*(a*a2 - 2*ar);
