@@ -408,6 +408,7 @@ Uniform-input screening checkpoint
   prefix columns bitwise, including odd lengths and tails. Full730d next.
   Memory sanitizer:27 uniform/prefix checks pass, zero errors.
   Full uniform-path validation atba518d1: constant11.055481s (4.997x vs
-  OOM-fixed workspace), mixed11.705346s. Both24 fields bitwise equal and
-  neither run thermally throttled. Constant prefix2.068s, coarse1.311s,
+  OOM-fixed workspace), mixed11.705346s. Both24 fields bitwise equal.
+  Constant has no thermal flag; mixed records a thermal flag. Do not repeat
+  the unchanged test solely for that flag. Constant prefix2.068s, coarse1.311s,
   refinements1.132s. Native constant capacity benefits from12P prefix storage.
