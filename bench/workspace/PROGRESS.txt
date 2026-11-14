@@ -261,3 +261,8 @@ Memory-kernel checkpoint
   storage no net gain; cache modifiers and forced asm loads no gain; directed
   FP32 error budgets pass63 checks but no timing gain; lookback scan all slower.
   Full combined730-day validation is next.
+  Full validation: mixed15.563057s, constant17.543514s; all24 fields bitwise
+  equal for both. Speedups2.365x and3.149x versus workspace references.
+  Mixed nsys: screen4.599s, prefix2.620s, scatter1.509s, sort1.318s,
+  refine1.155s, patch1.131s, fold.891s; total GPU14.006s.
+  Next experiments target phase sorting and remaining prefix/screen traffic.
