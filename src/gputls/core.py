@@ -12,6 +12,7 @@ from .grid import duration_limit_masses
 from .helpers import transit_mask
 from .screening import certificates, MIN_WIDTH
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
+from .workspace import BatchWorkspace, LAYOUT_ALLOWANCE, bytes_per_period as workspace_bytes_per_period
 
 KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
 
@@ -199,6 +200,17 @@ class GPUSearch:
                 self.screenPositions = cp.asarray(pos)
                 self.screenCoefficients = cp.asarray(coef)
                 self.screenMetadata = cp.asarray(meta)
+        self.workspace = None
+        self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
+            self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
+
+    def reserve_workspace(self, capacity):
+        """Keep the largest batch allocation for the search, including short tail/refit calls."""
+        if self.workspace is None or self.workspace.capacity < capacity:
+            self.workspace = None
+            self.workspace = BatchWorkspace(capacity, self.tSize, self.patchedDatasSize,
+                                            self.maxScreenStarts, self.screening)
+        return self.workspace
 
     def duration_mask(self, periods):
         """Boolean array (periods x durations) of physically plausible durations per period."""
@@ -233,6 +245,10 @@ class GPUSearch:
         tSize = self.tSize
         patchedSize = self.patchedDatasSize
         nPeriods = len(periods)
+        workspace = self.reserve_workspace(nPeriods)
+        # Offsets use the allocated capacity; active views have tightly packed rows
+        # for the current (possibly shorter) batch, as expected by the CUDA kernels.
+        index_bytes = workspace.index_bytes
 
         durationsBool = cp.any(periodMaskGPU, axis=0).get()
         selected = np.flatnonzero(durationsBool).astype(np.int32)
@@ -243,14 +259,15 @@ class GPUSearch:
 
         # Phase fold and sort (bucket sort, equal to a stable argsort of the phases)
         inversePeriodsGPU = cp.asarray(1.0 / np.asarray(periods, dtype=np.float64))
-        phasesGPU = cp.empty((nPeriods, tSize), dtype=cp.float64)
-        countsGPU = cp.zeros((nPeriods, tSize), dtype=cp.int32)
+        phasesGPU = workspace.view('scratch', (nPeriods, tSize), cp.float64, index_bytes)
+        countsGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32, 3*index_bytes)
+        countsGPU.fill(0)
         grid = ((tSize + 255) // 256, nPeriods)
         module.get_function("foldBuckets")(
             grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
-        cursorGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
+        cursorGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32, 4*index_bytes)
         module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(tSize)))
-        sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
+        sortIndexGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32)
         module.get_function("bucketScatter")(
             grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
         module.get_function("sortBuckets")(
@@ -258,8 +275,8 @@ class GPUSearch:
         del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
-        residualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.float32)
-        weightedGPU = cp.empty((nPeriods, patchedSize, 2), dtype=cp.float32)
+        residualGPU = workspace.view('scratch', (nPeriods, patchedSize), cp.float32, index_bytes)
+        weightedGPU = workspace.view('weighted', (nPeriods, patchedSize, 2), cp.float32)
         module.get_function("patchWeighted")(
             ((patchedSize + 255) // 256, nPeriods), (256,),
             (sortIndexGPU, self.residualGPU, self.dyGPU, residualGPU, weightedGPU,
@@ -267,7 +284,7 @@ class GPUSearch:
         del sortIndexGPU
 
         # Fixed-point prefix sums of the residuals
-        cumResidualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.int64)
+        cumResidualGPU = workspace.view('cumulative', (nPeriods, patchedSize), cp.int64)
         module.get_function("scanResidual")(
             (nPeriods,), (SCAN_THREADS,),
             (residualGPU, cumResidualGPU, self.fixedScale, np.int32(patchedSize)))
@@ -286,11 +303,11 @@ class GPUSearch:
         offsetsGPU = cp.asarray(offsets.astype(np.int32))
         stridesGPU = cp.asarray(strides)
         if screening:
-            prefixGPU = cp.empty((nPeriods, patchedSize, 4), dtype=cp.float64)
+            prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 4), cp.float64)
             module.get_function("scanScreening")(
                 (nPeriods,), (SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])
-            lowerGPU = cp.empty((nPeriods, nBounds), dtype=cp.float32)
+            lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
             module.get_function("screenCandidates")(
                 ((nBounds + 255)//256, nPeriods), (256,),
@@ -356,35 +373,31 @@ class MultiGPUSearch:
         return self.searches[0]
 
     def bytes_per_period(self):
-        """Peak device memory of one period of a best_keys batch, in bytes.
+        """Persistent workspace plus small per-period masks, scalars and decoded results.
 
-        Live arrays peak in scanResidual at 20 P + 16 (P = patchedDatasSize): residual (4 P),
-        weighted (8 P), cumResidual (8 P) and periods (bounded by 16 bytes). The memory pool places residual
-        inside the freed 8 N phase buffer of the sort and cannot return that buffer to the
-        driver, so the device footprint is 8 N + 16 P + 16 (N = tSize), plus one byte per
-        duration for the period mask of searchChi2. Independent of T0_fit_margin.
+        One allocation owns the workspace across all batches. Its stage aliases
+        are explicit, so pool splitting cannot change its physical footprint.
+        Layout padding is budgeted separately in batch_size.
         """
         s = self.primary
-        base = 8 * s.tSize + 16 * s.patchedDatasSize + len(s.durations) + 16
-        if s.screening:
-            margin = min(s.T0_fit_margin, s.T0_refine_margin)
-            starts = np.sum(-(-s.tSize // start_strides(s.durations, margin)))
-            return base + 32*s.patchedDatasSize + 4*int(starts) + 8
-        return base
+        return (workspace_bytes_per_period(s.tSize, s.patchedDatasSize, s.maxScreenStarts, s.screening)
+                + len(s.durations) + 128)
 
     @staticmethod
     def available_memory(device_id):
         """Free device memory, including blocks cached but unused by the CuPy memory pool."""
         with cp.cuda.Device(device_id):
             pool = cp.get_default_memory_pool()
-            return cp.cuda.Device(device_id).mem_info[0] + pool.total_bytes() - pool.used_bytes()
+            free = cp.cuda.Device(device_id).mem_info[0] + pool.total_bytes() - pool.used_bytes()
+            limit = pool.get_limit()
+            return min(free, max(0, limit-pool.used_bytes())) if limit else free
 
     def batch_size(self, n_periods):
         """Periods per batch: at least BATCHES_MIN batches (progress bar and balance between
         devices), within the memory of the fullest device. Results do not depend on it."""
         free = min(self.available_memory(device_id) for device_id in self.device_ids)
-        by_memory = int(MEMORY_FRACTION * free // self.bytes_per_period())
-        if free < self.bytes_per_period():
+        by_memory = int((MEMORY_FRACTION * free - LAYOUT_ALLOWANCE) // self.bytes_per_period())
+        if free < self.bytes_per_period() + LAYOUT_ALLOWANCE:
             raise MemoryError(
                 f"One period needs {self.bytes_per_period() / 2**20:.0f} MiB of GPU memory, "
                 f"{free / 2**20:.0f} MiB are free")
@@ -401,13 +414,31 @@ class MultiGPUSearch:
 
         def worker(device_id, search):
             with cp.cuda.Device(device_id):
+                capacity = singleCalcPeriods
                 while True:
                     with lock:
                         start_idx = next(batches, None)
                     if start_idx is None:
                         return
-                    end_idx = start_idx + singleCalcPeriods
-                    chi2[start_idx:end_idx] = search.chi2_batch(periods[start_idx:end_idx], singleCalcPeriods, refine)
+                    end_idx = min(start_idx + singleCalcPeriods, len(periods))
+                    cursor = start_idx
+                    while cursor < end_idx:
+                        stop = min(cursor+capacity, end_idx)
+                        failed = False
+                        try:
+                            chi2[cursor:stop] = search.chi2_batch(periods[cursor:stop], capacity, refine)
+                        except cp.cuda.memory.OutOfMemoryError:
+                            if stop-cursor == 1:
+                                raise
+                            failed = True
+                        if failed:
+                            # Leave the except block before releasing storage: the
+                            # exception traceback otherwise keeps failed arrays alive.
+                            search.workspace = None
+                            cp.get_default_memory_pool().free_all_blocks()
+                            capacity = max(1, (stop-cursor)//2)
+                            continue
+                        cursor = stop
                     if pbar is not None:
                         with lock:
                             pbar.update(1)
@@ -424,7 +455,8 @@ class MultiGPUSearch:
 
     def close(self):
         """Release the GPU arrays and return the cached memory to the driver."""
-        self.searches = []
+        while self.searches:
+            self.searches.pop().workspace = None
         for device_id in self.device_ids:
             with cp.cuda.Device(device_id):
                 cp.get_default_memory_pool().free_all_blocks()
