@@ -35,6 +35,44 @@ __device__ __forceinline__ T blockInclusiveScan(T value, T* blockTotal) {
     return value;
 }
 
+// Folded phases are nonnegative finite doubles. Their complete IEEE bit strings
+// have the same order as the values, so integer comparisons lose no precision.
+// Keep small buckets entirely in registers to avoid repeated phase gathers and
+// intermediate index writes during insertion sort.
+__device__ __forceinline__ void sortSmallBucket(int* points, const double* phase, int count) {
+    constexpr int N = 8;
+    unsigned long long keys[N];
+    int indices[N];
+    #pragma unroll
+    for (int i = 0; i < N; ++i) {
+        indices[i] = i < count ? points[i] : 0x7fffffff;
+        keys[i] = i < count ? (unsigned long long)__double_as_longlong(phase[indices[i]])
+                            : 0xffffffffffffffffull;
+    }
+    #pragma unroll
+    for (int k = 2; k <= N; k <<= 1) {
+        #pragma unroll
+        for (int j = k >> 1; j > 0; j >>= 1) {
+            #pragma unroll
+            for (int i = 0; i < N; ++i) {
+                int other = i ^ j;
+                if (other > i) {
+                    bool greater = keys[i] > keys[other]
+                        || (keys[i] == keys[other] && indices[i] > indices[other]);
+                    if ((i & k) == 0 ? greater : !greater) {
+                        unsigned long long key = keys[i];
+                        keys[i] = keys[other]; keys[other] = key;
+                        int index = indices[i];
+                        indices[i] = indices[other]; indices[other] = index;
+                    }
+                }
+            }
+        }
+    }
+    #pragma unroll
+    for (int i = 0; i < N; ++i) if (i < count) points[i] = indices[i];
+}
+
 extern "C"{
     #define SECONDS_PER_DAY 86400              // Seconds in a day
 
@@ -111,13 +149,19 @@ extern "C"{
         }
         int* bucketPoints = sortIndex + rowOffset + bucketEnds[(long long)periodIndex*nBuckets + bucket] - bucketSize;
         const double* rowPhase = phase + rowOffset;
+        if (bucketSize <= 8) {
+            sortSmallBucket(bucketPoints, rowPhase, bucketSize);
+            return;
+        }
         for (int next = 1; next < bucketSize; next++) {
             int keyPoint = bucketPoints[next];
-            double keyPhase = rowPhase[keyPoint];
+            unsigned long long keyPhase = __double_as_longlong(rowPhase[keyPoint]);
             int slot = next - 1;
-            while (slot >= 0 && (rowPhase[bucketPoints[slot]] > keyPhase ||
-                                 (rowPhase[bucketPoints[slot]] == keyPhase && bucketPoints[slot] > keyPoint))) {
-                bucketPoints[slot + 1] = bucketPoints[slot];
+            while (slot >= 0) {
+                int point = bucketPoints[slot];
+                unsigned long long value = __double_as_longlong(rowPhase[point]);
+                if (value < keyPhase || (value == keyPhase && point <= keyPoint)) break;
+                bucketPoints[slot + 1] = point;
                 slot--;
             }
             bucketPoints[slot + 1] = keyPoint;

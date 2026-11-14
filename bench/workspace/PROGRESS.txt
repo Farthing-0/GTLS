@@ -442,3 +442,20 @@ Rejected prefix and uniform-knot experiments
   all24 fields match bitwise in both runs. See results-stats-full.json for
   per-run thermal flags. Constant final-fit GPU windowStd takes0.001243s.
   Related regression suite:116 passed, one multi-GPU skip.
+
+Register bucket-sort checkpoint
+  Keep up to8 phase/index pairs in registers and sort with a fixed network.
+  Nonnegative finite phase doubles are compared by their complete64-bit IEEE
+  order; ties retain the original point index. Larger buckets retain insertion
+  sort with the same exact integer comparator. Bucket count stays ceil(N/3).
+  Three752-row batches, offsets0/16000/40000, all indices bitwise identical.
+  GPU0 sort20.62/22.18/15.77 ->12.74/13.71/11.80ms; complete fold-sort pipeline
+  61.65/61.85/55.99 ->53.40/54.08/52.41ms. GPU1 also improves.
+  Four-point average buckets help GPU1 but do not consistently help GPU0, so
+  leave histogram sizing unchanged. Network16 and rank variants are weaker.
+  Carrying phase values or packed keys during scatter regresses due to added
+  random writes. Warp cooperative sorting spends too much on comparisons and
+  shuffle traffic even with exact integer comparison. These are not adopted.
+  Fixed-point screening prefixes passed independent long-double error coverage,
+  but their additional registers/conversions regress general scans53 ->64.6ms;
+  uniform31.2 ->31.3ms. Keep the existing FP64 prefixes.
