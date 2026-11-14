@@ -179,50 +179,52 @@ extern "C"{
         }
     }
 
-    /**
-     * Phase-folded light curve, extended by its first points to handle transits at the phase
-     * edge, in the form used by searchChi2: the residual r = 1 - flux and (w * r, w), with
-     * w = 1 / dy^2.
-     */
-    __global__ void patchWeighted(const int* sortIndex, const float* residual, const float* dy,
-                                  float* patchedResidual, float2* patchedWeighted,
-                                  int tSize, int patchedSize) {
-        int patchedIndex = blockIdx.x * blockDim.x + threadIdx.x;
-        int periodIndex = blockIdx.y;
-        if (patchedIndex >= patchedSize) {
-            return;
-        }
-        int sourceIndex = sortIndex[(long long)periodIndex * tSize + patchedIndex % tSize];
-        float pointResidual = residual[sourceIndex];
-        float variance = dy[sourceIndex] * dy[sourceIndex];
-        // Prevent division by zero
-        if (variance < 1e-10f) {
-            variance = 1e-10f;
-        }
-        float weight = 1.0f / variance;
-        long long outputIndex = (long long)periodIndex * patchedSize + patchedIndex;
-        patchedResidual[outputIndex] = pointResidual;
-        patchedWeighted[outputIndex] = make_float2(weight * pointResidual, weight);
+    // Input-dependent weights are rebuilt once for each search. Interleaving r and
+    // w makes the later permutation a single float2 gather per input point.
+    __global__ void prepareWeights(const float* residual, const float* dy,
+                                   float2* prepared, int size) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i >= size) return;
+        float variance = dy[i] * dy[i];
+        if (variance < 1e-10f) variance = 1e-10f;
+        prepared[i] = make_float2(residual[i], 1.0f / variance);
     }
 
     /**
-     * Inclusive prefix sum of each row of the patched residuals (one block per row), in fixed
-     * point: every residual is rounded to a multiple of 1 / scale (scale = 2^E, chosen by
-     * GPUSearch so the row sums fit in 63 bits), then summed exactly in int64. Window sums are
-     * exact differences of two prefix sums, whatever the row length and the residual offset.
+     * Gather the folded/extended points, write (w*r,w), and form exact fixed-point
+     * residual prefixes in one pass. Integer addition is associative and the scale
+     * bounds every partial sum within int64, so two consecutive samples per thread
+     * preserve the original scan bit for bit while halving its synchronizations.
      */
-    __global__ void scanResidual(const float* patchedResidual, long long* cumResidual, float scale,
-                                 int patchedSize) {
+    __global__ void patchScan(const int* sortIndex, const float2* prepared,
+                             float2* weighted, long long* cumulative, float scale,
+                             int tSize, int patchedSize) {
         long long rowOffset = (long long)blockIdx.x * patchedSize;
+        long long indexOffset = (long long)blockIdx.x * tSize;
         long long carry = 0;
-        for (int tileStart = 0; tileStart < patchedSize; tileStart += blockDim.x) {
-            int patchedIndex = tileStart + threadIdx.x;
-            long long fixedResidual =
-                patchedIndex < patchedSize ? __float2ll_rn(patchedResidual[rowOffset + patchedIndex] * scale) : 0;
+        for (int tile = 0; tile < patchedSize; tile += 2 * blockDim.x) {
+            long long local[2], total = 0;
+            #pragma unroll
+            for (int j = 0; j < 2; ++j) {
+                int i = tile + 2 * threadIdx.x + j;
+                if (i < patchedSize) {
+                    int source = i;
+                    if (source >= tSize) {
+                        source -= tSize;
+                        if (source >= tSize) source %= tSize;
+                    }
+                    float2 point = prepared[sortIndex[indexOffset + source]];
+                    weighted[rowOffset + i] = make_float2(point.y * point.x, point.y);
+                    total += __float2ll_rn(point.x * scale);
+                }
+                local[j] = total;
+            }
             long long tileTotal;
-            long long inclusiveSum = blockInclusiveScan(fixedResidual, &tileTotal);
-            if (patchedIndex < patchedSize) {
-                cumResidual[rowOffset + patchedIndex] = carry + inclusiveSum;
+            long long before = blockInclusiveScan(total, &tileTotal) - total;
+            #pragma unroll
+            for (int j = 0; j < 2; ++j) {
+                int i = tile + 2 * threadIdx.x + j;
+                if (i < patchedSize) cumulative[rowOffset + i] = carry + before + local[j];
             }
             carry += tileTotal;
         }
@@ -246,7 +248,7 @@ __device__ __forceinline__ unsigned int orderedKey(float value) {
  * A_2 = sum s_i^2 w_i (squareTerm) (the algebraic expansion of TLS 2.0). base = sum_{all points}
  * w r^2 is the same for every window and period, so the windows are ranked by delta alone, in
  * float32 (decode_keys adds base). The mean depth is the exact fixed-point window sum of r (see
- * scanResidual), converted and divided by L with float32 rounding: no float64 per window.
+ * patchScan), converted and divided by L with float32 rounding: no float64 per window.
  *
  * Work items of a period are the start points of all searched durations, laid out by
  * `offsets`; start points of selected duration selectedIndex are multiples of
