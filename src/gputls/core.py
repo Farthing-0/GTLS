@@ -151,6 +151,19 @@ def decode_keys(keys, base):
 class GPUSearch:
     """GPU state shared by all chi2 evaluations of one light curve."""
 
+    def window_standard_deviations(self, data, width):
+        """Reuse completed search buffers for the final pink-noise statistic."""
+        size = len(data)
+        count = size - width + 1
+        with cp.cuda.Device(self.tGPU.device.id):
+            source = self.workspace.view('weighted', (size,), cp.float64)
+            output = self.workspace.view('cumulative', (count,), cp.float64)
+            source.set(np.ascontiguousarray(data))
+            self.module.get_function('windowStd')(
+                ((count + 255) // 256,), (256,),
+                (source, output, np.int32(count), np.int32(width)))
+            return output.get()
+
     def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
                  T0_refine_margin, R_star_min=constants.R_STAR_MIN, R_star_max=constants.R_STAR_MAX,
                  M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX):
@@ -663,23 +676,25 @@ def search_single_period(search, period, t, y, dy):
 
     dataOutTransit = np.concatenate((bestFlux[0:bestRowT0], bestFlux[bestRowT0 + durationPointsNum:]))
 
-    snrFit = transitDepth * (durationPointsNum ** 0.5) / np.std(dataOutTransit)
+    whiteNoise = np.std(dataOutTransit)
+    snrFit = transitDepth * (durationPointsNum ** 0.5) / whiteNoise
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum]) / durationPointsNum
     redNoise = np.std(DataSlideAvg)
 
     Tx = bestTime[bestRowT0]
-    T0 = Tx - int((Tx - min(t)) / period) * period - period
+    minTime = min(t)
+    T0 = Tx - int((Tx - minTime) / period) * period - period
     transit_times = all_transit_times(T0, t, period)
 
     snrFitPink = transitDepth / (
-        (np.std(dataOutTransit) ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
+        (whiteNoise ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
 
     transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
 
     T0 = T0 + transit_duration_in_days / 2
     transit_times = transit_times + transit_duration_in_days / 2
-    if T0 < min(t):
+    if T0 < minTime:
         T0 = T0 + period
 
     # SNR
@@ -694,6 +709,7 @@ def search_single_period(search, period, t, y, dy):
         transit_times=transit_times,
         transit_duration_in_days=transit_duration_in_days,
         per_transit_count=per_transit_count,
+        window_std=search.window_standard_deviations,
     )
 
     all_flux_intransit = np.concatenate([all_flux_intransit_odd, all_flux_intransit_even])

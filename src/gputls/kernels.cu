@@ -1032,3 +1032,55 @@ COMPACTED_EXACT(8)
 COMPACTED_EXACT(16)
 COMPACTED_EXACT(32)
 #undef COMPACTED_EXACT
+
+// NumPy-compatible FP64 standard deviation for windows of 1..256 points.
+// Eight independent accumulators and 128-point recursive splits reproduce
+// numpy/_core/src/umath/loops_utils.h.src. Explicit RN operations prevent FMA
+// contraction; the outer chunk sums remain on the CPU in their original order.
+template<bool Squared>
+__device__ __forceinline__ double windowStdValue(const double *x, int i, double mean) {
+    double a = x[i];
+    if (Squared) {
+        a = __dsub_rn(a, mean);
+        a = __dmul_rn(a, a);
+    }
+    return a;
+}
+template<bool Squared>
+__device__ __forceinline__ double windowStdLeaf(const double *x, int n, double mean) {
+    if (n < 8) {
+        double result = -0.;
+        for (int i=0; i<n; ++i) result = __dadd_rn(result, windowStdValue<Squared>(x,i,mean));
+        return result;
+    }
+    double r[8];
+    #pragma unroll
+    for (int j=0;j<8;++j) r[j]=windowStdValue<Squared>(x,j,mean);
+    int i=8;
+    for (; i<n-(n%8);i+=8) {
+        #pragma unroll
+        for (int j=0;j<8;++j) r[j]=__dadd_rn(r[j],windowStdValue<Squared>(x,i+j,mean));
+    }
+    double result = __dadd_rn(__dadd_rn(__dadd_rn(r[0],r[1]),__dadd_rn(r[2],r[3])),__dadd_rn(__dadd_rn(r[4],r[5]),__dadd_rn(r[6],r[7])));
+    for (;i<n;++i) result=__dadd_rn(result,windowStdValue<Squared>(x,i,mean));
+    return result;
+}
+template<bool Squared>
+__device__ __forceinline__ double windowStdMiddle(const double *x, int n, double mean) {
+    if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
+    int half=(n/2)&~7;
+    return __dadd_rn(windowStdLeaf<Squared>(x,half,mean),windowStdLeaf<Squared>(x+half,n-half,mean));
+}
+template<bool Squared>
+__device__ __forceinline__ double windowStdPairwise(const double *x, int n, double mean) {
+    if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
+    int half=(n/2)&~7;
+    return __dadd_rn(windowStdMiddle<Squared>(x,half,mean),windowStdMiddle<Squared>(x+half,n-half,mean));
+}
+extern "C" __global__ void windowStd(const double *x,double *out,int count,int width) {
+    int i=blockIdx.x*blockDim.x+threadIdx.x;
+    if(i>=count) return;
+    double mean=__ddiv_rn(windowStdPairwise<false>(x+i,width,0.),double(width));
+    double variance=__ddiv_rn(windowStdPairwise<true>(x+i,width,mean),double(width));
+    out[i]=__dsqrt_rn(variance);
+}

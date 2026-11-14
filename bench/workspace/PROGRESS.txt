@@ -412,3 +412,29 @@ Uniform-input screening checkpoint
   Constant has no thermal flag; mixed records a thermal flag. Do not repeat
   the unchanged test solely for that flag. Constant prefix2.068s, coarse1.311s,
   refinements1.132s. Native constant capacity benefits from12P prefix storage.
+
+Postprocessing checkpoint
+  Hoist the unchanged transit end expression outside the transit loop; locate
+  sorted strict time windows by searchsorted(right,left), keeping the mask path
+  for unsorted inputs. Reuse identical white-noise and minimum-time scalars.
+  Real730d CPU probe: in-transit0.1196 ->0.00169s, transit times0.0778 ->0.0319s;
+  outputs are bitwise equal. Timing is a short probe, not a new end-to-end claim.
+  Add FP64 GPU window standard deviations using NumPy's eight accumulators and
+  recursive128-point split. Explicit RN add/sub/mul/div/sqrt preserves operation
+  order; original CPU chunk sums remain unchanged. Reuse completed weighted and
+  cumulative arena regions, with no new device allocation. Other dtypes, widths
+  above256, nonfinite data and short arrays keep the existing NumPy path.
+  All widths1..256 match NumPy bitwise for normal, near-unit, wide-magnitude,
+  constant and signed-zero data. Real627085-sample,125-point pink-noise value
+  matches bitwise: CPU0.28555s -> GPU0.00337s including copies/outer reductions.
+  Source algorithm: https://github.com/numpy/numpy/blob/main/numpy/_core/src/umath/loops_utils.h.src
+  Twelve targeted checks pass, including split249, strict duplicate boundaries,
+  multiple original outer chunks and zero new device allocations.
+
+Rejected prefix and uniform-knot experiments
+  General prefix shared transposes regress (36.81 ->38.07/38.25ms on GPU0).
+  Vectorized mass writes give only~4%, retained as a possible later small gain.
+  Independent segmented prefix sections fit high-precision error budgets, but
+  the extra weighted read and carry stage regress53.07 ->57.96ms on GPU1.
+  Uniform AR-only knot selection reduces some term counts but weakens the useful
+  approximation: three-batch screen165.74 ->187.31..204.26ms. Keep joint knots.
