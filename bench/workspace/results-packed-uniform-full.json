@@ -1,0 +1,244 @@
+{
+  "result": {
+    "case": {
+      "id": "0730d_100s",
+      "days": 730,
+      "cadence_seconds": 100,
+      "n_points": 630720,
+      "input": "inputs/cadence_100s.npz",
+      "input_sha256": "a1495c55225fb7eafb59d59f3d7ea9e56a66be5225e35caa692b8c19bcc3efe3",
+      "arrays_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+      },
+      "grid": "grids/0730d_100s.npy",
+      "grid_file_sha256": "b411366aa1f831254202e080bbd538657b2507b1afc6a62dd61faccea0f00f34",
+      "period_count": 48935,
+      "period_array_sha256": "853da475b81b7271e0ec021bdfe42b3c11f8f0946d1849a09893b026431738b9"
+    },
+    "pattern": "constant",
+    "baseline": false,
+    "gtls_version": "2.2.0",
+    "cupy_version": "14.2.0",
+    "gpu": "GPU-a8281b40-72b0-f4a1-95ba-d0eeefb61ba4",
+    "source_sha256": {
+      "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+      "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+      "core.py": "6b2beb4d8f80e6bd6f63d2b44418670f8f709462b7f24f38f019f50e36f76c95",
+      "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+      "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+      "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+      "kernels.cu": "683a0d77b8ade74699b03f106836de4295384cdbc465fa03b491b733d9ecc8d6",
+      "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+      "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+      "screening.py": "7d0385e2cfb109a77222928444be656cb645afa30a06faa00faa64d6837eaacd",
+      "stats.py": "3ecc81198e90c210c345b71b1b66029d4908dce0c02df0ef1bb9a4cda21310d0",
+      "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+      "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+      "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+      "workspace.py": "5089b2b0dd7d0f90cafe0e27a7b8cfdae42e70bfdda9bc54701ffa08df834930"
+    },
+    "branch": "perf/gtls-memory-speed",
+    "commit": "6d433f538b07578657973327f80261e745c69cea",
+    "git_status": "",
+    "runner_sha256": "c955ae4662df90a4161c853abfdaa0bf587465d61a2b7a15ad04d3451a1fb3e6",
+    "profiled": true,
+    "phase": "complete",
+    "batch_cap": null,
+    "input_sha256": {
+      "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+      "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+      "dy": "382048993da68577a4eca256bd8fb2ba7db8a0275799ad922e4e159d924b9842"
+    },
+    "settings": {
+      "period_min": 1.0,
+      "period_max": 12.0,
+      "R_star": 1.0,
+      "M_star": 1.0,
+      "oversampling_factor": 3,
+      "n_transits_min": 2,
+      "duration_grid_step": 1.1,
+      "T0_fit_margin": 0.01,
+      "T0_refine_margin": 0.01,
+      "GPUDeviceID": 0,
+      "GPUDeviceIDs": [
+        0
+      ],
+      "fast": false
+    },
+    "dy_min": 0.00025,
+    "dy_max": 0.00025,
+    "initialization_seconds": 7.471428870223463,
+    "warmup_seconds": 9.853922385722399,
+    "times_seconds": [
+      9.964720184914768
+    ],
+    "ok": true,
+    "median_seconds": 9.964720184914768,
+    "field_sha256": "c4dd95715037b649051809bba6779d31af82e18ddfa6e9583d52d3e5fb7ec577",
+    "period": 7.1229777249928725,
+    "sde": 82.44850158691406,
+    "recovered": true,
+    "peak_device_bytes": 23357751296,
+    "thermal_throttled": false,
+    "pool_used_after": 0,
+    "pool_total_after": 0
+  },
+  "comparison": {
+    "all_fields_bitwise_equal": true,
+    "fields": [
+      {
+        "field": "periods",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "periods__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "period",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDuration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "durationPoints",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDurations",
+        "bitwise_equal": true,
+        "shape": [
+          37
+        ]
+      },
+      {
+        "field": "duration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "depth",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "T0",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "SDE",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "chi2__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "transitTimes",
+        "bitwise_equal": true,
+        "shape": [
+          103
+        ]
+      },
+      {
+        "field": "power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "snr",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFit",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFitPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "raw_power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "possiblePeriodsIndices",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      },
+      {
+        "field": "possiblePeriods",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      }
+    ],
+    "reference": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/register-sort-730-constant/run",
+    "candidate": "/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization/packed-uniform-730-constant/run",
+    "reference_median_seconds": 10.276813477277756,
+    "candidate_median_seconds": 9.964720184914768,
+    "speedup": 1.0313198249997482
+  }
+}

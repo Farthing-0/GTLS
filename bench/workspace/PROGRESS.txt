@@ -490,3 +490,8 @@ Other probes rejected during this checkpoint
   scoped reserve/reset and streaming cache hints give no useful net gain.
   Direct index gathers avoid a weighted buffer but increase mixed patch/prefix/
   exact356.8 ->499.8ms even with cache hints. Keep the contiguous weighted buffer.
+  Full packed-layout validation at6d433f5: constant9.964720s, all24 fields
+  bitwise equal, no thermal flag;5.544x vs55.248526s OOM-fixed workspace.
+  Coarse prefix launches51 ->45, prefix2.147950 ->2.070006s, patch1.130635
+  ->0.989399s, compacted exact G320.142589 ->0.077695s. Full result improves
+  10.276813 ->9.964720s. No unchanged variable-dy full rerun for this node.
