@@ -65,7 +65,8 @@ def find_nearest_indices(a, b):
 
 
 EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
-SCAN_THREADS = 512  # threads per row of the scan kernels
+SCAN_THREADS = 512  # threads per row of the integer scan kernels
+SCREEN_SCAN_THREADS = 32  # 16 samples per thread: a 512-point screening tile
 MAX_BATCH = 65535  # periods are the y dimension of the kernel grids
 BATCHES_MIN = 30  # the first pass is split into at least this many batches
 MEMORY_FRACTION = 0.9  # share of the free device memory used by one batch
@@ -309,7 +310,7 @@ class GPUSearch:
         if screening:
             prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 4), cp.float64)
             module.get_function("scanScreening")(
-                (nPeriods,), (128,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
+                (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
             nBounds = int(offsets[-1])
             lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
