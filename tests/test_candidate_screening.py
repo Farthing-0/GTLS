@@ -87,8 +87,11 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
          cp.asarray(meta), *map(np.float64, mass_error), np.int32(1), np.int32(1),
          np.int32(n), np.int32(size), np.float32(-1))
     block_map = cp.asarray(core.screen_block_map(np.array([0, n]), np.array([1])))
+    budgets = cp.empty((3, 4), dtype=cp.float64)
+    module.get_function('prepareScreenBudgets')((1,), (64,),
+        (widths, selected, screen_args[10], screen_args[14], budgets, np.int32(1), np.int32(1)))
     module.get_function('screenCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
-                                                  screen_args+(block_map,))
+                                                  screen_args+(block_map, budgets))
     best = cp.full(n, core.EMPTY_KEY, dtype=cp.uint64)
     args = (best, cum, inv_scale, weighted, cp.asarray(signal), overshoot,
             widths, selected, offsets, strides, mask, np.int32(0), np.int32(1),
@@ -120,7 +123,7 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         # path is exercised even when the entire row fits in a single block.
         upper.fill(np.uint64(int(expected[0]) & 0xffffffff00000000))
         module.get_function('screenCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
-                                                      screen_args+(block_map,))
+                                                      screen_args+(block_map, budgets))
         assert np.all(lower[0].get() <= delta)
         best.fill(core.EMPTY_KEY)
         exact(grid, (256,), args+(lower, upper, np.int32(n)))
@@ -134,7 +137,7 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         refined_args = screen_args[:12] + (cp.asarray(pos), cp.asarray(coef), cp.asarray(meta),
                                            *map(np.float64, mass_error)) + screen_args[17:]
         module.get_function('refineCandidatesMapped')((len(block_map), n), (core.SCREEN_THREADS,),
-                                                      refined_args+(block_map,))
+                                                      refined_args+(block_map, budgets))
         assert bool(cp.all(lower >= before_lower))
         assert bool(cp.all(upper <= before_upper))
         if pattern != 'overflow':

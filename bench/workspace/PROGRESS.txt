@@ -374,3 +374,12 @@ CPU certificate reconstruction checkpoint
   change7.24e-13; every bound covers independent long-double reconstruction.
   64 candidate/certificate checks pass; one multi-GPU skip. Combined full check
   follows the GPU budget-hoisting change now under evaluation.
+
+Screening rounding-budget checkpoint
+  Compute FP64/FP32 gamma, tiny allowances and template peak multipliers once
+  per selected-duration/stride geometry on the GPU, preserving the original
+  directed FP32 operations. Reuse the small three-plane buffer across all
+  hierarchy levels; rebuild when selected widths/strides change.
+  GPU0 five752-period batches: screen228.940 ->208.359ms; GPU1226.184
+  ->205.743ms. Every exact winner key unchanged. Combined CPU/GPU changes
+  pass92 tests with both3090s visible; no skips. Full730d validation next.

@@ -11,7 +11,7 @@ for name in subprocess.check_output(['git','ls-tree','-r','--name-only','48ac580
 sys.path.insert(0,str(snapshot))
 import cupy as cp,numpy as np,gputls
 from gputls import core
-source=(repo/'src/gputls/kernels.cu').read_text();(args.output/'candidate.cu').write_text(source);candidate=cp.RawModule(code=source,options=('-DGTLS_CHEAP_SCREEN_BOUNDS=0',));kernels={name:candidate.get_function(name+'Mapped') for name in ['screenCandidates','refineCandidates']};loader=core.load_module;mode='baseline';measure={};keys=[];checked=False;mapping_cache={}
+source=subprocess.check_output(['git','show','32d63c7:src/gputls/kernels.cu'],cwd=repo,text=True);(args.output/'candidate.cu').write_text(source);candidate=cp.RawModule(code=source,options=('-DGTLS_CHEAP_SCREEN_BOUNDS=0',));kernels={name:candidate.get_function(name+'Mapped') for name in ['screenCandidates','refineCandidates']};loader=core.load_module;mode='baseline';measure={};keys=[];checked=False;mapping_cache={}
 class Module:
  def __init__(self):self.module=loader()
  def get_function(self,name):

@@ -1,0 +1,102 @@
+{
+  "gpu0": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.1402880009263754,
+        "durationBool": 0.07475199922919273,
+        "foldBuckets": 69.31353664398193,
+        "scanCounts": 8.943616032600403,
+        "bucketScatter": 118.48489761352539,
+        "sortBuckets": 105.07775688171387,
+        "patchScan": 87.06354999542236,
+        "scanScreening": 195.46959686279297,
+        "screenCandidatesMapped": 152.23090744018555,
+        "refineCandidatesMapped": 76.70880043506622,
+        "compactCandidates": 2.496415987610817,
+        "searchChi2CompactedG32": 5.370495945215225,
+        "searchChi2CompactedG8": 0.084927998483181,
+        "searchChi2CompactedG16": 0.08883199840784073
+      },
+      "screen_ms": 228.93970787525177,
+      "total_kernel_ms": 821.5483738351613,
+      "elapsed_seconds": 0.8428642731159925,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "all",
+      "kernel_ms": {
+        "durationsGrid": 0.14848000183701515,
+        "durationBool": 0.08191999793052673,
+        "foldBuckets": 69.87980842590332,
+        "scanCounts": 8.992767930030823,
+        "bucketScatter": 120.089599609375,
+        "sortBuckets": 106.39558410644531,
+        "patchScan": 87.70969676971436,
+        "scanScreening": 198.01808166503906,
+        "screenCandidatesMapped": 131.32185745239258,
+        "refineCandidatesMapped": 77.03750360012054,
+        "compactCandidates": 2.5251520052552223,
+        "searchChi2CompactedG32": 5.445087939500809,
+        "searchChi2CompactedG8": 0.08563199639320374,
+        "searchChi2CompactedG16": 0.09011200070381165
+      },
+      "screen_ms": 208.35936105251312,
+      "total_kernel_ms": 807.8212835006416,
+      "elapsed_seconds": 0.8313871156424284,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    }
+  ],
+  "gpu1": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.13516799919307232,
+        "durationBool": 0.06976000033318996,
+        "foldBuckets": 78.86540603637695,
+        "scanCounts": 8.871935963630676,
+        "bucketScatter": 172.3166732788086,
+        "sortBuckets": 111.02614402770996,
+        "patchScan": 85.78662586212158,
+        "scanScreening": 265.1121253967285,
+        "screenCandidatesMapped": 149.91359901428223,
+        "refineCandidatesMapped": 76.27043235301971,
+        "compactCandidates": 2.450399972498417,
+        "searchChi2CompactedG32": 5.488671958446503,
+        "searchChi2CompactedG8": 0.0814720019698143,
+        "searchChi2CompactedG16": 0.08726400136947632
+      },
+      "screen_ms": 226.18403136730194,
+      "total_kernel_ms": 956.4756778664887,
+      "elapsed_seconds": 0.9752680966630578,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "all",
+      "kernel_ms": {
+        "durationsGrid": 0.13011199794709682,
+        "durationBool": 0.06963199935853481,
+        "foldBuckets": 79.47571086883545,
+        "scanCounts": 8.896448016166687,
+        "bucketScatter": 172.3391990661621,
+        "sortBuckets": 111.39686393737793,
+        "patchScan": 86.20441627502441,
+        "scanScreening": 264.80118560791016,
+        "screenCandidatesMapped": 128.53042888641357,
+        "refineCandidatesMapped": 77.21264016628265,
+        "compactCandidates": 2.4821759834885597,
+        "searchChi2CompactedG32": 5.473056137561798,
+        "searchChi2CompactedG8": 0.08131200075149536,
+        "searchChi2CompactedG16": 0.08819200098514557
+      },
+      "screen_ms": 205.74306905269623,
+      "total_kernel_ms": 937.1813729442656,
+      "elapsed_seconds": 0.9559821793809533,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    }
+  ]
+}
