@@ -266,3 +266,17 @@ Memory-kernel checkpoint
   Mixed nsys: screen4.599s, prefix2.620s, scatter1.509s, sort1.318s,
   refine1.155s, patch1.131s, fold.891s; total GPU14.006s.
   Next experiments target phase sorting and remaining prefix/screen traffic.
+
+Compressed mass-prefix checkpoint
+  Keep dot-product prefixes in FP64; store only nonnegative mass prefixes in
+  FP32, adding endpoint storage-roundoff allowances before any bound uses them.
+  The exact FP32 statistic and its FMA/reduction order are unchanged. Infinite
+  storage/error falls back to the exact path. All dy-dependent budgets remain
+  computed from each input. Scratch reduces32P ->24P bytes per period.
+  Five629-period mixed batches: prefix+screens674.359 ->602.286ms,1.120x;
+  all packed exact winner keys bitwise equal.67 checks pass, one second-GPU
+  test skipped under single-device visibility. Overflow case now also overflows
+  compressed mass storage while original weighted input remains finite.
+  Broad22-configuration hierarchy trial retained the existing four levels.
+  CUB segmented24-bit radix sorting63.256 ->54.288ms with exact phase fixup;
+  further work required before considering its dependency and scratch costs.

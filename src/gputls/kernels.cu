@@ -551,7 +551,9 @@ SEARCH_ADJACENT(32,4)
 #undef REUSE_PASS
 
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
-// Two contiguous double2 planes per row: (D_z, D_w), then (S_abs_z, S_w).
+// All FP64 (D_z, D_w) rows, followed by FP32 (S_abs_z, S_w) rows.
+// Mass storage roundoff is bounded when loading each window; the dot-product
+// prefixes and the final statistic retain their existing precision.
 // One-warp specialization with exactly the additions of blockInclusiveScan.
 __device__ __forceinline__ double warpInclusiveScan(double value, double* total) {
     int lane = threadIdx.x & 31;
@@ -589,9 +591,11 @@ extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix
         #pragma unroll
         for (int q = 0; q < ITEMS; ++q) {
             if (begin+q < size) {
-                prefix[2*row+begin+q] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
+                prefix[row+begin+q] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
                                                     beforeDW + (dw[q]+(q+1)*beforeW));
-                prefix[2*row+size+begin+q] = make_double2(beforeA+az[q], beforeW+w[q]);
+                float2* mass = (float2*)(prefix+(long long)gridDim.x*size);
+                mass[row+begin+q] = make_float2(__double2float_rn(beforeA+az[q]),
+                                              __double2float_rn(beforeW+w[q]));
             }
         }
         zCarry += zTotal; wCarry += wTotal; absCarry += absTotal;
@@ -646,7 +650,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                 const double* m = metadata + duration*8;
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
-                    const double2* p = prefix + (long long)period*size*2;
+                    const double2* p = prefix + (long long)period*size;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
                     // Prefetch independent prefixes before the dependent FMA chain.
@@ -684,10 +688,18 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS) {
                         ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
                     }
 #endif
-                    double2 end = p[size+start+width-1];
-                    double2 first = start ? p[size+start-1] : make_double2(0,0);
-                    double az = fmax(0.0, end.x-first.x) + absMassError;
-                    double w = fmax(0.0, end.y-first.y) + weightMassError;
+                    const float2* mass = (const float2*)(prefix+(long long)gridDim.y*size)+(long long)period*size;
+                    float2 endf=mass[start+width-1], firstf=start?mass[start-1]:make_float2(0,0);
+                    double2 end=make_double2(endf.x,endf.y), first=make_double2(firstf.x,firstf.y);
+                    // A finite rounded float f has error <= u/(1-u)*|f|+2^-149.
+                    // Using 2*u for both endpoints also covers the much smaller
+                    // FP64 subtraction/addition errors; allow extra subnormal
+                    // slack. Overflow gives an infinite allowance and keeps
+                    // the original exact candidate path.
+                    double absStorageError=0x1p-23*(fabs(end.x)+fabs(first.x))+0x1p-125;
+                    double weightStorageError=0x1p-23*(fabs(end.y)+fabs(first.y))+0x1p-125;
+                    double az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
+                    double w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
                     int g = lanes[d];
                     int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
                     double gu = steps*0x1p-24;
