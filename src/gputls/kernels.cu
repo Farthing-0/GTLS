@@ -862,6 +862,91 @@ extern "C" __global__ void scanScreeningUniformSparse(const float2* weighted, do
     scanScreeningUniformImpl<true, 16>(weighted, prefix, size);
 }
 
+// Approximate only the screening inputs. Host certificates include pointwise
+// quantization error; original weighted data and final exact kernels are untouched.
+__device__ __forceinline__ long long warpIntegerScan(long long value, long long* total) {
+    int lane = threadIdx.x & 31;
+    for (int offset = 1; offset < 32; offset <<= 1) {
+        long long neighbor = __shfl_up_sync(0xffffffff, value, offset);
+        if (lane >= offset) value += neighbor;
+    }
+    *total = __shfl_sync(0xffffffff, value, 31);
+    return value;
+}
+
+template <bool Uniform>
+__device__ void scanScreeningIntegerImpl(const float2* weighted, double2* prefix,
+    int size, float scaleZ, float scaleW, double invZ, double invW) {
+    constexpr int ITEMS = 16, STRIDE = Uniform ? 16 : 8;
+    int prefixSize = (size+STRIDE-1)/STRIDE+1;
+    long long sourceRow = (long long)blockIdx.x*size;
+    long long row = (long long)blockIdx.x*prefixSize;
+    if (threadIdx.x == 0) {
+        if (Uniform) {
+            ((double*)prefix)[row] = 0.;
+            ((unsigned int*)((double*)prefix+(long long)gridDim.x*prefixSize))[row] = 0;
+        } else {
+            prefix[row] = make_double2(0, 0);
+            ((uint2*)(prefix+(long long)gridDim.x*prefixSize))[row] = make_uint2(0, 0);
+        }
+    }
+    long long zCarry = 0, wCarry = 0, aCarry = 0, dzCarry = 0, dwCarry = 0;
+    for (int tile = 0; tile < size; tile += 512) {
+        int begin = tile+ITEMS*threadIdx.x;
+        long long w[ITEMS], a[ITEMS], dz[ITEMS], dw[ITEMS];
+        long long sz = 0, sw = 0, sa = 0, sdz = 0, sdw = 0;
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            float2 v = make_float2(0, 0);
+            if (begin+q < size)
+                v = Uniform ? make_float2(((const float*)weighted)[sourceRow+begin+q], 0)
+                            : weighted[sourceRow+begin+q];
+            long long iz = __float2ll_rn(v.x*scaleZ);
+            long long iw = Uniform ? 0 : __float2ll_rn(v.y*scaleW);
+            sz += iz; sw += iw; sa += iz < 0 ? -iz : iz;
+            sdz += sz; sdw += sw;
+            w[q] = sw; a[q] = sa; dz[q] = sdz; dw[q] = sdw;
+        }
+        long long zTotal, wTotal, aTotal, dzTotal, dwTotal;
+        long long beforeZ = zCarry+(warpIntegerScan(sz, &zTotal)-sz);
+        long long beforeW = Uniform ? 0 : wCarry+(warpIntegerScan(sw, &wTotal)-sw);
+        long long beforeA = aCarry+(warpIntegerScan(sa, &aTotal)-sa);
+        long long blockDZ = sdz+ITEMS*beforeZ, blockDW = sdw+ITEMS*beforeW;
+        long long beforeDZ = dzCarry+(warpIntegerScan(blockDZ, &dzTotal)-blockDZ);
+        long long beforeDW = Uniform ? 0 : dwCarry+(warpIntegerScan(blockDW, &dwTotal)-blockDW);
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            if (begin+q < (prefixSize-1)*STRIDE && (begin+q+1)%STRIDE == 0) {
+                int index = (begin+q+1)/STRIDE;
+                double d = __ll2double_rn(beforeDZ+dz[q]+(q+1)*beforeZ)*invZ;
+                double az = __ll2double_rn(beforeA+a[q])*invZ;
+                if (Uniform) {
+                    ((double*)prefix)[row+index] = d;
+                    ((unsigned int*)((double*)prefix+(long long)gridDim.x*prefixSize))[row+index]
+                        = __double2hiint(az);
+                } else {
+                    prefix[row+index] = make_double2(d,
+                        __ll2double_rn(beforeDW+dw[q]+(q+1)*beforeW)*invW);
+                    ((uint2*)(prefix+(long long)gridDim.x*prefixSize))[row+index] = make_uint2(
+                        __double2hiint(az), __double2hiint(__ll2double_rn(beforeW+w[q])*invW));
+                }
+            }
+        }
+        zCarry += zTotal; aCarry += aTotal; dzCarry += dzTotal;
+        if (!Uniform) { wCarry += wTotal; dwCarry += dwTotal; }
+    }
+}
+
+extern "C" __global__ void scanScreeningInteger(const float2* weighted, double2* prefix,
+    int size, float scaleZ, float scaleW, double invZ, double invW) {
+    scanScreeningIntegerImpl<false>(weighted, prefix, size, scaleZ, scaleW, invZ, invW);
+}
+
+extern "C" __global__ void scanScreeningUniformInteger(const float2* weighted, double2* prefix,
+    int size, float scaleZ, float scaleW, double invZ, double invW) {
+    scanScreeningIntegerImpl<true>(weighted, prefix, size, scaleZ, scaleW, invZ, invW);
+}
+
 // Preserve searchChi2Lanes' FP32 FMA sequence and XOR reduction for each G.
 extern "C" __global__ void prepareUniformSquare(const float* signal, const int* widths,
     const int* selected, const int* lanes, int maxWidth, float weight, float* squares) {

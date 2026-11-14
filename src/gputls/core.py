@@ -12,7 +12,7 @@ from .grid import duration_limit_masses
 from .helpers import transit_mask
 from .screening import (certificates, MIN_WIDTH, SCREEN_TOLERANCES,
                         UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE,
-                        uniform_sparse_certificate, sparse_certificate)
+                        uniform_sparse_certificate, sparse_certificate, prefix_quantization)
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
 from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
                         bytes_per_period as workspace_bytes_per_period)
@@ -232,6 +232,7 @@ class GPUSearch:
                           and min(T0_fit_margin, T0_refine_margin) > 0)
         self.uniformWeight = None
         self.screenPrefixStride = 1
+        self.screenQuantization = None
         if self.screening:
             max_z = float(cp.max(cp.abs(weightedResidual)))
             max_w = float(cp.max(cp.float32(1) / dy2))
@@ -248,16 +249,21 @@ class GPUSearch:
                 self.screenPrefixStride = UNIFORM_PREFIX_STRIDE
             stride = self.screenPrefixStride
             certificateSize = (self.patchedDatasSize+stride-1)//stride*stride
+            if cp.cuda.Device().attributes.get("SingleToDoublePrecisionPerfRatio", 64) > 2:
+                self.screenQuantization = prefix_quantization(certificateSize, max_z, max_w)
+            point_error = None if self.screenQuantization is None else self.screenQuantization[2]
+            prefix_maxima = (np.array([max_z, max_w]) if point_error is None else
+                             np.nextafter(np.array([max_z, max_w])+point_error, np.inf))
             self.screenCertificates = []
             for tolerance in SCREEN_TOLERANCES:
                 pos, coef, meta, mass_error = certificates(
-                    signal, durations, max_z, max_w, certificateSize, tolerance)
+                    signal, durations, max_z, max_w, certificateSize, tolerance, point_error)
                 if self.uniformWeight is not None:
                     pos, coef, meta = uniform_sparse_certificate(
-                        pos, coef, meta, stride, certificateSize, max_z)
+                        pos, coef, meta, stride, certificateSize, prefix_maxima[0])
                 else:
                     pos, coef, meta = sparse_certificate(
-                        pos, coef, meta, stride, certificateSize, max_z, max_w)
+                        pos, coef, meta, stride, certificateSize, *prefix_maxima)
                 self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
                                                 cp.asarray(meta), *map(np.float64, mass_error)))
         self.workspace = None
@@ -403,8 +409,12 @@ class GPUSearch:
                 self.screenMapKey = mapKey
             prefixGPU = workspace.view('scratch', (nPeriods, self.screenPrefixSize, self.screenPrefixBytes), cp.uint8)
             prefixKernel = "scanScreeningUniformSparse" if packed else "scanScreeningSparse"
+            prefix_args = (weightedGPU, prefixGPU, np.int32(patchedSize))
+            if self.screenQuantization is not None:
+                prefixKernel = "scanScreeningUniformInteger" if packed else "scanScreeningInteger"
+                prefix_args += (*self.screenQuantization[0], *self.screenQuantization[1])
             module.get_function(prefixKernel)(
-                (nPeriods,), (SCREEN_SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
+                (nPeriods,), (SCREEN_SCAN_THREADS,), prefix_args)
             nBounds = int(offsets[-1])
             lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
