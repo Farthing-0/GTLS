@@ -122,6 +122,16 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         best.fill(core.EMPTY_KEY)
         exact(grid, (256,), args+(lower, upper, np.int32(n)))
         np.testing.assert_array_equal(best.get(), expected)
+    candidates = cp.full((n, n), -1, dtype=cp.int32)
+    counts = cp.zeros(n, dtype=cp.int32)
+    module.get_function('compactCandidates')(((n+255)//256, n), (256,),
+        (lower, upper, candidates, counts, np.int32(0), np.int32(n), np.int32(n), np.int32(n)))
+    maximum = int(counts.max())
+    best.fill(core.EMPTY_KEY)
+    if maximum:
+        module.get_function(f'searchChi2CompactedG{g}')(((maximum*g+255)//256, n), (256,),
+            args+(lower, upper, np.int32(n), candidates, counts, np.int32(n)))
+    np.testing.assert_array_equal(best.get(), expected)
     if pattern == 'tie':
         assert int(expected[0] & np.uint64(0xffffffff)) == 0
 
@@ -197,3 +207,26 @@ def test_screening_multi_gpu_matches_single_gpu():
     multi = gtls(*arrays, verbose=False).power(GPUDeviceIDs=[0, 1], **settings)
     for name in vars(single):
         np.testing.assert_array_equal(getattr(single, name), getattr(multi, name), err_msg=name)
+
+
+def test_candidate_compaction_keeps_ties_nonfinite_bounds_and_tail():
+    n, begin, end = 801, 7, 786
+    rng = np.random.default_rng(818)
+    lower = rng.normal(size=(4, n)).astype(np.float32)
+    lower[:, 11:15] = [-.5, np.inf, -np.inf, np.nan]
+    lower[-1].fill(1)  # an entirely pruned row
+    thresholds = np.array([-.5, np.inf, np.nan, -np.inf], np.float32)
+    bits = thresholds.view(np.uint32)
+    ordered = np.where(bits & 0x80000000, ~bits, bits | 0x80000000).astype(np.uint64)
+    upper = cp.asarray(ordered << 32)
+    candidates = cp.full((4, end-begin), -1, cp.int32)
+    counts = cp.zeros(4, cp.int32)
+    core.load_module().get_function('compactCandidates')(((end-begin+255)//256, 4), (256,),
+        (cp.asarray(lower), upper, candidates, counts, np.int32(begin), np.int32(end),
+         np.int32(n), np.int32(end-begin)))
+    candidates, counts = candidates.get(), counts.get()
+    for row in range(4):
+        expected = np.flatnonzero(~(lower[row, begin:end] > thresholds[row]))+begin
+        assert counts[row] == len(expected)
+        np.testing.assert_array_equal(np.sort(candidates[row, :counts[row]]), expected)
+        assert np.all(candidates[row, counts[row]:] == -1)

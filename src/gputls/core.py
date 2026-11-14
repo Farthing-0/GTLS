@@ -338,13 +338,32 @@ class GPUSearch:
             nGroups = int(offsets[yEnd] - offsets[yBegin])
             kernel = (f"searchChi2ScreenedG{G}" if screening else
                       f"searchChi2AdjacentG{G}" if G >= 8 else f"searchChi2G{G}")
-            module.get_function(kernel)(
-                ((nGroups * G + 255) // 256, nPeriods), (256,),
-                (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
-                 self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
-                 np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
-                 np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min)
-                + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()))
+            work_items = nGroups
+            compact_args = ()
+            # Prefix data are dead after screening. Reuse their arena for the
+            # surviving indices and row counts, retaining the original path if
+            # this layout does not fit or the candidate set is dense.
+            if screening and 4*nPeriods*(nGroups+1) <= workspace.regions['scratch'][1]:
+                candidatesGPU = workspace.view('scratch', (nPeriods, nGroups), cp.int32)
+                countsGPU = workspace.view('scratch', (nPeriods,), cp.int32, 4*nPeriods*nGroups)
+                countsGPU.fill(0)
+                module.get_function("compactCandidates")(
+                    ((nGroups + 255)//256, nPeriods), (256,),
+                    (lowerGPU, upperGPU, candidatesGPU, countsGPU, np.int32(offsets[yBegin]),
+                     np.int32(offsets[yEnd]), np.int32(nBounds), np.int32(nGroups)))
+                survivors = int(cp.max(countsGPU))
+                if survivors*4 <= nGroups:
+                    kernel = f"searchChi2CompactedG{G}"
+                    work_items = survivors
+                    compact_args = (candidatesGPU, countsGPU, np.int32(nGroups))
+            if work_items:
+                module.get_function(kernel)(
+                    ((work_items * G + 255) // 256, nPeriods), (256,),
+                    (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
+                     self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
+                     np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
+                     np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min)
+                    + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()) + compact_args)
             yBegin = yEnd
         return bestGPU
 
