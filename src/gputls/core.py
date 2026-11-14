@@ -229,6 +229,7 @@ class GPUSearch:
         self.workspace = None
         self.screenMapKey = None
         self.screenMapGPU = None
+        self.screenBudgetsGPU = None
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
             self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
 
@@ -330,8 +331,15 @@ class GPUSearch:
             # Only geometry is reused, within this search. The latest map suffices
             # for consecutive batches; weights and bounds are always input-dependent.
             mapKey = (tuple(selected), tuple(strides))
+            lanesGPU = cp.asarray(lanes)
             if mapKey != self.screenMapKey:
                 self.screenMapGPU = cp.asarray(screen_block_map(offsets, strides))
+                if self.screenBudgetsGPU is None:
+                    self.screenBudgetsGPU = cp.empty((3*len(self.durations), 4), dtype=cp.float64)
+                module.get_function("prepareScreenBudgets")(
+                    ((len(selected)+63)//64,), (64,),
+                    (self.widthsGPU, selectedGPU, lanesGPU, self.screenCertificates[0][2],
+                     self.screenBudgetsGPU, np.int32(len(selected)), np.int32(len(self.durations))))
                 self.screenMapKey = mapKey
             prefixGPU = workspace.view('scratch', (nPeriods, patchedSize, 24), cp.uint8)
             module.get_function("scanScreening")(
@@ -341,7 +349,7 @@ class GPUSearch:
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
             screen_before = (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
                              self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
-                             cp.asarray(lanes), periodMaskGPU)
+                             lanesGPU, periodMaskGPU)
             screen_after = (np.int32(len(selected)), np.int32(len(self.durations)), np.int32(tSize),
                             np.int32(patchedSize), self.transit_depth_min)
             # Tight certificates only visit survivors of the preceding pass. All
@@ -351,7 +359,8 @@ class GPUSearch:
                 kernel = "refineCandidatesMapped" if level else "screenCandidatesMapped"
                 module.get_function(kernel)(
                     (len(self.screenMapGPU), nPeriods), (SCREEN_THREADS,),
-                    screen_before + certificate + screen_after + (self.screenMapGPU,))
+                    screen_before + certificate + screen_after
+                    + (self.screenMapGPU, self.screenBudgetsGPU))
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):

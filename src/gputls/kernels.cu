@@ -653,21 +653,51 @@ __device__ __forceinline__ double2 screenSparseDot(const double2* p, int start,
     return make_double2(ar, a2);
 }
 
+// Per-template rounding terms, evaluated on the GPU with the same arithmetic
+// as the candidate path. All hierarchy levels share the same template peaks.
+__device__ __forceinline__ double4 screenRoundingBudget(int width, int g) {
+    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
+    double gu = steps*0x1p-24;
+    double gamma = gu < .5 ? gu/(1-gu) : __int_as_float(0x7f800000);
+    double tiny = (double)width*(steps+8)*0x1p-149;
+    float gu32 = __fmul_ru(__int2float_ru(steps), 0x1p-24f);
+    float gamma32 = gu32 < .5f ? __fdiv_ru(gu32, __fsub_rd(1.0f, gu32)) : __int_as_float(0x7f800000);
+    float tiny32 = __fmul_ru(__fmul_ru(__int2float_ru(width), __int2float_ru(steps+8)), 0x1p-149f);
+    return make_double4(gamma, tiny, (double)gamma32, (double)tiny32);
+}
+
+__device__ __forceinline__ double4 screenFactors(const double* m, double4 r) {
+    return make_double4((1+r.x)*m[4], (1+r.x)*m[5], r.x*m[4], r.x*m[5]);
+}
+
+__device__ __forceinline__ double2 cheapScreenFactors(const double* m, double4 r) {
+    float factor = __fadd_ru(1.0f, (float)r.z);
+    return make_double2((double)__fmul_ru(factor, __double2float_ru(m[4])),
+                       (double)__fmul_ru(factor, __double2float_ru(m[5])));
+}
+
+extern "C" __global__ void prepareScreenBudgets(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if (i < nSelected) {
+        int d = selected[i];
+        double4 r = screenRoundingBudget(widths[d], lanes[i]);
+        // Three planes: rounding terms, FP64 factors, outward-rounded FP32 factors.
+        budgets[d] = r;
+        budgets[nDurations+d] = screenFactors(metadata+8*d, r);
+        double2 cheap = cheapScreenFactors(metadata+8*d, r);
+        budgets[2*nDurations+d] = make_double4(cheap.x, cheap.y, 0, 0);
+    }
+}
+
 // Drop the nonnegative A2 term for a cheap lower bound. All nonnegative
 // quantities are rounded upward, then negated. If FP32 intermediates cannot
 // certify that the original statistic is finite, retain the full bound path.
-__device__ __forceinline__ float cheapScreenLower32(float amplitude, int width, int g,
-                                                   const double* meta, double az, double w) {
+__device__ __forceinline__ float cheapScreenLower32(float amplitude, double az, double w,
+                                                   float arFactor, float a2Factor, float tiny) {
     float a = fabsf(amplitude);
-    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
-    float gu = __fmul_ru(__int2float_ru(steps), 0x1p-24f);
-    float gamma = gu < .5f ? __fdiv_ru(gu, __fsub_rd(1.0f, gu)) : __int_as_float(0x7f800000);
-    float tiny = __fmul_ru(__fmul_ru(__int2float_ru(width), __int2float_ru(steps+8)), 0x1p-149f);
-    float factor = __fadd_ru(1.0f, gamma);
-    float ar = __fadd_ru(__fmul_ru(__fmul_ru(factor, __double2float_ru(meta[4])),
-                                  __double2float_ru(az)), tiny);
-    float a2 = __fadd_ru(__fmul_ru(__fmul_ru(factor, __double2float_ru(meta[5])),
-                                  __double2float_ru(w)), tiny);
+    float ar=__fadd_ru(__fmul_ru(arFactor,__double2float_ru(az)),tiny);
+    float a2=__fadd_ru(__fmul_ru(a2Factor,__double2float_ru(w)),tiny);
     float inner = __fadd_ru(__fmul_ru(a, a2), __fmul_ru(2.0f, ar));
     float rounding = __fadd_ru(__fmul_ru(0x1p-21f, __fmul_ru(a, inner)), tiny);
     float low = -__fadd_ru(__fmul_ru(__fadd_ru(__fmul_ru(__fmul_ru(2.0f, a), ar), rounding),
@@ -678,7 +708,7 @@ __device__ __forceinline__ float cheapScreenLower32(float amplitude, int width, 
 }
 
 template <bool Refine, bool Mapped = false>
-__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr) {
+__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr) {
     int period = blockIdx.y;
     int d = 0;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
@@ -714,6 +744,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                 const double* m = metadata + duration*8;
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
+                    double4 rounding = Mapped ? budgets[duration] : screenRoundingBudget(width,lanes[d]);
                     const double2* p = prefix + (long long)period*size;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
@@ -740,8 +771,13 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                     // The first pass benefits from the cheap FP32 shortcut on
                     // slow-FP64 devices. Later passes already visit few candidates.
                     if (!Refine) {
+                        double2 cheapFactors;
+                        if (Mapped) {
+                            double4 v = budgets[2*nDurations+duration];
+                            cheapFactors = make_double2(v.x, v.y);
+                        } else cheapFactors = cheapScreenFactors(m, rounding);
                         float cheap = cheapScreenLower32(depth*overshoot[duration]*2.0f,
-                                                         width, lanes[d], m, az, w);
+                                                         az, w, (float)cheapFactors.x, (float)cheapFactors.y, (float)rounding.w);
                         if (cheap > earlierUpper) { lo = cheap; discarded = true; }
                     }
 #endif
@@ -752,20 +788,16 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                         ar = dot.x; a2 = dot.y;
                     }
 #endif
-                    int g = lanes[d];
-                    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
-                    double gu = steps*0x1p-24;
-                    double gamma = gu < 0.5 ? gu/(1-gu) : __int_as_float(0x7f800000);
-                    // The original FMA chains + XOR tree, including subnormal rounding.
-                    double tiny = (double)width*(steps+8)*0x1p-149;
+                    double tiny = rounding.y;
+                    double4 factors = Mapped ? budgets[nDurations+duration] : screenFactors(m, rounding);
 #if !GTLS_CHEAP_SCREEN_BOUNDS
-                    double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
-                    double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
+                    double eAr = m[2]*az + m[6] + factors.z*az + tiny;
+                    double eA2 = m[3]*w + m[7] + factors.w*w + tiny;
 #endif
                     float amplitude = depth*overshoot[duration]*2.0f;
                     double a = amplitude, aa = fabs(a);
-                    double arBound = (1+gamma)*m[4]*az + tiny;
-                    double a2Bound = (1+gamma)*m[5]*w + tiny;
+                    double arBound = factors.x*az + tiny;
+                    double a2Bound = factors.y*w + tiny;
                     double finalRound = 0x1p-21*(a*a*a2Bound + 2*aa*arBound) + tiny;
 #if !GTLS_CHEAP_SCREEN_BOUNDS
                     double proxy = a*(a*a2 - 2*ar);
@@ -809,8 +841,8 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
                             double2 c=coefficients[j];
                             ar=fma(c.x,v.x,ar);a2=fma(c.y,v.y,a2);
                         }
-                        double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
-                        double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
+                        double eAr = m[2]*az + m[6] + factors.z*az + tiny;
+                        double eA2 = m[3]*w + m[7] + factors.w*w + tiny;
                         double proxy = a*(a*a2 - 2*ar);
                         double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
                         double hi = proxy+error;
@@ -852,16 +884,16 @@ extern "C" __global__ void refineCandidates(SCREEN_ARGS) {
         absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin);
 }
 
-extern "C" __global__ void screenCandidatesMapped(SCREEN_ARGS, const int2* blockMap) {
+extern "C" __global__ void screenCandidatesMapped(SCREEN_ARGS, const int2* blockMap, const double4* budgets) {
     screenCandidatesImpl<false, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
-        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap);
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
 }
 
-extern "C" __global__ void refineCandidatesMapped(SCREEN_ARGS, const int2* blockMap) {
+extern "C" __global__ void refineCandidatesMapped(SCREEN_ARGS, const int2* blockMap, const double4* budgets) {
     screenCandidatesImpl<true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
-        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap);
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
 }
 #undef SCREEN_ARGS
 
