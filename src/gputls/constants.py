@@ -88,7 +88,8 @@ SDE_MEDIAN_KERNEL_SIZE = 30
 
 # Step between trial transit start points in the coarse period search, as a fraction
 # of the transit duration (clipped to [0, 0.125]); 0 tests every cadence (slowest).
-T0_FIT_MARGIN = 0.125
+# Both search stages default to a 1% duration step.
+T0_FIT_MARGIN = 0.01
 
 # Step between trial transit start points when the best candidate periods are re-searched,
 # as a fraction of the transit duration (clipped to [0, 0.125]); 0 tests every cadence.

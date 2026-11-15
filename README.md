@@ -85,7 +85,7 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `duration_grid_step` | `1.1` | Multiplicative step of the duration grid |
 | `transit_depth_min` | `1e-5` | Minimum depth of a trial transit |
 | `transit_template` | `"default"` | `"default"`, `"grazing"` or `"box"` |
-| `T0_fit_margin` | `0.125` | Epoch step of the coarse search as a fraction of the duration (0 to 0.125; 0 tests every cadence) |
+| `T0_fit_margin` | `0.01` | Epoch step of the coarse search as a fraction of the duration (0 to 0.125; 0 tests every cadence) |
 | `T0_refine_margin` | `0.01` | Epoch step when the strongest peaks are re-searched, as a fraction of the duration (0 to 0.125; 0 tests every cadence). 0.01 is the T0 resolution of TLS |
 | `GPUDeviceID` | `0` | CUDA device to run on |
 | `GPUDeviceIDs` | `None` | List of CUDA devices to split the search across (e.g. `[0, 1]`); overrides `GPUDeviceID`. Results are identical to a single-GPU run |
