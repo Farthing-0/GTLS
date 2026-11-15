@@ -1,0 +1,666 @@
+{
+  "lease": {
+    "id": 60719464,
+    "created_utc": "2026-11-15T01:31:44.112402+00:00",
+    "offer_id": 48716611,
+    "accepted_id": 48716611,
+    "quoted_dph": 0.6777777777777777
+  },
+  "destroyed": {
+    "checked_utc": "2026-11-15T01:42:20.441375+00:00",
+    "response": {
+      "instances_found": 0,
+      "instances": []
+    },
+    "absent": true
+  },
+  "estimated_rental_seconds": 636.328973,
+  "estimated_cost_usd": 0.11980267701543208,
+  "estimate_not_invoice": true,
+  "download": {
+    "sha256": "c1507f945477e38ffe52db3d7a2ec8d2700693be07f5c2054d48eb919cdf1c28",
+    "archive_bytes": 3346357,
+    "verified": true
+  },
+  "notes": [
+    "All inputs, source hashes and settings match across devices.",
+    "NumPy AVX512 dispatch disabled remotely to match local AVX2 generation.",
+    "Main uses cap256 to avoid its native-batch memory fragmentation OOM.",
+    "Main timings: one measured search after warmup; optimized: median of3.",
+    "Native nsys2025.1.1 exists in bundled Nsight Compute; uploaded validated nsys used in this capture."
+  ],
+  "runs": {
+    "3090_main": {
+      "commit": "bebb9f1eafae8ff804db45757fd744129ce5ee68",
+      "source_sha256": {
+        "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+        "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+        "core.py": "423b980984c34f5850fa7c0e3264b233ff498b56a132eb221ac9c0e3ad8c037c",
+        "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+        "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+        "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+        "kernels.cu": "36f566d3eaa212a8d979fe8590a777c57cd1f9dca4874f58dd5d81e41f45fdff",
+        "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+        "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+        "screening.py": "4789bc6317022185f151e1b116c0716517acaa1509dea4be63f7a3ea88fe9445",
+        "stats.py": "6b135265230be2a90cd6f054b99bff3112a5020c5bc36da0abeeae04d25ce725",
+        "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+        "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+        "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1"
+      },
+      "input_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+      },
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      },
+      "batch_cap": 256,
+      "times_seconds": [
+        39.85584353003651
+      ],
+      "median_seconds": 39.85584353003651,
+      "thermal_throttled": true,
+      "peak_device_bytes": 12902793216,
+      "pool_used_after": 0,
+      "pool_total_after": 0
+    },
+    "3090_optimized": {
+      "commit": "84a4c3d58301ef653ee97d6505219985c2c77786",
+      "source_sha256": {
+        "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+        "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+        "core.py": "28bd6073581654dfb63fc99866245a58af09cf20a415897799d6972cdef16bec",
+        "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+        "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+        "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+        "kernels.cu": "39df4f5e0ede9c0b2c70cd844328669e4a48507fb84edfa2464531303328d2bc",
+        "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+        "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+        "screening.py": "843c499b1f6a8b8a86a33234f3f9d6029164f6e278532f4cac8d0a753902444f",
+        "stats.py": "3ecc81198e90c210c345b71b1b66029d4908dce0c02df0ef1bb9a4cda21310d0",
+        "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+        "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+        "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+        "workspace.py": "5dd1d3fcc87b412e00ad2275cceaa888e10494bcf4f6a08bb9e5815372d84886"
+      },
+      "input_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+      },
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      },
+      "batch_cap": null,
+      "times_seconds": [
+        9.306646337732673,
+        9.339336411096156,
+        9.35269204992801
+      ],
+      "median_seconds": 9.339336411096156,
+      "thermal_throttled": false,
+      "peak_device_bytes": 23310958592,
+      "pool_used_after": 0,
+      "pool_total_after": 0
+    },
+    "A100_main": {
+      "commit": "84a4c3d58301ef653ee97d6505219985c2c77786",
+      "source_sha256": {
+        "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+        "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+        "core.py": "423b980984c34f5850fa7c0e3264b233ff498b56a132eb221ac9c0e3ad8c037c",
+        "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+        "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+        "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+        "kernels.cu": "36f566d3eaa212a8d979fe8590a777c57cd1f9dca4874f58dd5d81e41f45fdff",
+        "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+        "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+        "screening.py": "4789bc6317022185f151e1b116c0716517acaa1509dea4be63f7a3ea88fe9445",
+        "stats.py": "6b135265230be2a90cd6f054b99bff3112a5020c5bc36da0abeeae04d25ce725",
+        "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+        "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+        "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1"
+      },
+      "input_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+      },
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      },
+      "batch_cap": 256,
+      "times_seconds": [
+        15.842276417650282
+      ],
+      "median_seconds": 15.842276417650282,
+      "thermal_throttled": false,
+      "peak_device_bytes": 12964200448,
+      "pool_used_after": 0,
+      "pool_total_after": 0
+    },
+    "A100_optimized": {
+      "commit": "84a4c3d58301ef653ee97d6505219985c2c77786",
+      "source_sha256": {
+        "__init__.py": "e29956aee28760ba1a0f5dd5dfda3ceb78cd08018b34a9bbd633cf044be508e8",
+        "constants.py": "c3e7edd7d1de3d239c814f7e9d64d8a465e3a1d564cbc468151dd40204571fdd",
+        "core.py": "28bd6073581654dfb63fc99866245a58af09cf20a415897799d6972cdef16bec",
+        "grid.py": "fafd78c043a30c6ff9afc104dee52efdabf5d7edb2bef517901c0cccdeb19e60",
+        "helpers.py": "a2d94972dec18274e5c118f42598fa7fa4a458906cf18f3e70e118209516cdc2",
+        "interpolation.py": "651aa755dd11bdc6d7d58390b1d878eeccfe97294ee81655af77fe9c671344a9",
+        "kernels.cu": "39df4f5e0ede9c0b2c70cd844328669e4a48507fb84edfa2464531303328d2bc",
+        "main.py": "16a690a3fa0c1e3ade13b3fe628ccf8aa5aa8095e5280ce6e90aa342caa7fa38",
+        "results.py": "e7f1a10e62915d016db244a27f62141022f37f9b9a082f21acc96f7aed083ad1",
+        "screening.py": "843c499b1f6a8b8a86a33234f3f9d6029164f6e278532f4cac8d0a753902444f",
+        "stats.py": "3ecc81198e90c210c345b71b1b66029d4908dce0c02df0ef1bb9a4cda21310d0",
+        "transit.py": "e8c770403117a1d8cd6ec080dac1510723182dc1d03e8d8f1b59670ad6a0673e",
+        "validate.py": "4161be562c8ba257771028303d2791e92a661da90d72fe62653069d1c89bde2f",
+        "version.py": "67c3cd482735b2cd9a353c325388b71072aa5ddd0aaff2e7436d0318457c32f1",
+        "workspace.py": "5dd1d3fcc87b412e00ad2275cceaa888e10494bcf4f6a08bb9e5815372d84886"
+      },
+      "input_sha256": {
+        "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+        "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+        "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+      },
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      },
+      "batch_cap": null,
+      "times_seconds": [
+        6.5452019684016705,
+        6.560583367943764,
+        6.279368682764471
+      ],
+      "median_seconds": 6.5452019684016705,
+      "thermal_throttled": false,
+      "peak_device_bytes": 32213958656,
+      "pool_used_after": 0,
+      "pool_total_after": 0
+    }
+  },
+  "local_main_comparison": {
+    "all_fields_bitwise_equal": true,
+    "fields": [
+      {
+        "field": "periods",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "periods__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "period",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDuration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "durationPoints",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDurations",
+        "bitwise_equal": true,
+        "shape": [
+          37
+        ]
+      },
+      {
+        "field": "duration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "depth",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "T0",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "SDE",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "chi2__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "transitTimes",
+        "bitwise_equal": true,
+        "shape": [
+          103
+        ]
+      },
+      {
+        "field": "power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "snr",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFit",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFitPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "raw_power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "possiblePeriodsIndices",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      },
+      {
+        "field": "possiblePeriods",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      }
+    ],
+    "reference": "/home/farthing/GTLS/optimization-20261115/local-main",
+    "candidate": "/home/farthing/GTLS/optimization-20261115/local-initial",
+    "reference_median_seconds": 39.85584353003651,
+    "candidate_median_seconds": 9.339336411096156,
+    "speedup": 4.267524134014853
+  },
+  "cross_gpu_comparison": {
+    "all_fields_bitwise_equal": true,
+    "fields": [
+      {
+        "field": "periods",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "periods__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "period",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDuration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "durationPoints",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "rawDurations",
+        "bitwise_equal": true,
+        "shape": [
+          37
+        ]
+      },
+      {
+        "field": "duration",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "depth",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "T0",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "SDE",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "chi2__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "transitTimes",
+        "bitwise_equal": true,
+        "shape": [
+          103
+        ]
+      },
+      {
+        "field": "power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "snr",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFit",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "snrFitPink",
+        "bitwise_equal": true,
+        "shape": []
+      },
+      {
+        "field": "raw_power",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_power__mask",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "raw_chi2",
+        "bitwise_equal": true,
+        "shape": [
+          48935
+        ]
+      },
+      {
+        "field": "possiblePeriodsIndices",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      },
+      {
+        "field": "possiblePeriods",
+        "bitwise_equal": true,
+        "shape": [
+          200
+        ]
+      }
+    ],
+    "reference": "/home/farthing/GTLS/optimization-20261115/local-initial",
+    "candidate": "/home/farthing/GTLS/optimization-20261115/a100/results/initial-mixed",
+    "reference_median_seconds": 9.339336411096156,
+    "candidate_median_seconds": 6.5452019684016705,
+    "speedup": 1.426898124180698
+  },
+  "kernel_seconds": {
+    "3090": {
+      "bucketScatterPackedPhase": 2.153814643,
+      "screenCandidatesMappedSparse": 2.017527279,
+      "patchScan": 1.152504947,
+      "refineCandidatesMappedSparse": 0.88155917,
+      "foldBucketsPackedPhase": 0.865160892,
+      "sortBucketsPackedPhase": 0.762540376,
+      "scanScreeningInteger": 0.499053058,
+      "scanCounts": 0.104179812,
+      "searchChi2CompactedG32": 0.091171012,
+      "compactCandidates": 0.030846956,
+      "evaluateScreenSeed": 0.029694933,
+      "searchChi2G1": 0.016094102,
+      "seedScreenCandidates": 0.009331321,
+      "windowStd": 0.001251137,
+      "searchChi2CompactedG16": 0.001216739,
+      "cupy_any": 0.000601041,
+      "durationsGrid": 0.000508056,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<int, unsigned int, cuda::__4::maximum<void>>::Policy1000, int *, int *, unsigned int, cuda::__4::maximum<void>, int, int, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)": 0.000348059,
+      "searchChi2CompactedG8": 0.000306489,
+      "cupyx_scipy_ndimage_rank_91_45_1d_nearest_w91": 0.000256794,
+      "cupy_copy__int64_int32": 0.000193243,
+      "cupy_copy__uint_uint64": 0.000149819,
+      "durationBool": 0.000121471,
+      "prepareScreenBudgetsSparse": 9.7149e-05,
+      "cupy_cub_any_pass1": 9.4301e-05,
+      "cupy_right_shift__uint64_uint_uint64": 8.883e-05,
+      "cupy_copy__float64_float32": 8.649e-05,
+      "cupy_copy__float32_float64": 7.8205e-05,
+      "cupy_copy__uint64_uint32": 7.4783e-05,
+      "cupy_cub_any_pass2": 7.2288e-05,
+      "cupy_copy__float64_float64": 7.0464e-05,
+      "cupy_where__bool_uint32_uint32_uint32": 6.4637e-05,
+      "cupy_greater_equal__uint32_int_bool": 6.3807e-05,
+      "cupy_copy__uint32_uint32": 6.2494e-05,
+      "cupy_add__float_float64_float64": 6.2368e-05,
+      "cupy_where__bool_float32_float_float32": 6.1823e-05,
+      "cupy_copy__uint64_int64": 6.0416e-05,
+      "cupy_isfinite__float32_bool": 6.0255e-05,
+      "cupy_bitwise_and__uint64_uint_uint64": 6.0222e-05,
+      "cupy_bitwise_xor__uint32_uint_uint32": 5.9965e-05,
+      "cupy_invert__uint32_uint32": 5.9936e-05,
+      "cupy_copy__float32_float32": 5.8752e-05,
+      "cupy_multiply__float64_float64_float64": 1.8847e-05,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, unsigned int, nan_handling_max<float>, float, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)": 1.5551e-05,
+      "cupy_multiply__float32_float32_float32": 1.5168e-05,
+      "cupy_absolute__float32_float32": 1.408e-05,
+      "prepareWeights": 1.1967e-05,
+      "cupy_true_divide__float_float32_float32": 1.1776e-05,
+      "cupy_equal__float32_float32_bool": 8e-06,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, unsigned int, cuda::std::__4::plus<void>, double, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)": 7.872e-06,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, float *, int, nan_handling_max<float>, float, float, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)": 5.599e-06,
+      "cupy_maximum__float32_float_float32": 4.864e-06,
+      "cupy_fill": 3.392e-06,
+      "cupy_cub_all_pass1": 2.688e-06,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, double *, int, cuda::std::__4::plus<void>, double, double, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)": 2.336e-06,
+      "cupy_cub_all_pass2": 1.728e-06
+    },
+    "A100": {
+      "screenCandidatesMappedSparse": 1.172758117,
+      "bucketScatterPackedPhase": 1.155097012,
+      "patchScan": 0.856629451,
+      "refineCandidatesMappedSparse": 0.620714555,
+      "foldBucketsPackedPhase": 0.573625908,
+      "sortBucketsPackedPhase": 0.567039266,
+      "scanScreeningSparse": 0.329084008,
+      "scanCounts": 0.076881996,
+      "searchChi2CompactedG32": 0.058032306,
+      "compactCandidates": 0.026211069,
+      "evaluateScreenSeed": 0.024289874,
+      "searchChi2G1": 0.014802615,
+      "seedScreenCandidates": 0.00539916,
+      "searchChi2CompactedG16": 0.00248222,
+      "cupy_any": 0.000752892,
+      "searchChi2CompactedG8": 0.000534077,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<int, unsigned int, cuda::__4::maximum<void>>::Policy1000, int *, int *, unsigned int, cuda::__4::maximum<void>, int, int, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)": 0.000335391,
+      "cupyx_scipy_ndimage_rank_91_45_1d_nearest_w91": 0.000268509,
+      "cupy_copy__int64_int32": 0.000214976,
+      "durationBool": 0.000164382,
+      "durationsGrid": 0.000145312,
+      "cupy_copy__uint_uint64": 0.000144064,
+      "prepareScreenBudgetsSparse": 9.3792e-05,
+      "cupy_right_shift__uint64_uint_uint64": 9.0144e-05,
+      "cupy_cub_any_pass1": 8.9056e-05,
+      "windowStd": 8.6048e-05,
+      "cupy_copy__float64_float32": 8.5727e-05,
+      "cupy_copy__uint64_uint32": 8.0319e-05,
+      "cupy_cub_any_pass2": 7.9839e-05,
+      "cupy_copy__float32_float64": 7.9167e-05,
+      "cupy_where__bool_uint32_uint32_uint32": 7.7056e-05,
+      "cupy_copy__float64_float64": 7.6927e-05,
+      "cupy_copy__uint32_uint32": 7.3983e-05,
+      "cupy_greater_equal__uint32_int_bool": 7.2704e-05,
+      "cupy_add__float_float64_float64": 7.1711e-05,
+      "cupy_isfinite__float32_bool": 6.723e-05,
+      "cupy_where__bool_float32_float_float32": 6.6911e-05,
+      "cupy_bitwise_and__uint64_uint_uint64": 6.6528e-05,
+      "cupy_copy__uint64_int64": 6.6399e-05,
+      "cupy_bitwise_xor__uint32_uint_uint32": 6.6367e-05,
+      "cupy_invert__uint32_uint32": 6.624e-05,
+      "cupy_copy__float32_float32": 6.6144e-05,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, unsigned int, nan_handling_max<float>, float, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)": 2.0896e-05,
+      "cupy_true_divide__float_float32_float32": 1.2672e-05,
+      "cupy_absolute__float32_float32": 1.2448e-05,
+      "cupy_multiply__float32_float32_float32": 1.1616e-05,
+      "cupy_equal__float32_float32_bool": 9.439e-06,
+      "prepareWeights": 7.936e-06,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<float, unsigned int, nan_handling_max<float>>::Policy1000, float *, float *, int, nan_handling_max<float>, float, float, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)": 7.872e-06,
+      "cupy_multiply__float64_float64_float64": 6.24e-06,
+      "cupy_maximum__float32_float_float32": 5.792e-06,
+      "cupy_fill": 5.184e-06,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, unsigned int, cuda::std::__4::plus<void>, double, cuda::std::__4::identity>(T2, T5 *, T3, cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::GridEvenShare<T3>, T4, T6)": 4.224e-06,
+      "cupy_cub_all_pass1": 3.616e-06,
+      "cupy_cub_all_pass2": 2.592e-06,
+      "void cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::DeviceReduceSingleTileKernel<cub::CUB_300102_SM_500_520_600_610_700_750_800_860_890_900_1000_1200::detail::reduce::policy_hub<double, unsigned int, cuda::std::__4::plus<void>>::Policy1000, double *, double *, int, cuda::std::__4::plus<void>, double, double, cuda::std::__4::identity>(T2, T3, T4, T5, T6, T8)": 2.368e-06
+    }
+  }
+}

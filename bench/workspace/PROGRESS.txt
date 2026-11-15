@@ -678,3 +678,22 @@ Fresh local baseline and rejected probes
   A100 SXM4 lease60719464 created2026-11-15T01:31:44Z at0.677778USD/h.
   Several less expensive live offers disappeared at creation; no other lease
   was created. Uploading frozen source/input and nsys. Destroy after retrieval.
+
+A100 campaign complete
+  A100 SXM4 40GB: optimized6.545202/6.560583/6.279369s, median6.545202s.
+  Same-device main cap256:15.842276s after warm-up (one measurement):2.420x.
+  RTX3090 GPU1: main39.855844s (one), optimized median9.339336s:4.268x.
+  Same current source/input/settings across devices; optimized A100 is1.427x
+  faster than GPU1. All24 fields match bitwise in main/optimized and cross-GPU
+  comparisons, all observed thermal flags false, optimized pool0/0.
+  A100 nsys:screen1.173s, scatter1.155s, patch0.857s, refine0.621s,
+  fold0.574s, sort0.567s, prefix0.329s. Full traces saved outside Git.
+  Native nsys2025.1.1 exists under bundled Nsight Compute (not on PATH).
+  Uploaded verified version was used this time; inspect installed tools first.
+  Archive c1507f945477e38ffe52db3d7a2ec8d2700693be07f5c2054d48eb919cdf1c28.
+  Instance60719464 DESTROYED at2026-11-15T01:42:20.441375+00:00; API list empty.
+  Approximate lease10.61min, cost$0.120 at quoted rate, not invoice.
+  Adaptive3-pass seeds:9.355917s; global pure-template cache:9.311695s.
+  Both preserve24 fields but no stable gain; neither merged. Shared knot tree
+  CPU probe0.2663 ->0.2278s is too small to justify added production complexity.
+  Next: one alternative segmented radix-sort experiment at the measured bottleneck.
