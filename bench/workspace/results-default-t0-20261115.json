@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "case": "0030d_600s",
+  "dy": "mixed",
+  "defaults": {
+    "T0_fit_margin": 0.01,
+    "T0_refine_margin": 0.01
+  },
+  "actual_model_parameters": {
+    "T0_fit_margin": 0.01,
+    "T0_refine_margin": 0.01
+  },
+  "fields_bitwise_equal": [
+    "periods",
+    "period",
+    "rawDuration",
+    "durationPoints",
+    "rawDurations",
+    "duration",
+    "depth",
+    "T0",
+    "SDE",
+    "chi2",
+    "transitTimes",
+    "power",
+    "snr",
+    "snrPink",
+    "snrFit",
+    "snrFitPink",
+    "raw_power",
+    "raw_chi2",
+    "possiblePeriodsIndices",
+    "possiblePeriods"
+  ],
+  "period": 7.120127483679665,
+  "input_sha256": {
+    "t": "3b0dd179bf3b6a5266a8c09e1b79ae02b1ac673e431c72cac4378061d7ebf3fc",
+    "y": "76b0a222b3ab500c7098796461c6a99b70623259d4933730543c3f2194c2dc9f",
+    "dy": "490e94fe92692251c367b77067d3a46dffd0ad15f27a5195efa0d1da414a95a7"
+  },
+  "existing_end_to_end_tests": {
+    "passed": 6,
+    "skipped": 1,
+    "skip_reason": "Two-GPU test requires two visible GPUs; check ran with GPU1 isolated"
+  }
+}

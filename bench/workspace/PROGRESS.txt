@@ -736,3 +736,9 @@ Two DNS-failed leases destroyed; user authorized changing providers/hardware.
 Active A100 SXM4 80GB lease 60727848; quoted $1.1633333333/hour.
 Preinstalled nsys 2025.1.1 found and used; no profiler upload.
 30 varying-dy inputs, native GTLS/CETRA grids, 3 measured calls after full warmup.
+
+2026-11-15 default T0 step update requested by user
+Changed main T0_FIT_MARGIN default from 0.125 to 0.01; T0_REFINE_MARGIN remains 0.01. README synchronized.
+Existing end-to-end GPU tests: 6 passed, 1 two-GPU test skipped with GPU1 isolated.
+A 30d/600s mixed-dy default call is bitwise equal in all result fields and masks to explicit T0_fit_margin=0.01,T0_refine_margin=0.01.
+The in-progress A100 matrix already passes both values explicitly as 0.01; its frozen source and measurement protocol remain the recorded benchmark snapshot.
