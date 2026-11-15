@@ -24,18 +24,22 @@ parser.add_argument('--batch-cap',type=int)
 parser.add_argument('--repeats',type=int,default=3)
 parser.add_argument('--profile',action='store_true')
 parser.add_argument('--diagnose-memory',action='store_true')
+parser.add_argument('--source',type=Path,help='Explicit frozen gputls source directory')
+parser.add_argument('--experiment',type=Path,default=EXPERIMENT)
+parser.add_argument('--device',help='CUDA_VISIBLE_DEVICES override')
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
+EXPERIMENT=args.experiment.resolve()
 out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 if (out/'result.json').exists():raise FileExistsError(out/'result.json')
 p=json.loads((EXPERIMENT/'protocol.json').read_text())
 c=next(c for c in p['cases'] if c['id']==args.case)
-device=os.environ.get('CUDA_VISIBLE_DEVICES',p['gpu0_uuid'])
+device=args.device or os.environ.get('CUDA_VISIBLE_DEVICES',p['gpu0_uuid'])
 os.environ.update(CUDA_VISIBLE_DEVICES=device,CUDA_DEVICE_ORDER='PCI_BUS_ID',
                   OMP_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',MKL_NUM_THREADS='1',NUMBA_NUM_THREADS='1',
                   CUPY_CACHE_DIR=str(EXPERIMENT/'workspace-optimization/cache/cupy'),
                   NUMBA_CACHE_DIR=str(EXPERIMENT/'workspace-optimization/cache/numba'))
-source=EXPERIMENT/'sources/gtls/gputls' if args.baseline else REPO/'src/gputls'
+source=args.source if args.source is not None else (EXPERIMENT/'sources/gtls/gputls' if args.baseline else REPO/'src/gputls')
 snapshot=out/'source/gputls'
 shutil.copytree(source,snapshot,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
 sys.path.insert(0,str(snapshot.parent))

@@ -654,3 +654,15 @@ Exact initial upper bound
   nsys. All24 fields bitwise equal; no thermal flags; used/total pool0/0 bytes.
   Previous integer-prefix checkpoint8.723703/7.891801s; elapsed decreases1.99%
   mixed and5.61% constant. Both complete traces and source hashes are preserved.
+
+New verification and A100 campaign — 2026-11-15
+  Freeze main8f6c36c and optimization3fab6cc; four30-day comparisons cover
+  600s constant/random dy and100s mixed/spike dy. All24 fields/masks match
+  bitwise in all four cases. No numerical discrepancy found.
+  Added explicit frozen-source/experiment/device options to the benchmark runner
+  and a reproducible main-vs-branch short comparison driver.
+  Nsight Systems smoke capture succeeds:1679 CUDA kernel events, SQLite export
+  verified. Driver RmProfilingAdminOnly=0. Full artifacts are under
+  /home/farthing/GTLS/optimization-20261115.
+  Next: current-source730d/100s A100 capture and local comparison, then optimize
+  measured bottlenecks while preserving variable-dy results. Destroy each lease.
