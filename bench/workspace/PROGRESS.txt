@@ -666,3 +666,15 @@ New verification and A100 campaign — 2026-11-15
   /home/farthing/GTLS/optimization-20261115.
   Next: current-source730d/100s A100 capture and local comparison, then optimize
   measured bottlenecks while preserving variable-dy results. Destroy each lease.
+
+Fresh local baseline and rejected probes
+  GPU1 current730d/100s mixed:9.306646/9.339336/9.352692s, median9.339336s;
+  no thermal flags; pool0/0. Separate nsys:scatter2.154s, coarse screen2.018s,
+  patch1.153s, refinement0.882s, fold0.865s, sort0.763s, integer prefix0.499s.
+  Scatter64..1024-thread sweep has no consistent gain. Power-of-two histogram
+ 131072 improves short/mid periods but regresses long periods; retain factor3.
+  Early outward-FP32 mass shortcut preserves all24 full fields, but median
+ 9.605874s is2.85% slower. Candidate remains outside production.
+  A100 SXM4 lease60719464 created2026-11-15T01:31:44Z at0.677778USD/h.
+  Several less expensive live offers disappeared at creation; no other lease
+  was created. Uploading frozen source/input and nsys. Destroy after retrieval.
