@@ -650,3 +650,7 @@ Exact initial upper bound
   Regression439 passed, one multi-GPU skip; sanitizer37 passed with zero errors.
   Dedicated two-device checks pass for both ordinary and screened searches.
   Full constant/mixed validation is next.
+  Full validation at7a27d01: mixed8.550335s and constant7.448810s, both under
+  nsys. All24 fields bitwise equal; no thermal flags; used/total pool0/0 bytes.
+  Previous integer-prefix checkpoint8.723703/7.891801s; elapsed decreases1.99%
+  mixed and5.61% constant. Both complete traces and source hashes are preserved.
