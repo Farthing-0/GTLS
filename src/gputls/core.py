@@ -13,7 +13,8 @@ from .helpers import transit_mask
 from .screening import (certificates, MIN_WIDTH, SCREEN_TOLERANCES,
                         UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE,
                         uniform_sparse_certificate, sparse_certificate, prefix_quantization)
-from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
+from .stats import (all_transit_times, calculate_transit_duration_in_days, final_T0_fit,
+                    intransit_stats, snr_stats, spectra)
 from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
                         bytes_per_period as workspace_bytes_per_period)
 
@@ -726,7 +727,7 @@ def search_single_period(search, period, t, y, dy):
     durationPointsNum = durations[durationIndex]
     rawDuration = single_lc_cache_overview["duration"][durationIndex]
 
-    bestTime, bestFlux, _ = foldCPU(t, y, dy, period)
+    _, bestFlux, _ = foldCPU(t, y, dy, period)
     bestFlux = np.concatenate((bestFlux, bestFlux[:maxDuration]))
 
     bestRowT0 = bestLocation % (tSize)
@@ -745,20 +746,16 @@ def search_single_period(search, period, t, y, dy):
     DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum]) / durationPointsNum
     redNoise = np.std(DataSlideAvg)
 
-    Tx = bestTime[bestRowT0]
-    minTime = min(t)
-    T0 = Tx - int((Tx - minTime) / period) * period - period
-    transit_times = all_transit_times(T0, t, period)
+    # Keep the GPU-selected template/depth, but fit its epoch and convert its
+    # duration with TLS2's final-candidate conventions. The periodogram is fixed.
+    signal = search.lc_arr[durationsBool][durationIndex]
+    T0 = final_T0_fit(signal, 1 - transitDepth, t, y, dy, period, search.T0_fit_margin)
+    transit_times = np.asarray(all_transit_times(T0, t, period))
 
     snrFitPink = transitDepth / (
         (whiteNoise ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
 
-    transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
-
-    T0 = T0 + transit_duration_in_days / 2
-    transit_times = transit_times + transit_duration_in_days / 2
-    if T0 < minTime:
-        T0 = T0 + period
+    transit_duration_in_days = calculate_transit_duration_in_days(t, period, transit_times, rawDuration)
 
     # SNR
     all_flux_intransit_odd, all_flux_intransit_even, per_transit_count = intransit_stats(

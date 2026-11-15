@@ -1,4 +1,5 @@
 import numpy as np
+from numba import njit
 
 from . import constants
 from .helpers import running_median, transit_mask
@@ -76,6 +77,73 @@ def calcDurationDays(times, period, StartT0, rawDuration):
     endPhases = phases_sorted[endIdx]
     DurationDays = (endPhases - 0.5) * period
     return DurationDays
+
+
+@njit(fastmath=True, cache=True)
+def _fold_phase(time, period, T0):
+    # Match the phase arithmetic of TLS2's final epoch fit.
+    return (time - T0) / period - np.floor((time - T0) / period)
+
+
+@njit(cache=True)
+def _t0_scan(flux, weights, signal, starts, total):
+    best = np.inf
+    best_index = 0
+    for index in range(len(starts)):
+        start = starts[index]
+        delta = 0.0
+        for k in range(len(signal)):
+            value = flux[start + k]
+            delta += ((value - signal[k]) ** 2 - (value - 1.0) ** 2) * weights[start + k]
+        residual = total + delta
+        if residual < best:
+            best = residual
+            best_index = index
+    return best_index
+
+
+def final_T0_fit(signal, depth, t, y, dy, period, T0_fit_margin):
+    """TLS2-compatible epoch fit for one fixed period, template and depth.
+
+    Here ``depth`` is the in-transit flux (1 minus the fractional drop),
+    matching TLS2. Sort once, then scan cyclic template windows on its
+    uniform epoch grid. Cost: O(N log N + trials * template_width).
+    Adapted from MIT-licensed TLS2 2.0.4's final_T0_fit.
+    """
+    signal = np.asarray(signal, dtype=np.float64)
+    width = len(signal)
+    n = len(y)
+    points = n if T0_fit_margin == 0 else min(n, int(n / (T0_fit_margin * width)))
+    # Flat/no-fit GTLS results keep their existing undefined SDE/SNR contract.
+    # A zero-depth template cannot identify an epoch; use the first trial.
+    if depth == 1.0:
+        return float(np.min(t))
+    scale = constants.SIGNAL_DEPTH / (1 - depth)
+    signal = 1 - ((1 - signal) / scale)
+    epochs = np.linspace(np.min(t), np.min(t) + period, num=points)
+    phases = _fold_phase(t, period, np.min(t))
+    order = np.argsort(phases, kind="mergesort")
+    phase_sorted = phases[order]
+    flux = y[order]
+    weights = 1 / dy[order] ** 2
+    offsets = (epochs - np.min(t)) / period
+    starts = np.searchsorted(phase_sorted, offsets, side="left")
+    starts = (starts - (int(width / 2) + 1)) % n
+    flux_p = np.concatenate([flux, flux[:width]])
+    weights_p = np.concatenate([weights, weights[:width]])
+    total = np.sum((flux - 1) ** 2 * weights)
+    best = _t0_scan(flux_p, weights_p, signal, starts.astype(np.int64), total)
+    return epochs[best]
+
+
+def calculate_transit_duration_in_days(t, period, transit_times, duration):
+    """Convert a template's fractional width with TLS2's epoch stretch.
+
+    Gaps do not multiply the duration by an observing fill factor.
+    Keep TLS2's operation order, including the period in the stretch.
+    """
+    stretch = ((np.max(t) - np.min(t)) / period) / len(transit_times)
+    return duration * stretch * period
 
 
 def _transit_flux(t, y, transit_times, transit_duration_in_days):
