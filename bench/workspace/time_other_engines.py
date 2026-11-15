@@ -1,7 +1,7 @@
 """Time native TLS2/CETRA on the exact heterogeneous-dy GTLS workspace input.
 
-Each invocation runs one engine, a small compilation warmup, one full warmup,
-and the requested number of measured complete searches. Never run competing
+Each invocation runs one engine, a small compilation warmup, an optional full
+warmup, and the requested number of measured complete searches. Never run competing
 benchmarks concurrently. CETRA retains its native duration and period grids.
 """
 import argparse
@@ -30,7 +30,9 @@ def main():
     parser.add_argument('engine', choices=['tls2', 'cetra'])
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--repeats', type=int, default=1)
-    parser.add_argument('--cetra-stride', type=float, default=.01)
+    parser.add_argument('--skip-full-warmup', action='store_true',
+                        help='Measure the first full call after the small compilation warmup')
+    parser.add_argument('--cetra-stride', type=float, default=.1)
     parser.add_argument('--device', default='GPU-f0f7673f-e676-9211-a9f6-68bcd9dd2aab')
     args = parser.parse_args()
     out = args.output.resolve()
@@ -58,7 +60,8 @@ def main():
                   runner_sha256=digest(__file__),
                   source_sha256={str(p.relative_to(snapshot)): digest(p)
                                  for p in sorted(snapshot.rglob('*')) if p.is_file()},
-                  cuda_visible_devices=os.environ['CUDA_VISIBLE_DEVICES'])
+                  cuda_visible_devices=os.environ['CUDA_VISIBLE_DEVICES'],
+                  full_warmup_enabled=not args.skip_full_warmup)
 
     def save(**updates):
         record.update(updates)
@@ -87,6 +90,7 @@ def main():
             import transitleastsquares as module
             from transitleastsquares.version import TLS_VERSIONING
             settings = protocol['settings']['tls2'].copy()
+            settings['show_progress_bar'] = True
             sync = lambda: None
             save(version=TLS_VERSIONING, settings=settings, cpu_threads=14)
 
@@ -147,13 +151,15 @@ def main():
         start = time.perf_counter()
         call(t[small], y[small], dy[small], small=True)
         sync()
-        save(initialization_seconds=time.perf_counter()-start, phase='full_warmup')
-        print(f'{args.engine}: small warmup complete; full warmup starting', flush=True)
-        start = time.perf_counter()
-        call(t, y, dy)
-        sync()
-        save(full_warmup_seconds=time.perf_counter()-start, phase='measuring')
-        print(f"{args.engine}: full warmup {record['full_warmup_seconds']:.3f}s", flush=True)
+        save(initialization_seconds=time.perf_counter()-start,
+             phase='measuring' if args.skip_full_warmup else 'full_warmup')
+        print(f'{args.engine}: small warmup complete', flush=True)
+        if not args.skip_full_warmup:
+            start = time.perf_counter()
+            call(t, y, dy)
+            sync()
+            save(full_warmup_seconds=time.perf_counter()-start, phase='measuring')
+            print(f"{args.engine}: full warmup {record['full_warmup_seconds']:.3f}s", flush=True)
         times, stages, candidates = [], [], []
         for repeat in range(args.repeats):
             sync()

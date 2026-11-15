@@ -718,3 +718,14 @@ Final alternative-sort probe and profiler discovery
   the full unconstrained730d period range. No active cloud lease remains.
   Automatic nsys discovery smoke:success,1679 CUDA kernel events and complete
   .nsys-rep/SQLite export. Shell syntax and git diff whitespace checks pass.
+
+2026-11-15 local TLS2/CETRA comparison and approved A100 matrix
+Exact mixed-dy 730d/100s input (630720 samples), P=1..12 days.
+TLS2 2.0.4 fused: 2208.2700257832184 s, 14 CPU workers, one complete call after 30-day compilation warmup.
+The initial harness called this full warmup; its complete elapsed time was retained, then the extra repeat cancelled. Output periodogram was not retained by that path.
+CETRA 1.04: 45.88515186589211, 45.913158763200045, 46.01907672453672 s; median 45.913158763200045 s.
+Native CETRA grid: 48926 periods; GTLS: 48935. CETRA recovered injected period. Same input hashes in all engines.
+GTLS existing optimized median: 9.339336411096156 s on the same RTX3090.
+User approved 30 mixed-dy A100 cases, 5 lengths x 6 cadences, 3 repeats per engine, native grids; cap $1.50/h, $5 total, 3h.
+User requested patch release 2.2.1, merge to main, remain on main and upload main to A100.
+Premerge GPU checks: 445 passed, 2 skipped; 13.09 s. One existing flat-spectrum SDE warning.

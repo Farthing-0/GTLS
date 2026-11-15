@@ -1,0 +1,180 @@
+{
+  "status": "approved",
+  "cloud_instance_created": false,
+  "prior_protocol": "/home/farthing/GTLS/GTLS-Compare/results/timing-cadence-gpu0-20261114/protocol.json",
+  "prior_protocol_sha256": "538a64dfa5352c6985241ac94ebef5c4d99c3b6e71fa9c9830ec17c8524ed590",
+  "prior_versions": {
+    "gtls": "2.1.1",
+    "cetra": "1.04"
+  },
+  "prior_completed_pairs": 23,
+  "prior_planned_pairs": 30,
+  "engines": {
+    "gtls": {
+      "branch": "main",
+      "version": "2.2.1",
+      "source_policy": "Freeze main after merging perf/gtls-memory-speed and bumping version to 2.2.1; upload this main snapshot to A100",
+      "settings": {
+        "period_min": 1.0,
+        "period_max": 12.0,
+        "R_star": 1.0,
+        "M_star": 1.0,
+        "oversampling_factor": 3,
+        "n_transits_min": 2,
+        "duration_grid_step": 1.1,
+        "T0_fit_margin": 0.01,
+        "T0_refine_margin": 0.01,
+        "GPUDeviceID": 0,
+        "GPUDeviceIDs": [
+          0
+        ],
+        "fast": false
+      }
+    },
+    "cetra": {
+      "version": "1.04",
+      "source_commit": "93aa3953a69f690ba9cc0926bafe9c86e37c4280",
+      "settings": {
+        "min_duration": 0.02,
+        "max_duration": 0.5,
+        "duration_log_step": 1.1,
+        "t0_stride_fraction": 0.1
+      },
+      "period_grid": "Native automatic; omit periods argument",
+      "periodic_settings": {
+        "min_period": 1.0,
+        "max_period": 12.0,
+        "n_transits_min": 2,
+        "pgrid_R_star": 1.0,
+        "pgrid_M_star": 1.0,
+        "pgrid_oversample": 3,
+        "random_order": false
+      }
+    }
+  },
+  "days": [
+    30,
+    90,
+    365,
+    730,
+    1460
+  ],
+  "cadences_seconds": [
+    25,
+    50,
+    100,
+    200,
+    400,
+    600
+  ],
+  "dy_patterns": [
+    "mixed"
+  ],
+  "number_of_input_cases": 30,
+  "number_of_engine_cases": 60,
+  "measured_repeats_per_engine_case": 3,
+  "measured_full_searches": 180,
+  "input": {
+    "source": "Frozen 1460-day inputs from tls2-gtls-delta001-20261114v2; shorter lengths are exact prefixes",
+    "arrays_identical_between_engines_and_devices": true,
+    "constant_dy_ppm": 250,
+    "mixed_dy": "dy_constant * exp(N(0,0.6)) * (1+0.4*sin(sample_index*0.003)); RNG seed 20261114",
+    "mixed_generation": "Generate on full 1460-day curve per cadence, then take prefixes; 730d/100s matches existing mixed run",
+    "flux_policy": "Keep the frozen y unchanged when varying dy, matching the current performance test; this tests sensitivity of runtime to supplied weights, not calibrated recovery statistics",
+    "injection": {
+      "period_days": 7.123,
+      "t0_days": 102.1,
+      "rp_rs": 0.035,
+      "impact_parameter": 0.3,
+      "R_star": 1.0,
+      "M_star": 1.0,
+      "limb_darkening": [
+        0.45,
+        0.2
+      ],
+      "eccentricity": 0.0,
+      "supersample_factor": 7,
+      "exposure": "cadence",
+      "batman_version": "2.5.1"
+    },
+    "noise": {
+      "distribution": "independent Gaussian white noise",
+      "sigma_ppm": 250,
+      "cadence_scaling": false,
+      "seed_rule": "SeedSequence([20261113,cadence_seconds])",
+      "prefixes": "Within each cadence, all shorter baselines are exact prefixes of the 1460-day curve"
+    }
+  },
+  "grid_policy": "Each engine builds its own native grid within the complete timed call; record counts and hashes, do not force equal candidate grids",
+  "timing": {
+    "warmup": "Small compilation warmup per process plus one full call per engine/input case",
+    "scope": "Synchronized complete API wall time including native grids, validation, transfers, search, candidate extraction",
+    "excludes": [
+      "imports",
+      "warmup",
+      "disk I/O",
+      "verification",
+      "profiler"
+    ],
+    "aggregation": "Median of 3; also retain all raw times",
+    "parallelism": "One engine process on one GPU at a time",
+    "progress": "Enable native progress where available; report case index and elapsed time"
+  },
+  "validation": [
+    "Verify input t/y/dy hashes",
+    "Retain native periodograms and candidates",
+    "Check finite outputs and injected-period recovery",
+    "Compare each engine with its own local output where available; GTLS and CETRA are not required to have identical statistics"
+  ],
+  "profiling": {
+    "tool": "nsys",
+    "cases": [
+      {
+        "days": 730,
+        "cadence_seconds": 100,
+        "dy": "mixed"
+      },
+      {
+        "days": 1460,
+        "cadence_seconds": 25,
+        "dy": "mixed"
+      }
+    ],
+    "engines": [
+      "gtls",
+      "cetra"
+    ],
+    "policy": "Separate runs excluded from timing; discover installed nsys first"
+  },
+  "hardware": {
+    "gpus": 1,
+    "preferred_gpu": "A100 SXM4 40GB, matching previous A100 run",
+    "minimum_gpu_ram_gb": 40,
+    "minimum_host_ram_gb": 64,
+    "disk_gb": 60,
+    "no_gpu_sharing": true
+  },
+  "proposed_spend_limits": {
+    "max_all_in_hourly_usd": 1.5,
+    "max_total_usd": 5.0,
+    "max_lease_hours": 3.0,
+    "runtime_estimate_hours": [
+      1,
+      3
+    ],
+    "estimate_uncertain": true,
+    "on_limit": "Save completed data, terminate running benchmark if necessary, destroy instance; do not extend without confirmation"
+  },
+  "lease_policy": "Only create after user confirms this protocol; try fresh stable slightly higher-priced offers within cap; download/verify artifacts and destroy after completion or failure",
+  "deliverables": [
+    "Timing CSV/JSON",
+    "Runtime vs cadence and baseline plots",
+    "GTLS/CETRA speedup matrix",
+    "VRAM/thermal telemetry",
+    "Native result and input hashes",
+    "nsys traces and bottleneck summary",
+    "Git checkpoint commits",
+    "Verified instance destruction"
+  ],
+  "user_confirmation": "Only the 30 varying-dy input cases; rent A100 under the proposed limits"
+}
