@@ -767,7 +767,7 @@ def search_single_period(search, period, t, y, dy):
         t=t,
         y=y,
         period=period,
-        duration=rawDuration,
+        duration=transit_duration_in_days,
         T0=T0,
         transit_times=transit_times,
         transit_duration_in_days=transit_duration_in_days,
@@ -776,7 +776,8 @@ def search_single_period(search, period, t, y, dy):
     )
 
     all_flux_intransit = np.concatenate([all_flux_intransit_odd, all_flux_intransit_even])
-    intransit = transit_mask(t, period, 2 * rawDuration, T0)
+    # The mask uses the same time units as t; rawDuration is a fraction of P.
+    intransit = transit_mask(t, period, 2 * transit_duration_in_days, T0)
     flux_ootr = y[~intransit]
     depth_mean = np.mean(all_flux_intransit)
     snr = ((1 - depth_mean) / np.std(flux_ootr)) * len(all_flux_intransit) ** (0.5)

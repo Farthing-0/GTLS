@@ -136,7 +136,7 @@ def pink_noise(data, width, window_std=None):
 
 def snr_stats(t, y, period, duration, T0, transit_times, transit_duration_in_days, per_transit_count,
               window_std=None):
-    """Return the pink-noise SNR of each transit"""
+    """Return per-transit pink-noise SNR; both duration arguments are in days."""
 
     snr_pink_per_transit = np.zeros([len(transit_times)])
     intransit = transit_mask(t, period, 2 * duration, T0)
