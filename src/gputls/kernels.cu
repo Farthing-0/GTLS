@@ -35,28 +35,160 @@ __device__ __forceinline__ T blockInclusiveScan(T value, T* blockTotal) {
     return value;
 }
 
+// Extract the exact binary fraction without a double-to-int conversion and
+// double subtraction. Preserve the original arithmetic outside its normal
+// nonnegative, int32-range input. The remaining fraction is exactly representable.
+__device__ __forceinline__ double phaseFraction(double cycles) {
+    unsigned long long bits = __double_as_longlong(cycles);
+    int exponent = ((bits >> 52) & 2047) - 1023;
+    if ((bits >> 63) || exponent >= 31) return cycles - (int)cycles;
+    if (exponent < 0) return cycles;
+    int shift = 52 - exponent;
+    unsigned long long fraction = bits & ((1ull << shift) - 1);
+    if (!fraction) return 0.;
+    int lead = 63 - __clzll(fraction);
+    return __longlong_as_double(((unsigned long long)(lead - shift + 1023) << 52)
+        | ((fraction << (52 - lead)) & 0xfffffffffffffull));
+}
+
+// A compact monotone key for [0, 1): floor(phase * 2^32), extracted exactly.
+// The top key also covers out-of-range values. Equal keys always fall back to
+// the full original phase, so compression cannot change ordering or tie breaks.
+__device__ __forceinline__ unsigned int phaseKey(double phase) {
+    unsigned long long bits = __double_as_longlong(phase);
+    int exponent = (bits >> 52) - 1023;
+    if (exponent >= 0) return 0xffffffffu;
+    if (exponent < -32) return 0;
+    return ((bits & 0xfffffffffffffull) | 0x10000000000000ull) >> (20 - exponent);
+}
+
+__device__ __forceinline__ int packedPhaseBucket(unsigned int key, const double* time,
+                                                double inverse, int index, int buckets) {
+    if (key != 0xffffffffu) {
+        unsigned int lower = __umulhi(key, (unsigned int)buckets);
+        // The upper endpoint is exact in FP64 for buckets < 2^21. Above that,
+        // add a conservative half-ULP product budget in units of 2^-32 before
+        // taking its floor. This also covers FP64 multiplication rounding up
+        // to an integer. Ambiguous intervals use the original expression.
+        unsigned long long upperProduct = (unsigned long long)(key + 1) * (unsigned int)buckets
+                                        + ((unsigned int)buckets >> 21);
+        unsigned int upper = upperProduct >> 32;
+        if (lower == upper) return lower;
+    }
+    return min((int)(phaseFraction(time[index] * inverse) * buckets), buckets - 1);
+}
+
+__device__ __forceinline__ bool phaseKeyGreater(unsigned long long left, int li,
+        unsigned long long right, int ri, const double*, double) {
+    return left > right || (left == right && li > ri);
+}
+
+__device__ __forceinline__ bool phaseKeyGreater(unsigned int left, int li,
+        unsigned int right, int ri, const double* time, double inverse) {
+    if (left != right) return left > right;
+    // Empty network slots must not dereference their sentinel point indices.
+    if (li == 0x7fffffff) return ri != 0x7fffffff;
+    if (ri == 0x7fffffff) return false;
+    unsigned long long a = __double_as_longlong(phaseFraction(time[li] * inverse));
+    unsigned long long b = __double_as_longlong(phaseFraction(time[ri] * inverse));
+    return a > b || (a == b && li > ri);
+}
+
+// Keep small buckets entirely in registers. Full IEEE keys and compact keys
+// share the network; the compact comparator resolves collisions in FP64.
+template <typename Key>
+__device__ __forceinline__ void sortSmallBucket(int* points, const Key* phase, int count,
+                                               const double* time, double inverse) {
+    constexpr int N = 8;
+    Key keys[N];
+    int indices[N];
+    #pragma unroll
+    for (int i = 0; i < N; ++i) {
+        indices[i] = i < count ? points[i] : 0x7fffffff;
+        keys[i] = i < count ? phase[indices[i]] : (Key)0xffffffffffffffffull;
+    }
+    #pragma unroll
+    for (int k = 2; k <= N; k <<= 1) {
+        #pragma unroll
+        for (int j = k >> 1; j > 0; j >>= 1) {
+            #pragma unroll
+            for (int i = 0; i < N; ++i) {
+                int other = i ^ j;
+                if (other > i) {
+                    bool greater = phaseKeyGreater(keys[i], indices[i], keys[other], indices[other],
+                                                   time, inverse);
+                    if ((i & k) == 0 ? greater : !greater) {
+                        Key key = keys[i];
+                        keys[i] = keys[other]; keys[other] = key;
+                        int index = indices[i];
+                        indices[i] = indices[other]; indices[other] = index;
+                    }
+                }
+            }
+        }
+    }
+    #pragma unroll
+    for (int i = 0; i < N; ++i) if (i < count) points[i] = indices[i];
+}
+
+template <bool Packed>
+__device__ __forceinline__ void patchScanImpl(const int* sortIndex, const float2* prepared,
+                                               float2* weighted, long long* cumulative, float scale,
+                                               int tSize, int patchedSize) {
+    long long rowOffset = (long long)blockIdx.x * patchedSize;
+    long long indexOffset = (long long)blockIdx.x * tSize;
+    long long carry = 0;
+    for (int tile = 0; tile < patchedSize; tile += 2 * blockDim.x) {
+        long long local[2], total = 0;
+        #pragma unroll
+        for (int j = 0; j < 2; ++j) {
+            int i = tile + 2 * threadIdx.x + j;
+            if (i < patchedSize) {
+                int source = i;
+                if (source >= tSize) {
+                    source -= tSize;
+                    if (source >= tSize) source %= tSize;
+                }
+                float2 point = prepared[sortIndex[indexOffset + source]];
+                if (Packed) ((float*)weighted)[rowOffset+i] = point.y*point.x;
+                else weighted[rowOffset + i] = make_float2(point.y * point.x, point.y);
+                total += __float2ll_rn(point.x * scale);
+            }
+            local[j] = total;
+        }
+        long long tileTotal;
+        long long before = blockInclusiveScan(total, &tileTotal) - total;
+        #pragma unroll
+        for (int j = 0; j < 2; ++j) {
+            int i = tile + 2 * threadIdx.x + j;
+            if (i < patchedSize) cumulative[rowOffset + i] = carry + before + local[j];
+        }
+        carry += tileTotal;
+    }
+}
+
 extern "C"{
     #define SECONDS_PER_DAY 86400              // Seconds in a day
 
     /**
-     * Phase sort, stage 1: fold and count the points of each bucket floor(phase * tSize)
-     * (about one point per bucket). phase = time / period - floor(time / period), with the
+     * Phase sort, stage 1: fold and count the points of each bucket floor(phase * nBuckets)
+     * (about three points per bucket). phase = time / period - floor(time / period), with the
      * division done as a multiplication by the correctly rounded 1 / period (float64 division
      * is a long instruction sequence, multiplication a single instruction).
      */
     __global__ void foldBuckets(const double* time, const double* inversePeriods, double* phase,
-                                int* counts, int tSize) {
+                                int* counts, int tSize, int nBuckets) {
         int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
         int periodIndex = blockIdx.y;
         if (pointIndex >= tSize) {
             return;
         }
         double cycles = time[pointIndex] * inversePeriods[periodIndex];
-        double pointPhase = cycles - (int)(cycles);
+        double pointPhase = phaseFraction(cycles);
         long long rowOffset = (long long)periodIndex * tSize;
         phase[rowOffset + pointIndex] = pointPhase;
-        int bucket = min((int)(pointPhase * tSize), tSize - 1);
-        atomicAdd(counts + rowOffset + bucket, 1);
+        int bucket = min((int)(pointPhase * nBuckets), nBuckets - 1);
+        atomicAdd(counts + (long long)periodIndex*nBuckets + bucket, 1);
     }
 
     /**
@@ -82,15 +214,15 @@ extern "C"{
      * Phase sort, stage 2: scatter the point indices into their buckets. cursor holds the
      * first position of each bucket on entry and one past its last position on exit.
      */
-    __global__ void bucketScatter(const double* phase, int* cursor, int* sortIndex, int tSize) {
+    __global__ void bucketScatter(const double* phase, int* cursor, int* sortIndex, int tSize, int nBuckets) {
         int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
         int periodIndex = blockIdx.y;
         if (pointIndex >= tSize) {
             return;
         }
         long long rowOffset = (long long)periodIndex * tSize;
-        int bucket = min((int)(phase[rowOffset + pointIndex] * tSize), tSize - 1);
-        sortIndex[rowOffset + atomicAdd(cursor + rowOffset + bucket, 1)] = pointIndex;
+        int bucket = min((int)(phase[rowOffset + pointIndex] * nBuckets), nBuckets - 1);
+        sortIndex[rowOffset + atomicAdd(cursor + (long long)periodIndex*nBuckets + bucket, 1)] = pointIndex;
     }
 
     /**
@@ -98,26 +230,96 @@ extern "C"{
      * with phase, so the result equals a stable argsort of the phases.
      */
     __global__ void sortBuckets(const double* phase, const int* counts, const int* bucketEnds,
-                                int* sortIndex, int tSize) {
+                                int* sortIndex, int tSize, int nBuckets) {
         int bucket = blockIdx.x * blockDim.x + threadIdx.x;
         int periodIndex = blockIdx.y;
-        if (bucket >= tSize) {
+        if (bucket >= nBuckets) {
             return;
         }
         long long rowOffset = (long long)periodIndex * tSize;
-        int bucketSize = counts[rowOffset + bucket];
+        int bucketSize = counts[(long long)periodIndex*nBuckets + bucket];
         if (bucketSize < 2) {
             return;
         }
-        int* bucketPoints = sortIndex + rowOffset + bucketEnds[rowOffset + bucket] - bucketSize;
+        int* bucketPoints = sortIndex + rowOffset + bucketEnds[(long long)periodIndex*nBuckets + bucket] - bucketSize;
         const double* rowPhase = phase + rowOffset;
+        if (bucketSize <= 8) {
+            sortSmallBucket(bucketPoints, (const unsigned long long*)rowPhase, bucketSize, nullptr, 0.);
+            return;
+        }
         for (int next = 1; next < bucketSize; next++) {
             int keyPoint = bucketPoints[next];
-            double keyPhase = rowPhase[keyPoint];
+            unsigned long long keyPhase = __double_as_longlong(rowPhase[keyPoint]);
             int slot = next - 1;
-            while (slot >= 0 && (rowPhase[bucketPoints[slot]] > keyPhase ||
-                                 (rowPhase[bucketPoints[slot]] == keyPhase && bucketPoints[slot] > keyPoint))) {
-                bucketPoints[slot + 1] = bucketPoints[slot];
+            while (slot >= 0) {
+                int point = bucketPoints[slot];
+                unsigned long long value = __double_as_longlong(rowPhase[point]);
+                if (value < keyPhase || (value == keyPhase && point <= keyPoint)) break;
+                bucketPoints[slot + 1] = point;
+                slot--;
+            }
+            bucketPoints[slot + 1] = keyPoint;
+        }
+    }
+
+    // Compact phase storage with exact boundary and collision fallback.
+    __global__ void foldBucketsPackedPhase(const double* time, const double* inversePeriods, unsigned int* phase,
+                                int* counts, int tSize, int nBuckets) {
+        int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
+        int periodIndex = blockIdx.y;
+        if (pointIndex >= tSize) {
+            return;
+        }
+        double cycles = time[pointIndex] * inversePeriods[periodIndex];
+        double pointPhase = phaseFraction(cycles);
+        long long rowOffset = (long long)periodIndex * tSize;
+        phase[rowOffset + pointIndex] = phaseKey(pointPhase);
+        int bucket = min((int)(pointPhase * nBuckets), nBuckets - 1);
+        atomicAdd(counts + (long long)periodIndex*nBuckets + bucket, 1);
+    }
+
+    __global__ void bucketScatterPackedPhase(const unsigned int* phase, const double* time,
+            const double* inversePeriods, int* cursor, int* sortIndex, int tSize, int nBuckets) {
+        int pointIndex = blockIdx.x * blockDim.x + threadIdx.x;
+        int periodIndex = blockIdx.y;
+        if (pointIndex >= tSize) {
+            return;
+        }
+        long long rowOffset = (long long)periodIndex * tSize;
+        int bucket = packedPhaseBucket(phase[rowOffset + pointIndex], time,
+                                       inversePeriods[periodIndex], pointIndex, nBuckets);
+        sortIndex[rowOffset + atomicAdd(cursor + (long long)periodIndex*nBuckets + bucket, 1)] = pointIndex;
+    }
+
+    __global__ void sortBucketsPackedPhase(const unsigned int* phase, const double* time,
+            const double* inversePeriods, const int* counts, const int* bucketEnds,
+            int* sortIndex, int tSize, int nBuckets) {
+        int bucket = blockIdx.x * blockDim.x + threadIdx.x;
+        int periodIndex = blockIdx.y;
+        if (bucket >= nBuckets) {
+            return;
+        }
+        long long rowOffset = (long long)periodIndex * tSize;
+        int bucketSize = counts[(long long)periodIndex*nBuckets + bucket];
+        if (bucketSize < 2) {
+            return;
+        }
+        int* bucketPoints = sortIndex + rowOffset + bucketEnds[(long long)periodIndex*nBuckets + bucket] - bucketSize;
+        const unsigned int* rowPhase = phase + rowOffset;
+        double inverse = inversePeriods[periodIndex];
+        if (bucketSize <= 8) {
+            sortSmallBucket(bucketPoints, rowPhase, bucketSize, time, inverse);
+            return;
+        }
+        for (int next = 1; next < bucketSize; next++) {
+            int keyPoint = bucketPoints[next];
+            unsigned int keyPhase = rowPhase[keyPoint];
+            int slot = next - 1;
+            while (slot >= 0) {
+                int point = bucketPoints[slot];
+                unsigned int value = rowPhase[point];
+                if (!phaseKeyGreater(value, point, keyPhase, keyPoint, time, inverse)) break;
+                bucketPoints[slot + 1] = point;
                 slot--;
             }
             bucketPoints[slot + 1] = keyPoint;
@@ -179,53 +381,33 @@ extern "C"{
         }
     }
 
-    /**
-     * Phase-folded light curve, extended by its first points to handle transits at the phase
-     * edge, in the form used by searchChi2: the residual r = 1 - flux and (w * r, w), with
-     * w = 1 / dy^2.
-     */
-    __global__ void patchWeighted(const int* sortIndex, const float* residual, const float* dy,
-                                  float* patchedResidual, float2* patchedWeighted,
-                                  int tSize, int patchedSize) {
-        int patchedIndex = blockIdx.x * blockDim.x + threadIdx.x;
-        int periodIndex = blockIdx.y;
-        if (patchedIndex >= patchedSize) {
-            return;
-        }
-        int sourceIndex = sortIndex[(long long)periodIndex * tSize + patchedIndex % tSize];
-        float pointResidual = residual[sourceIndex];
-        float variance = dy[sourceIndex] * dy[sourceIndex];
-        // Prevent division by zero
-        if (variance < 1e-10f) {
-            variance = 1e-10f;
-        }
-        float weight = 1.0f / variance;
-        long long outputIndex = (long long)periodIndex * patchedSize + patchedIndex;
-        patchedResidual[outputIndex] = pointResidual;
-        patchedWeighted[outputIndex] = make_float2(weight * pointResidual, weight);
+    // Input-dependent weights are rebuilt once for each search. Interleaving r and
+    // w makes the later permutation a single float2 gather per input point.
+    __global__ void prepareWeights(const float* residual, const float* dy,
+                                   float2* prepared, int size) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i >= size) return;
+        float variance = dy[i] * dy[i];
+        if (variance < 1e-10f) variance = 1e-10f;
+        prepared[i] = make_float2(residual[i], 1.0f / variance);
     }
 
     /**
-     * Inclusive prefix sum of each row of the patched residuals (one block per row), in fixed
-     * point: every residual is rounded to a multiple of 1 / scale (scale = 2^E, chosen by
-     * GPUSearch so the row sums fit in 63 bits), then summed exactly in int64. Window sums are
-     * exact differences of two prefix sums, whatever the row length and the residual offset.
+     * Gather the folded/extended points, write (w*r,w), and form exact fixed-point
+     * residual prefixes in one pass. Integer addition is associative and the scale
+     * bounds every partial sum within int64, so two consecutive samples per thread
+     * preserve the original scan bit for bit while halving its synchronizations.
      */
-    __global__ void scanResidual(const float* patchedResidual, long long* cumResidual, float scale,
-                                 int patchedSize) {
-        long long rowOffset = (long long)blockIdx.x * patchedSize;
-        long long carry = 0;
-        for (int tileStart = 0; tileStart < patchedSize; tileStart += blockDim.x) {
-            int patchedIndex = tileStart + threadIdx.x;
-            long long fixedResidual =
-                patchedIndex < patchedSize ? __float2ll_rn(patchedResidual[rowOffset + patchedIndex] * scale) : 0;
-            long long tileTotal;
-            long long inclusiveSum = blockInclusiveScan(fixedResidual, &tileTotal);
-            if (patchedIndex < patchedSize) {
-                cumResidual[rowOffset + patchedIndex] = carry + inclusiveSum;
-            }
-            carry += tileTotal;
-        }
+    __global__ void patchScan(const int* sortIndex, const float2* prepared,
+                             float2* weighted, long long* cumulative, float scale,
+                             int tSize, int patchedSize) {
+        patchScanImpl<false>(sortIndex, prepared, weighted, cumulative, scale, tSize, patchedSize);
+    }
+
+    __global__ void patchScanPacked(const int* sortIndex, const float2* prepared,
+                             float2* weighted, long long* cumulative, float scale,
+                             int tSize, int patchedSize) {
+        patchScanImpl<true>(sortIndex, prepared, weighted, cumulative, scale, tSize, patchedSize);
     }
 
 }  // extern "C"
@@ -246,7 +428,7 @@ __device__ __forceinline__ unsigned int orderedKey(float value) {
  * A_2 = sum s_i^2 w_i (squareTerm) (the algebraic expansion of TLS 2.0). base = sum_{all points}
  * w r^2 is the same for every window and period, so the windows are ranked by delta alone, in
  * float32 (decode_keys adds base). The mean depth is the exact fixed-point window sum of r (see
- * scanResidual), converted and divided by L with float32 rounding: no float64 per window.
+ * patchScan), converted and divided by L with float32 rounding: no float64 per window.
  *
  * Work items of a period are the start points of all searched durations, laid out by
  * `offsets`; start points of selected duration selectedIndex are multiples of
@@ -262,7 +444,7 @@ __device__ __forceinline__ unsigned int orderedKey(float value) {
  * overlap of neighbouring windows from L1 once the stride is large; G is chosen per duration
  * from the stride (see core.lanes_per_window and bench/window_lanes on branch perf/window-lanes).
  */
-template <int G>
+template <int G, bool Compacted = false, bool Packed = false>
 __device__ __forceinline__ void searchChi2Lanes(
         unsigned long long* best,
         const long long* cumResidual,  // (periods, patchedSize), inclusive, fixed point
@@ -278,10 +460,16 @@ __device__ __forceinline__ void searchChi2Lanes(
         int yBegin, int yEnd, int nDurations, int tSize, int patchedSize,
         int maxWidth, float transitDepthMin,
         const float* lowerBounds = nullptr, const unsigned long long* upperKeys = nullptr,
-        int nBounds = 0) {
+        int nBounds = 0, const int* candidates = nullptr, const int* counts = nullptr,
+        int listStride = 0, float uniformWeight = 0) {
     int periodIndex = blockIdx.y;
     int laneInWindow = threadIdx.x % G;
     int workItem = offsets[yBegin] + (blockIdx.x * blockDim.x + threadIdx.x) / G;
+    if (Compacted) {
+        int task = (blockIdx.x * blockDim.x + threadIdx.x) / G;
+        workItem = task < counts[periodIndex]
+            ? candidates[(long long)periodIndex*listStride+task] : offsets[yEnd];
+    }
     unsigned long long key = 0xffffffffffffffffull;
     float crossTerm = 0.0f;
     float squareTerm = 0.0f;
@@ -312,11 +500,13 @@ __device__ __forceinline__ void searchChi2Lanes(
             }
         }
         if (active) {
-            const float2* windowWeighted = patchedWeighted + (long long)periodIndex * patchedSize + windowStart;
+            long long windowOffset = (long long)periodIndex * patchedSize + windowStart;
             const float* durationSignal = signal + (long long)durationIndex * maxWidth;
             for (int pointInWindow = laneInWindow; pointInWindow < windowWidth; pointInWindow += G) {
                 float signalValue = durationSignal[pointInWindow];
-                float2 weighted = windowWeighted[pointInWindow];
+                float2 weighted = Packed
+                    ? make_float2(((const float*)patchedWeighted)[windowOffset+pointInWindow], uniformWeight)
+                    : patchedWeighted[windowOffset+pointInWindow];
                 crossTerm = fmaf(signalValue, weighted.x, crossTerm);
                 squareTerm = fmaf(signalValue * signalValue, weighted.y, squareTerm);
             }
@@ -545,43 +735,376 @@ SEARCH_ADJACENT(32,4)
 #undef REUSE_PASS
 
 // Inclusive first/double prefixes of the actual stored float2 data, in FP64.
-// At index i: (D_z[i+2], D_w[i+2], S_abs_z[i+1], S_w[i+1]).
-extern "C" __global__ void scanScreening(const float2* weighted, double4* prefix, int size) {
-    long long row = (long long)blockIdx.x * size;
+// All FP64 (D_z, D_w) rows, followed by the high32 bits of (S_abs_z, S_w).
+// Mass storage roundoff is bounded when loading each window; the dot-product
+// prefixes and the final statistic retain their existing precision.
+// One-warp specialization with exactly the additions of blockInclusiveScan.
+__device__ __forceinline__ double warpInclusiveScan(double value, double* total) {
+    int lane = threadIdx.x & 31;
+    for (int offset = 1; offset < 32; offset <<= 1) {
+        double neighbor = __shfl_up_sync(0xffffffff, value, offset);
+        if (lane >= offset) value += neighbor;
+    }
+    *total = __shfl_sync(0xffffffff, value, 31);
+    return value;
+}
+
+template <int Stride>
+__device__ __forceinline__ void scanScreeningImpl(const float2* weighted, double2* prefix, int size) {
+    constexpr int ITEMS = 16;
+    int prefixSize = Stride == 1 ? size : (size+Stride-1)/Stride+1;
+    long long sourceRow = (long long)blockIdx.x*size;
+    long long row = (long long)blockIdx.x*prefixSize;
+    if (Stride > 1 && threadIdx.x == 0) {
+        prefix[row] = make_double2(0, 0);
+        ((uint2*)(prefix+(long long)gridDim.x*prefixSize))[row] = make_uint2(0, 0);
+    }
     double zCarry = 0, wCarry = 0, absCarry = 0, dzCarry = 0, dwCarry = 0;
-    for (int tile = 0; tile < size; tile += blockDim.x) {
-        int i = tile + threadIdx.x;
-        float2 v = i < size ? weighted[row + i] : make_float2(0, 0);
+    for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {
+        int begin = tile + ITEMS*threadIdx.x;
+        double z[ITEMS], w[ITEMS], az[ITEMS], dz[ITEMS], dw[ITEMS];
+        double sz = 0, sw = 0, sa = 0, sdz = 0, sdw = 0;
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            float2 v = begin+q < size ? weighted[sourceRow+begin+q] : make_float2(0,0);
+            sz += (double)v.x; sw += (double)v.y; sa += fabs((double)v.x);
+            sdz += sz; sdw += sw;
+            z[q] = sz; w[q] = sw; az[q] = sa; dz[q] = sdz; dw[q] = sdw;
+        }
         double zTotal, wTotal, absTotal, dzTotal, dwTotal;
-        double z = zCarry + blockInclusiveScan((double)v.x, &zTotal);
-        double w = wCarry + blockInclusiveScan((double)v.y, &wTotal);
-        double az = absCarry + blockInclusiveScan(fabs((double)v.x), &absTotal);
-        double dz = dzCarry + blockInclusiveScan(z, &dzTotal);
-        double dw = dwCarry + blockInclusiveScan(w, &dwTotal);
-        if (i < size) prefix[row + i] = make_double4(dz, dw, az, w);
-        zCarry += zTotal;
-        wCarry += wTotal;
-        absCarry += absTotal;
-        dzCarry += dzTotal;
-        dwCarry += dwTotal;
+        double beforeZ = zCarry + (warpInclusiveScan(sz, &zTotal)-sz);
+        double beforeW = wCarry + (warpInclusiveScan(sw, &wTotal)-sw);
+        double beforeA = absCarry + (warpInclusiveScan(sa, &absTotal)-sa);
+        double blockDZ = sdz + ITEMS*beforeZ;
+        double blockDW = sdw + ITEMS*beforeW;
+        double beforeDZ = dzCarry + (warpInclusiveScan(blockDZ, &dzTotal)-blockDZ);
+        double beforeDW = dwCarry + (warpInclusiveScan(blockDW, &dwTotal)-blockDW);
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            bool store = Stride == 1 ? begin+q < size
+                : begin+q < (prefixSize-1)*Stride && (begin+q+1)%Stride == 0;
+            if (store) {
+                int index = Stride == 1 ? begin+q : (begin+q+1)/Stride;
+                prefix[row+index] = make_double2(beforeDZ + (dz[q]+(q+1)*beforeZ),
+                                                    beforeDW + (dw[q]+(q+1)*beforeW));
+                uint2* mass = (uint2*)(prefix+(long long)gridDim.x*prefixSize);
+                mass[row+index] = make_uint2(__double2hiint(beforeA+az[q]),
+                                             __double2hiint(beforeW+w[q]));
+            }
+        }
+        zCarry += zTotal; wCarry += wTotal; absCarry += absTotal;
+        dzCarry += dzTotal; dwCarry += dwTotal;
     }
 }
 
-extern "C" __global__ void screenCandidates(
-        float* lower, unsigned long long* upperKeys, const double4* prefix,
-        const long long* residual, float invScale, const float* overshoot,
-        const int* widths, const int* selected, const int* offsets, const int* strides,
-        const int* lanes, const bool* mask, const int* positions, const double2* coefficients,
-        const double* metadata, double absMassError, double weightMassError,
-        int nSelected, int nDurations, int tSize, int size, float depthMin) {
+extern "C" __global__ void scanScreening(const float2* weighted, double2* prefix, int size) {
+    scanScreeningImpl<1>(weighted, prefix, size);
+}
+
+extern "C" __global__ void scanScreeningSparse(const float2* weighted, double2* prefix, int size) {
+    scanScreeningImpl<8>(weighted, prefix, size);
+}
+
+// Equal weights make the template-square statistic independent of the window.
+// Only the weighted residual and its absolute mass need prefix storage here.
+template <bool Packed, int Stride = 1>
+__device__ __forceinline__ void scanScreeningUniformImpl(const float2* weighted, double* prefix, int size) {
+    constexpr int ITEMS = 16;
+    int prefixSize = Stride == 1 ? size : (size+Stride-1)/Stride+1;
+    long long sourceRow = (long long)blockIdx.x*size;
+    long long row = (long long)blockIdx.x*prefixSize;
+    if (Stride > 1 && threadIdx.x == 0) {
+        prefix[row] = 0.;
+        ((unsigned int*)(prefix+(long long)gridDim.x*prefixSize))[row] = 0;
+    }
+    double zCarry = 0, absCarry = 0, dzCarry = 0;
+    for (int tile = 0; tile < size; tile += ITEMS*blockDim.x) {
+        int begin = tile+ITEMS*threadIdx.x;
+        double az[ITEMS], dz[ITEMS], sz = 0, sa = 0, sdz = 0;
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            float v = begin+q < size ? (Packed ? ((const float*)weighted)[sourceRow+begin+q]
+                                                     : weighted[sourceRow+begin+q].x) : 0;
+            sz += (double)v; sa += fabs((double)v); sdz += sz;
+            az[q] = sa; dz[q] = sdz;
+        }
+        double zTotal, absTotal, dzTotal;
+        double beforeZ = zCarry+(warpInclusiveScan(sz, &zTotal)-sz);
+        double beforeA = absCarry+(warpInclusiveScan(sa, &absTotal)-sa);
+        double blockDZ = sdz+ITEMS*beforeZ;
+        double beforeDZ = dzCarry+(warpInclusiveScan(blockDZ, &dzTotal)-blockDZ);
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            // Sparse nodes count samples from zero. Continue the last cell with
+            // zero input so its endpoint is valid even when size is not aligned.
+            bool store = Stride == 1 ? begin+q < size
+                : begin+q < (prefixSize-1)*Stride && (begin+q+1)%Stride == 0;
+            if (store) {
+                int index = Stride == 1 ? begin+q : (begin+q+1)/Stride;
+                prefix[row+index] = beforeDZ+(dz[q]+(q+1)*beforeZ);
+                ((unsigned int*)(prefix+(long long)gridDim.x*prefixSize))[row+index]
+                    = __double2hiint(beforeA+az[q]);
+            }
+        }
+        zCarry += zTotal; absCarry += absTotal; dzCarry += dzTotal;
+    }
+}
+
+extern "C" __global__ void scanScreeningUniform(const float2* weighted, double* prefix, int size) {
+    scanScreeningUniformImpl<false>(weighted, prefix, size);
+}
+
+extern "C" __global__ void scanScreeningUniformPacked(const float2* weighted, double* prefix, int size) {
+    scanScreeningUniformImpl<true>(weighted, prefix, size);
+}
+
+extern "C" __global__ void scanScreeningUniformSparse(const float2* weighted, double* prefix, int size) {
+    scanScreeningUniformImpl<true, 16>(weighted, prefix, size);
+}
+
+// Approximate only the screening inputs. Host certificates include pointwise
+// quantization error; original weighted data and final exact kernels are untouched.
+__device__ __forceinline__ long long warpIntegerScan(long long value, long long* total) {
+    int lane = threadIdx.x & 31;
+    for (int offset = 1; offset < 32; offset <<= 1) {
+        long long neighbor = __shfl_up_sync(0xffffffff, value, offset);
+        if (lane >= offset) value += neighbor;
+    }
+    *total = __shfl_sync(0xffffffff, value, 31);
+    return value;
+}
+
+template <bool Uniform>
+__device__ void scanScreeningIntegerImpl(const float2* weighted, double2* prefix,
+    int size, float scaleZ, float scaleW, double invZ, double invW) {
+    constexpr int ITEMS = 16, STRIDE = Uniform ? 16 : 8;
+    int prefixSize = (size+STRIDE-1)/STRIDE+1;
+    long long sourceRow = (long long)blockIdx.x*size;
+    long long row = (long long)blockIdx.x*prefixSize;
+    if (threadIdx.x == 0) {
+        if (Uniform) {
+            ((double*)prefix)[row] = 0.;
+            ((unsigned int*)((double*)prefix+(long long)gridDim.x*prefixSize))[row] = 0;
+        } else {
+            prefix[row] = make_double2(0, 0);
+            ((uint2*)(prefix+(long long)gridDim.x*prefixSize))[row] = make_uint2(0, 0);
+        }
+    }
+    long long zCarry = 0, wCarry = 0, aCarry = 0, dzCarry = 0, dwCarry = 0;
+    for (int tile = 0; tile < size; tile += 512) {
+        int begin = tile+ITEMS*threadIdx.x;
+        long long w[ITEMS], a[ITEMS], dz[ITEMS], dw[ITEMS];
+        long long sz = 0, sw = 0, sa = 0, sdz = 0, sdw = 0;
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            float2 v = make_float2(0, 0);
+            if (begin+q < size)
+                v = Uniform ? make_float2(((const float*)weighted)[sourceRow+begin+q], 0)
+                            : weighted[sourceRow+begin+q];
+            long long iz = __float2ll_rn(v.x*scaleZ);
+            long long iw = Uniform ? 0 : __float2ll_rn(v.y*scaleW);
+            sz += iz; sw += iw; sa += iz < 0 ? -iz : iz;
+            sdz += sz; sdw += sw;
+            w[q] = sw; a[q] = sa; dz[q] = sdz; dw[q] = sdw;
+        }
+        long long zTotal, wTotal, aTotal, dzTotal, dwTotal;
+        long long beforeZ = zCarry+(warpIntegerScan(sz, &zTotal)-sz);
+        long long beforeW = Uniform ? 0 : wCarry+(warpIntegerScan(sw, &wTotal)-sw);
+        long long beforeA = aCarry+(warpIntegerScan(sa, &aTotal)-sa);
+        long long blockDZ = sdz+ITEMS*beforeZ, blockDW = sdw+ITEMS*beforeW;
+        long long beforeDZ = dzCarry+(warpIntegerScan(blockDZ, &dzTotal)-blockDZ);
+        long long beforeDW = Uniform ? 0 : dwCarry+(warpIntegerScan(blockDW, &dwTotal)-blockDW);
+        #pragma unroll
+        for (int q = 0; q < ITEMS; ++q) {
+            if (begin+q < (prefixSize-1)*STRIDE && (begin+q+1)%STRIDE == 0) {
+                int index = (begin+q+1)/STRIDE;
+                double d = __ll2double_rn(beforeDZ+dz[q]+(q+1)*beforeZ)*invZ;
+                double az = __ll2double_rn(beforeA+a[q])*invZ;
+                if (Uniform) {
+                    ((double*)prefix)[row+index] = d;
+                    ((unsigned int*)((double*)prefix+(long long)gridDim.x*prefixSize))[row+index]
+                        = __double2hiint(az);
+                } else {
+                    prefix[row+index] = make_double2(d,
+                        __ll2double_rn(beforeDW+dw[q]+(q+1)*beforeW)*invW);
+                    ((uint2*)(prefix+(long long)gridDim.x*prefixSize))[row+index] = make_uint2(
+                        __double2hiint(az), __double2hiint(__ll2double_rn(beforeW+w[q])*invW));
+                }
+            }
+        }
+        zCarry += zTotal; aCarry += aTotal; dzCarry += dzTotal;
+        if (!Uniform) { wCarry += wTotal; dwCarry += dwTotal; }
+    }
+}
+
+extern "C" __global__ void scanScreeningInteger(const float2* weighted, double2* prefix,
+    int size, float scaleZ, float scaleW, double invZ, double invW) {
+    scanScreeningIntegerImpl<false>(weighted, prefix, size, scaleZ, scaleW, invZ, invW);
+}
+
+extern "C" __global__ void scanScreeningUniformInteger(const float2* weighted, double2* prefix,
+    int size, float scaleZ, float scaleW, double invZ, double invW) {
+    scanScreeningIntegerImpl<true>(weighted, prefix, size, scaleZ, scaleW, invZ, invW);
+}
+
+// Preserve searchChi2Lanes' FP32 FMA sequence and XOR reduction for each G.
+extern "C" __global__ void prepareUniformSquare(const float* signal, const int* widths,
+    const int* selected, const int* lanes, int maxWidth, float weight, float* squares) {
+    int duration = selected[blockIdx.x], g = lanes[blockIdx.x], lane = threadIdx.x;
+    float sum = 0;
+    if (lane < g) {
+        for (int i = lane; i < widths[duration]; i += g) {
+            float v = signal[(long long)duration*maxWidth+i];
+            sum = fmaf(v*v, weight, sum);
+        }
+    }
+    for (int offset = g/2; offset; offset >>= 1) sum += __shfl_xor_sync(0xffffffff, sum, offset);
+    if (lane == 0) squares[duration] = sum;
+}
+
+#define SCREEN_ARGS \
+    float* lower, unsigned long long* upperKeys, const double2* prefix, \
+    const long long* residual, float invScale, const float* overshoot, \
+    const int* widths, const int* selected, const int* offsets, const int* strides, \
+    const int* lanes, const bool* mask, const int* positions, const double2* coefficients, \
+    const double* metadata, double absMassError, double weightMassError, \
+    int nSelected, int nDurations, int tSize, int size, float depthMin
+
+template <bool Uniform>
+__device__ __forceinline__ double2 screenSparseDot(const double2* p, int start,
+    const int* positions, const double2* coefficients, int begin, int terms) {
+    double ar = 0, a2 = 0;
+    // Prefetch independent prefixes before the dependent FMA chain.
+    // Accumulate in the original order, including the scalar tail.
+#if __CUDA_ARCH__ >= 700
+    constexpr int PREFETCH = 13;
+#else
+    constexpr int PREFETCH = 4;
+#endif
+    int j = begin;
+    for (; j+PREFETCH <= begin+terms; j += PREFETCH) {
+        double2 values[PREFETCH], weights[PREFETCH];
+        #pragma unroll
+        for (int q=0;q<PREFETCH;++q) {
+            int k=start+positions[j+q]-2;
+            values[q]=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
+            weights[q]=coefficients[j+q];
+        }
+#if __CUDA_ARCH__ >= 700
+        // Keep the independent reads ahead of the FMA chain.
+        // This mask names only the currently executing lanes;
+        // no value or reduction is shared between lanes here.
+        __syncwarp(__activemask());
+#endif
+        #pragma unroll
+        for (int q=0;q<PREFETCH;++q) {
+            ar=fma(weights[q].x,values[q].x,ar);
+            if (!Uniform) a2=fma(weights[q].y,values[q].y,a2);
+        }
+    }
+    for (;j<begin+terms;++j) {
+        int k=start+positions[j]-2;
+        double2 v=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
+        double2 c=coefficients[j];
+        ar=fma(c.x,v.x,ar);if (!Uniform) a2=fma(c.y,v.y,a2);
+    }
+    return make_double2(ar, a2);
+}
+
+// Per-template rounding terms, evaluated on the GPU with the same arithmetic
+// as the candidate path. All hierarchy levels share the same template peaks.
+__device__ __forceinline__ double4 screenRoundingBudget(int width, int g) {
+    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
+    double gu = steps*0x1p-24;
+    double gamma = gu < .5 ? gu/(1-gu) : __int_as_float(0x7f800000);
+    double tiny = (double)width*(steps+8)*0x1p-149;
+    float gu32 = __fmul_ru(__int2float_ru(steps), 0x1p-24f);
+    float gamma32 = gu32 < .5f ? __fdiv_ru(gu32, __fsub_rd(1.0f, gu32)) : __int_as_float(0x7f800000);
+    float tiny32 = __fmul_ru(__fmul_ru(__int2float_ru(width), __int2float_ru(steps+8)), 0x1p-149f);
+    return make_double4(gamma, tiny, (double)gamma32, (double)tiny32);
+}
+
+__device__ __forceinline__ double4 screenFactors(const double* m, double4 r) {
+    return make_double4((1+r.x)*m[4], (1+r.x)*m[5], r.x*m[4], r.x*m[5]);
+}
+
+__device__ __forceinline__ double2 cheapScreenFactors(const double* m, double4 r) {
+    float factor = __fadd_ru(1.0f, (float)r.z);
+    return make_double2((double)__fmul_ru(factor, __double2float_ru(m[4])),
+                       (double)__fmul_ru(factor, __double2float_ru(m[5])));
+}
+
+template <int Stride>
+__device__ __forceinline__ void prepareScreenBudgetsImpl(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if (i < nSelected) {
+        int d = selected[i];
+        double4 r = screenRoundingBudget(widths[d], lanes[i]);
+        // Three planes: rounding terms, FP64 factors, outward-rounded FP32 factors.
+        budgets[d] = r;
+        budgets[nDurations+d] = screenFactors(metadata+8*d*Stride, r);
+        double2 cheap = cheapScreenFactors(metadata+8*d*Stride, r);
+        budgets[2*nDurations+d] = make_double4(cheap.x, cheap.y, 0, 0);
+    }
+}
+
+extern "C" __global__ void prepareScreenBudgets(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    prepareScreenBudgetsImpl<1>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
+}
+
+extern "C" __global__ void prepareScreenBudgetsUniformSparse(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    prepareScreenBudgetsImpl<16>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
+}
+
+extern "C" __global__ void prepareScreenBudgetsSparse(const int* widths, const int* selected,
+    const int* lanes, const double* metadata, double4* budgets, int nSelected, int nDurations) {
+    prepareScreenBudgetsImpl<8>(widths, selected, lanes, metadata, budgets, nSelected, nDurations);
+}
+
+// Drop the nonnegative A2 term for a cheap lower bound. All nonnegative
+// quantities are rounded upward, then negated. If FP32 intermediates cannot
+// certify that the original statistic is finite, retain the full bound path.
+__device__ __forceinline__ float cheapScreenLower32(float amplitude, double az, double w,
+                                                   float arFactor, float a2Factor, float tiny) {
+    float a = fabsf(amplitude);
+    float ar=__fadd_ru(__fmul_ru(arFactor,__double2float_ru(az)),tiny);
+    float a2=__fadd_ru(__fmul_ru(a2Factor,__double2float_ru(w)),tiny);
+    float inner = __fadd_ru(__fmul_ru(a, a2), __fmul_ru(2.0f, ar));
+    float rounding = __fadd_ru(__fmul_ru(0x1p-21f, __fmul_ru(a, inner)), tiny);
+    float low = -__fadd_ru(__fmul_ru(__fadd_ru(__fmul_ru(__fmul_ru(2.0f, a), ar), rounding),
+                                    0x1.000004p0f), 0x1p-140f);
+    bool finite = ar <= 0x1.fffffep+126f && a2 <= 0x1.fffffep+127f
+        && inner <= 0x1.fffffep+127f && __fmul_ru(a, inner) <= 0x1.fffffep+127f;
+    return finite && isfinite(a) ? low : -__int_as_float(0x7f800000);
+}
+
+template <bool Refine, bool Mapped = false, bool Uniform = false, int PrefixStride = 1>
+__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr,
+    const float* uniformSquare = nullptr, float uniformWeight = 0) {
     int period = blockIdx.y;
+    int d = 0;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
+    if (Mapped) {
+        int2 mapped = blockMap[blockIdx.x];
+        d = mapped.x;
+        item = mapped.y + threadIdx.x;
+    }
     int count = offsets[nSelected];
+    // Upper bounds only decrease. A stale atomic snapshot can retain extra work,
+    // but can never discard a winner. The first pass starts with an empty key.
+    __shared__ unsigned long long earlierUpperKey;
+    if (threadIdx.x == 0) earlierUpperKey = atomicAdd(upperKeys + period, 0ull);
+    __syncthreads();
+    unsigned int high = (unsigned int)(earlierUpperKey >> 32);
+    float earlierUpper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
     unsigned long long key = 0xffffffffffffffffull;
-    if (item < count) {
+    int end = Mapped ? offsets[d+1] : count;
+    if (item < end && (!Refine || !(lower[(long long)period*count+item] > earlierUpper))) {
         float lo = -__int_as_float(0x7f800000);
-        int d = 0;
-        while (offsets[d + 1] <= item) ++d;
+        if (!Mapped) while (offsets[d + 1] <= item) ++d;
         int duration = selected[d], width = widths[duration];
         int start = (item - offsets[d]) * strides[d];
         if (!mask[(long long)period*nDurations + duration]) {
@@ -593,55 +1116,227 @@ extern "C" __global__ void screenCandidates(
             if (!(depth > depthMin)) {
                 lo = __int_as_float(0x7f800000);
             } else {
-                const double* m = metadata + duration*8;
+                const double* m = metadata + (duration*PrefixStride+start%PrefixStride)*8;
                 int begin = (int)m[0], terms = (int)m[1];
                 if (terms) {
-                    const double4* p = prefix + (long long)period*size;
+                    double4 rounding = Mapped ? budgets[duration] : screenRoundingBudget(width,lanes[d]);
+                    int prefixSize = PrefixStride == 1 ? size : (size+PrefixStride-1)/PrefixStride+1;
+                    int dotStart = start/PrefixStride;
+                    const double2* p = Uniform
+                        ? (const double2*)((const double*)prefix+(long long)period*prefixSize)
+                        : prefix+(long long)period*prefixSize;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
                     double ar = 0, a2 = 0;
-                    for (int j = begin; j < begin+terms; ++j) {
-                        int k = start + positions[j] - 2;
-                        double4 v = k >= 0 ? p[k] : make_double4(0,0,0,0);
-                        double2 c = coefficients[j];
-                        ar = fma(c.x, v.x, ar);
-                        a2 = fma(c.y, v.y, a2);
+                    if (Refine) {
+                        double2 dot = screenSparseDot<Uniform>(p, dotStart, positions, coefficients, begin, terms);
+                        ar = dot.x; a2 = Uniform ? (double)uniformSquare[duration] : dot.y;
                     }
-                    double4 end = p[start+width-1];
-                    double4 first = start ? p[start-1] : make_double4(0,0,0,0);
-                    double az = fmax(0.0, end.z-first.z) + absMassError;
-                    double w = fmax(0.0, end.w-first.w) + weightMassError;
-                    int g = lanes[d];
-                    int steps = (width+g-1)/g + (__ffs(g)-1) + 2;
-                    double gu = steps*0x1p-24;
-                    double gamma = gu < 0.5 ? gu/(1-gu) : __int_as_float(0x7f800000);
-                    // The original FMA chains + XOR tree, including subnormal rounding.
-                    double tiny = (double)width*(steps+8)*0x1p-149;
-                    double eAr = m[2]*az + m[6] + gamma*m[4]*az + tiny;
-                    double eA2 = m[3]*w + m[7] + gamma*m[5]*w + tiny;
+#endif
+                    double az, w;
+                    if (Uniform) {
+                        const unsigned int* mass = (const unsigned int*)((const double*)prefix
+                            +(long long)gridDim.y*prefixSize)+(long long)period*prefixSize;
+                        // Outward grid endpoints include the complete window mass.
+                        int endIndex = PrefixStride == 1 ? start+width-1 : (start+width+PrefixStride-1)/PrefixStride;
+                        int firstIndex = PrefixStride == 1 ? start-1 : start/PrefixStride;
+                        double end = __hiloint2double(mass[endIndex], 0);
+                        double first = start ? __hiloint2double(mass[firstIndex], 0) : 0;
+                        double storageError = 0x1p-19*(fabs(end)+fabs(first))+0x1p-1020;
+                        az = fmax(0.0, end-first)+absMassError+storageError;
+                        w = __dmul_ru((double)uniformWeight, (double)width);
+                    } else {
+                        const uint2* mass = (const uint2*)(prefix+(long long)gridDim.y*prefixSize)+(long long)period*prefixSize;
+                        int endIndex = PrefixStride == 1 ? start+width-1 : (start+width+PrefixStride-1)/PrefixStride;
+                        int firstIndex = PrefixStride == 1 ? start-1 : start/PrefixStride;
+                        uint2 endBits=mass[endIndex], firstBits=start?mass[firstIndex]:make_uint2(0,0);
+                        double2 end=make_double2(__hiloint2double(endBits.x,0), __hiloint2double(endBits.y,0));
+                        double2 first=make_double2(__hiloint2double(firstBits.x,0), __hiloint2double(firstBits.y,0));
+                        // Dropping the low32 bits keeps the full FP64 exponent and
+                        // avoids slow FP64-to-FP32 conversions. For nonnegative stored
+                        // h, truncation error is <= 2^-20*h+2^-1042. Twice that relative
+                        // allowance for both endpoints covers FP64 arithmetic too.
+                        // Nonfinite inputs still fall back to the original exact path.
+                        double absStorageError=0x1p-19*(fabs(end.x)+fabs(first.x))+0x1p-1020;
+                        double weightStorageError=0x1p-19*(fabs(end.y)+fabs(first.y))+0x1p-1020;
+                        az = fmax(0.0, end.x-first.x) + absMassError + absStorageError;
+                        w = fmax(0.0, end.y-first.y) + weightMassError + weightStorageError;
+                    }
+                    bool discarded = false;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
+                    // The first pass benefits from the cheap FP32 shortcut on
+                    // slow-FP64 devices. Later passes already visit few candidates.
+                    if (!Refine) {
+                        double2 cheapFactors;
+                        if (Mapped) {
+                            double4 v = budgets[2*nDurations+duration];
+                            cheapFactors = make_double2(v.x, v.y);
+                        } else cheapFactors = cheapScreenFactors(m, rounding);
+                        float cheap = cheapScreenLower32(depth*overshoot[duration]*2.0f,
+                                                         az, w, (float)cheapFactors.x, (float)cheapFactors.y, (float)rounding.w);
+                        if (cheap > earlierUpper) { lo = cheap; discarded = true; }
+                    }
+#endif
+                    if (!discarded) {
+#if !GTLS_CHEAP_SCREEN_BOUNDS
+                    if (!Refine) {
+                        double2 dot = screenSparseDot<Uniform>(p, dotStart, positions, coefficients, begin, terms);
+                        ar = dot.x; a2 = Uniform ? (double)uniformSquare[duration] : dot.y;
+                    }
+#endif
+                    double tiny = rounding.y;
+                    double4 factors = Mapped ? budgets[nDurations+duration] : screenFactors(m, rounding);
+#if !GTLS_CHEAP_SCREEN_BOUNDS
+                    double eAr = m[2]*az + m[6] + factors.z*az + tiny;
+                    double eA2 = Uniform ? 0 : m[3]*w + m[7] + factors.w*w + tiny;
+#endif
                     float amplitude = depth*overshoot[duration]*2.0f;
                     double a = amplitude, aa = fabs(a);
-                    double arBound = (1+gamma)*m[4]*az + tiny;
-                    double a2Bound = (1+gamma)*m[5]*w + tiny;
+                    double arBound = factors.x*az + tiny;
+                    double a2Bound = factors.y*w + tiny;
                     double finalRound = 0x1p-21*(a*a*a2Bound + 2*aa*arBound) + tiny;
+#if !GTLS_CHEAP_SCREEN_BOUNDS
                     double proxy = a*(a*a2 - 2*ar);
                     double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
                     double hi = proxy+error;
                     double low = proxy-error;
+#endif
                     double innerBound = aa*a2Bound + 2*arBound;
                     bool noOverflow = arBound <= 0x1.fffffep+126 && a2Bound <= 0x1.fffffep+127
                         && innerBound <= 0x1.fffffep+127 && aa*innerBound <= 0x1.fffffep+127;
+#if GTLS_CHEAP_SCREEN_BOUNDS
+                    // A2 is nonnegative for arbitrary positive weights. Discard
+                    // that term and bound |AR| with the same original-FP32 error
+                    // allowance. Outward slack also covers the FP64 operations.
+                    double cheap = (-2*aa*arBound-finalRound)*1.0000000001-0x1p-140;
+                    float cheapLower = __double2float_rd(cheap);
+                    if (noOverflow && isfinite(amplitude) && cheapLower > earlierUpper) {
+                        lo = cheapLower;
+                    } else {
+                        double ar = 0, a2 = 0;
+                        // Fetch four independent prefixes before the dependent FMA chain.
+                        // Accumulate in the original order, including the scalar tail.
+                        int j = begin;
+                        for (; j+4 <= begin+terms; j += 4) {
+                            double2 values[4], weights[4];
+                            #pragma unroll
+                            for (int q=0;q<4;++q) {
+                                int k=dotStart+positions[j+q]-2;
+                                values[q]=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
+                                weights[q]=coefficients[j+q];
+                            }
+                            #pragma unroll
+                            for (int q=0;q<4;++q) {
+                                ar=fma(weights[q].x,values[q].x,ar);
+                                if (!Uniform) a2=fma(weights[q].y,values[q].y,a2);
+                            }
+                        }
+                        for (;j<begin+terms;++j) {
+                            int k=dotStart+positions[j]-2;
+                            double2 v=k>=0?(Uniform?make_double2(((const double*)p)[k],0):p[k]):make_double2(0,0);
+                            double2 c=coefficients[j];
+                            ar=fma(c.x,v.x,ar);if (!Uniform) a2=fma(c.y,v.y,a2);
+                        }
+                        if (Uniform) a2 = (double)uniformSquare[duration];
+                        double eAr = m[2]*az + m[6] + factors.z*az + tiny;
+                        double eA2 = Uniform ? 0 : m[3]*w + m[7] + factors.w*w + tiny;
+                        double proxy = a*(a*a2 - 2*ar);
+                        double error = (a*a*eA2 + 2*aa*eAr + finalRound)*1.0000000001 + 0x1p-140;
+                        double hi = proxy+error;
+                        double low = proxy-error;
+                        // Unbounded/nonfinite certificates keep the original exact path.
+                        if (noOverflow && isfinite(hi) && isfinite(low) && isfinite(amplitude)) {
+                            lo = __double2float_rd(low);
+                            float upper = __double2float_ru(hi);
+                            key = ((unsigned long long)orderedKey(upper) << 32) | (unsigned int)item;
+                        }
+#else
                     // Unbounded/nonfinite certificates keep the original exact path.
                     if (noOverflow && isfinite(hi) && isfinite(low) && isfinite(amplitude)) {
                         lo = __double2float_rd(low);
                         float upper = __double2float_ru(hi);
                         key = ((unsigned long long)orderedKey(upper) << 32) | (unsigned int)item;
+#endif
+                    }
                     }
                 }
             }
         }
-        lower[(long long)period*count+item] = lo;
+        // Every pass is independently conservative; retain the tighter lower bound.
+        long long address = (long long)period*count+item;
+        lower[address] = Refine ? fmaxf(lower[address], lo) : lo;
     }
     storeAdjacentBest(key, upperKeys, period);
 }
+
+extern "C" __global__ void screenCandidates(SCREEN_ARGS) {
+    screenCandidatesImpl<false>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin);
+}
+
+extern "C" __global__ void refineCandidates(SCREEN_ARGS) {
+    screenCandidatesImpl<true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin);
+}
+
+extern "C" __global__ void screenCandidatesMapped(SCREEN_ARGS, const int2* blockMap, const double4* budgets) {
+    screenCandidatesImpl<false, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
+}
+
+extern "C" __global__ void refineCandidatesMapped(SCREEN_ARGS, const int2* blockMap, const double4* budgets) {
+    screenCandidatesImpl<true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
+}
+extern "C" __global__ void screenCandidatesUniform(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<false, true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void refineCandidatesUniform(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<true, true, true>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void screenCandidatesUniformSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<false, true, true, 16>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void refineCandidatesUniformSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight) {
+    screenCandidatesImpl<true, true, true, 16>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin,
+        blockMap, budgets, uniformSquare, uniformWeight);
+}
+
+extern "C" __global__ void screenCandidatesMappedSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets) {
+    screenCandidatesImpl<false, true, false, 8>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
+}
+
+extern "C" __global__ void refineCandidatesMappedSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets) {
+    screenCandidatesImpl<true, true, false, 8>(lower, upperKeys, prefix, residual, invScale, overshoot, widths,
+        selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
+        absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
+}
+#undef SCREEN_ARGS
 
 #define SCREENED_EXACT(G) \
     extern "C" __global__ void searchChi2ScreenedG##G( \
@@ -661,3 +1356,219 @@ SCREENED_EXACT(8)
 SCREENED_EXACT(16)
 SCREENED_EXACT(32)
 #undef SCREENED_EXACT
+
+// Keep the strict original bound comparison, including NaN/overflow fallbacks.
+// One atomic reserves each surviving warp's output slice; ordering within the
+// compact list does not affect packed-key minima or exact per-window arithmetic.
+extern "C" __global__ void compactCandidates(
+        const float* lower, const unsigned long long* upperKeys, int* candidates, int* counts,
+        int begin, int end, int nBounds, int listStride) {
+    int item = begin + blockIdx.x*blockDim.x + threadIdx.x;
+    int period = blockIdx.y;
+    unsigned int high = upperKeys[period] >> 32;
+    float upper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
+    bool keep = item < end && !(lower[(long long)period*nBounds+item] > upper);
+    unsigned int kept = __ballot_sync(0xffffffff, keep);
+    int lane = threadIdx.x & 31;
+    int base = 0;
+    if (lane == 0 && kept) base = atomicAdd(counts+period, __popc(kept));
+    base = __shfl_sync(0xffffffff, base, 0);
+    if (keep) candidates[(long long)period*listStride+base+__popc(kept & ((1u << lane)-1))] = item;
+}
+
+#define COMPACTED_EXACT(G) \
+    extern "C" __global__ void searchChi2CompactedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds, \
+        const int* candidates, const int* counts, int listStride) { \
+        searchChi2Lanes<G, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds, candidates, counts, listStride); \
+    }
+COMPACTED_EXACT(1)
+COMPACTED_EXACT(2)
+COMPACTED_EXACT(4)
+COMPACTED_EXACT(8)
+COMPACTED_EXACT(16)
+COMPACTED_EXACT(32)
+#undef COMPACTED_EXACT
+
+// NumPy-compatible FP64 standard deviation for windows of 1..256 points.
+// Eight independent accumulators and 128-point recursive splits reproduce
+// numpy/_core/src/umath/loops_utils.h.src. Explicit RN operations prevent FMA
+// contraction; the outer chunk sums remain on the CPU in their original order.
+template<bool Squared>
+__device__ __forceinline__ double windowStdValue(const double *x, int i, double mean) {
+    double a = x[i];
+    if (Squared) {
+        a = __dsub_rn(a, mean);
+        a = __dmul_rn(a, a);
+    }
+    return a;
+}
+template<bool Squared>
+__device__ __forceinline__ double windowStdLeaf(const double *x, int n, double mean) {
+    if (n < 8) {
+        double result = -0.;
+        for (int i=0; i<n; ++i) result = __dadd_rn(result, windowStdValue<Squared>(x,i,mean));
+        return result;
+    }
+    double r[8];
+    #pragma unroll
+    for (int j=0;j<8;++j) r[j]=windowStdValue<Squared>(x,j,mean);
+    int i=8;
+    for (; i<n-(n%8);i+=8) {
+        #pragma unroll
+        for (int j=0;j<8;++j) r[j]=__dadd_rn(r[j],windowStdValue<Squared>(x,i+j,mean));
+    }
+    double result = __dadd_rn(__dadd_rn(__dadd_rn(r[0],r[1]),__dadd_rn(r[2],r[3])),__dadd_rn(__dadd_rn(r[4],r[5]),__dadd_rn(r[6],r[7])));
+    for (;i<n;++i) result=__dadd_rn(result,windowStdValue<Squared>(x,i,mean));
+    return result;
+}
+template<bool Squared>
+__device__ __forceinline__ double windowStdMiddle(const double *x, int n, double mean) {
+    if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
+    int half=(n/2)&~7;
+    return __dadd_rn(windowStdLeaf<Squared>(x,half,mean),windowStdLeaf<Squared>(x+half,n-half,mean));
+}
+template<bool Squared>
+__device__ __forceinline__ double windowStdPairwise(const double *x, int n, double mean) {
+    if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
+    int half=(n/2)&~7;
+    return __dadd_rn(windowStdMiddle<Squared>(x,half,mean),windowStdMiddle<Squared>(x+half,n-half,mean));
+}
+extern "C" __global__ void windowStd(const double *x,double *out,int count,int width) {
+    int i=blockIdx.x*blockDim.x+threadIdx.x;
+    if(i>=count) return;
+    double mean=__ddiv_rn(windowStdPairwise<false>(x+i,width,0.),double(width));
+    double variance=__ddiv_rn(windowStdPairwise<true>(x+i,width,mean),double(width));
+    out[i]=__dsqrt_rn(variance);
+}
+
+// Uniform weights are supplied once; each point stores only its weighted residual.
+#define SEARCH_CHI2_PACKED(G)                                                                            \
+    extern "C" __global__ void searchChi2PackedG##G(                                                    \
+            unsigned long long* best, const long long* cumResidual, float invScale,               \
+            const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths,   \
+            const int* selected, const int* offsets, const int* strides, const bool* periodMask,  \
+            int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth,       \
+            float transitDepthMin, float uniformWeight) {                                                              \
+        searchChi2Lanes<G, false, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths,   \
+                           selected, offsets, strides, periodMask, yBegin, yEnd, nDurations,      \
+                           tSize, patchedSize, maxWidth, transitDepthMin, nullptr, nullptr, 0, nullptr, nullptr, 0, uniformWeight);                        \
+    }
+SEARCH_CHI2_PACKED(1)
+SEARCH_CHI2_PACKED(2)
+SEARCH_CHI2_PACKED(4)
+SEARCH_CHI2_PACKED(8)
+SEARCH_CHI2_PACKED(16)
+SEARCH_CHI2_PACKED(32)
+#undef SEARCH_CHI2_PACKED
+
+#define SCREENED_EXACT_PACKED(G) \
+    extern "C" __global__ void searchChi2PackedScreenedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds, float uniformWeight) { \
+        searchChi2Lanes<G, false, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds, nullptr, nullptr, 0, uniformWeight); \
+    }
+SCREENED_EXACT_PACKED(1)
+SCREENED_EXACT_PACKED(2)
+SCREENED_EXACT_PACKED(4)
+SCREENED_EXACT_PACKED(8)
+SCREENED_EXACT_PACKED(16)
+SCREENED_EXACT_PACKED(32)
+#undef SCREENED_EXACT_PACKED
+#define COMPACTED_EXACT_PACKED(G) \
+    extern "C" __global__ void searchChi2PackedCompactedG##G( \
+        unsigned long long* best, const long long* cumResidual, float invScale, \
+        const float2* patchedWeighted, const float* signal, const float* overshoot, const int* widths, \
+        const int* selected, const int* offsets, const int* strides, const bool* periodMask, \
+        int yBegin, int yEnd, int nDurations, int tSize, int patchedSize, int maxWidth, float transitDepthMin, \
+        const float* lowerBounds, const unsigned long long* upperKeys, int nBounds, \
+        const int* candidates, const int* counts, int listStride, float uniformWeight) { \
+        searchChi2Lanes<G, true, true>(best, cumResidual, invScale, patchedWeighted, signal, overshoot, widths, \
+            selected, offsets, strides, periodMask, yBegin, yEnd, nDurations, tSize, patchedSize, \
+            maxWidth, transitDepthMin, lowerBounds, upperKeys, nBounds, candidates, counts, listStride, uniformWeight); \
+    }
+COMPACTED_EXACT_PACKED(1)
+COMPACTED_EXACT_PACKED(2)
+COMPACTED_EXACT_PACKED(4)
+COMPACTED_EXACT_PACKED(8)
+COMPACTED_EXACT_PACKED(16)
+COMPACTED_EXACT_PACKED(32)
+#undef COMPACTED_EXACT_PACKED
+
+// Seed screening with one original-grid candidate selected from32 starts per
+// duration. Its FP32 statistic is evaluated with the original G/FMA/XOR order.
+// This supplies only an upper bound; strict screening still retains exact ties.
+extern "C" __global__ void seedScreenCandidates(unsigned long long* seeds,const long long* residual,
+    float invScale,const int* widths,const int* selected,const int* offsets,const int* strides,
+    const bool* mask,int nSelected,int nDurations,int tSize,int size,float depthMin) {
+    int period=blockIdx.x,lane=threadIdx.x&31;
+    const long long* row=residual+(long long)period*size;
+    unsigned long long best=0;
+    for(int i=threadIdx.x;i<nSelected*32;i+=blockDim.x) {
+        int d=i/32,sample=i%32,duration=selected[d];
+        if(!mask[(long long)period*nDurations+duration])continue;
+        int width=widths[duration],count=offsets[d+1]-offsets[d];
+        int ordinal=(long long)sample*count/32,start=ordinal*strides[d];
+        long long sum=row[start+width-1]-(start?row[start-1]:0);
+        float depth=__fdiv_rn(__ll2float_rn(sum)*invScale,(float)width);
+        float score=(depth*depth)*(float)width;
+        if(depth>depthMin && score>0 && isfinite(score)) {
+            unsigned int index=(unsigned int)d*(unsigned int)tSize+(unsigned int)start;
+            unsigned long long key=((unsigned long long)__float_as_uint(score)<<32)|(0xffffffffu-index);
+            best=key>best?key:best;
+        }
+    }
+    for(int offset=16;offset;offset>>=1){unsigned long long v=__shfl_xor_sync(0xffffffff,best,offset);best=v>best?v:best;}
+    __shared__ unsigned long long shared[32];
+    if(lane==0)shared[threadIdx.x/32]=best;
+    __syncthreads();
+    if(threadIdx.x<32) {
+        best=threadIdx.x<blockDim.x/32?shared[threadIdx.x]:0;
+        for(int offset=16;offset;offset>>=1){unsigned long long v=__shfl_xor_sync(0xffffffff,best,offset);best=v>best?v:best;}
+        if(threadIdx.x==0)seeds[period]=best?((best&0xffffffff00000000ull)|(0xffffffffu-(unsigned int)best)):0xffffffffffffffffull;
+    }
+}
+template <bool Packed> __device__ void evaluateScreenSeedImpl(unsigned long long* upper,const long long* residual,float invScale,
+    const float2* weighted,const float* signal,const float* overshoot,const int* widths,const int* selected,
+    const int* lanes,int tSize,int size,int maxWidth,float uniformWeight) {
+    int period=blockIdx.x,lane=threadIdx.x;unsigned long long seed=upper[period];
+    if(seed==0xffffffffffffffffull)return;
+    unsigned int index=(unsigned int)seed;int d=index/(unsigned int)tSize,start=index%(unsigned int)tSize,duration=selected[d],width=widths[duration],g=lanes[d];
+    const float* h=signal+(long long)duration*maxWidth;
+    long long offset=(long long)period*size+start;
+    float cross=0,square=0;
+    if(lane<g)for(int j=lane;j<width;j+=g) {
+        float s=h[j];float2 v=Packed?make_float2(((const float*)weighted)[offset+j],uniformWeight):weighted[offset+j];
+        cross=fmaf(s,v.x,cross);square=fmaf(s*s,v.y,square);
+    }
+    for(int k=g/2;k;k>>=1){cross+=__shfl_xor_sync(0xffffffff,cross,k);square+=__shfl_xor_sync(0xffffffff,square,k);}
+    if(lane==0) {
+        const long long* r=residual+(long long)period*size;
+        long long sum=r[start+width-1]-(start?r[start-1]:0);
+        float depth=__fdiv_rn(__ll2float_rn(sum)*invScale,(float)width);
+        float amplitude=depth*overshoot[duration]*2.0f;
+        float delta=amplitude*(amplitude*square-2.0f*cross);
+        upper[period]=isfinite(delta)?((unsigned long long)orderedKey(delta)<<32):0xffffffffffffffffull;
+    }
+}
+extern "C" __global__ void evaluateScreenSeed(unsigned long long* upper,const long long* residual,float invScale,
+    const float2* weighted,const float* signal,const float* overshoot,const int* widths,const int* selected,
+    const int* lanes,int tSize,int size,int maxWidth,float uniformWeight) {
+    evaluateScreenSeedImpl<false>(upper,residual,invScale,weighted,signal,overshoot,widths,selected,lanes,tSize,size,maxWidth,uniformWeight);
+}
+extern "C" __global__ void evaluateScreenSeedPacked(unsigned long long* upper,const long long* residual,float invScale,
+    const float2* weighted,const float* signal,const float* overshoot,const int* widths,const int* selected,
+    const int* lanes,int tSize,int size,int maxWidth,float uniformWeight) {
+    evaluateScreenSeedImpl<true>(upper,residual,invScale,weighted,signal,overshoot,widths,selected,lanes,tSize,size,maxWidth,uniformWeight);
+}

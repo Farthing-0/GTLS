@@ -10,15 +10,23 @@ import tqdm
 from . import constants
 from .grid import duration_limit_masses
 from .helpers import transit_mask
-from .screening import certificates, MIN_WIDTH
+from .screening import (certificates, MIN_WIDTH, SCREEN_TOLERANCES,
+                        UNIFORM_PREFIX_STRIDE, GENERAL_PREFIX_STRIDE,
+                        uniform_sparse_certificate, sparse_certificate, prefix_quantization)
 from .stats import all_transit_times, calcDurationDays, intransit_stats, snr_stats, spectra
+from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
+                        bytes_per_period as workspace_bytes_per_period)
 
 KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
 
 
 def load_module():
     """Compile the CUDA kernels."""
-    return cp.RawModule(code=KERNEL_SOURCE.read_text())
+    # The extra FP64 bound pays off on A100-class devices; the 3090's 1:64 FP64
+    # rate showed no gain. Compile out the shortcut on those devices entirely.
+    ratio = cp.cuda.Device().attributes.get("SingleToDoublePrecisionPerfRatio", 64)
+    options = (f"-DGTLS_CHEAP_SCREEN_BOUNDS={int(ratio <= 2)}",)
+    return cp.RawModule(code=KERNEL_SOURCE.read_text(), options=options)
 
 
 def foldCPU(time, flux, dy, period):
@@ -60,7 +68,9 @@ def find_nearest_indices(a, b):
 
 
 EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
-SCAN_THREADS = 512  # threads per row of the scan kernels
+SCAN_THREADS = 512  # threads per row of the integer scan kernels
+SCREEN_SCAN_THREADS = 32  # 16 samples per thread: a 512-point screening tile
+SCREEN_THREADS = 32  # nearby starts share prefix cache lines across durations
 MAX_BATCH = 65535  # periods are the y dimension of the kernel grids
 BATCHES_MIN = 30  # the first pass is split into at least this many batches
 MEMORY_FRACTION = 0.9  # share of the free device memory used by one batch
@@ -74,6 +84,17 @@ def start_strides(widths, margin):
         return np.ones(len(widths), dtype=np.int32)
     skip = int(1 / margin)
     return np.where(widths > skip, widths // skip, 1).astype(np.int32)
+
+
+def screen_block_map(offsets, strides):
+    """Schedule contiguous candidate blocks by start time, retaining original IDs."""
+    counts = (np.diff(offsets) + SCREEN_THREADS - 1) // SCREEN_THREADS
+    duration = np.repeat(np.arange(len(strides), dtype=np.int32), counts)
+    item = np.concatenate([np.arange(left, right, SCREEN_THREADS, dtype=np.int32)
+                           for left, right in zip(offsets[:-1], offsets[1:])])
+    start = (item - offsets[duration]) * strides[duration]
+    order = np.argsort(start, kind='stable')
+    return np.column_stack((duration[order], item[order])).astype(np.int32)
 
 
 WINDOW_LANES = (1, 2, 4, 8, 16, 32)  # threads per window of the searchChi2G* kernels
@@ -132,6 +153,19 @@ def decode_keys(keys, base):
 class GPUSearch:
     """GPU state shared by all chi2 evaluations of one light curve."""
 
+    def window_standard_deviations(self, data, width):
+        """Reuse completed search buffers for the final pink-noise statistic."""
+        size = len(data)
+        count = size - width + 1
+        with cp.cuda.Device(self.tGPU.device.id):
+            source = self.workspace.view('scratch', (size,), cp.float64)
+            output = self.workspace.view('cumulative', (count,), cp.float64)
+            source.set(np.ascontiguousarray(data))
+            self.module.get_function('windowStd')(
+                ((count + 255) // 256,), (256,),
+                (source, output, np.int32(count), np.int32(width)))
+            return output.get()
+
     def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
                  T0_refine_margin, R_star_min=constants.R_STAR_MIN, R_star_max=constants.R_STAR_MAX,
                  M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX):
@@ -151,6 +185,7 @@ class GPUSearch:
         self.maxDuration = maxDuration
 
         self.tSize = len(t)
+        self.nBuckets = bucket_count(self.tSize)
         self.patchedDatasSize = int(self.tSize + maxDuration)
 
         self.tGPU = cp.asarray(t).astype(cp.float64)
@@ -162,13 +197,19 @@ class GPUSearch:
         self.transit_depth_min = np.float32(transit_depth_min)
         self.constant_residual = float(np.sum(((1.0 - y) / dy) ** 2))
 
-        # chi2 without transit, sum of w r^2 as searchChi2 weights the points (patchWeighted):
+        # Rebuild from this call's dy; only the per-period permutation is repeated.
+        self.preparedGPU = cp.empty((self.tSize, 2), dtype=cp.float32)
+        module.get_function("prepareWeights")(
+            ((self.tSize + 255) // 256,), (256,),
+            (self.residualGPU, self.dyGPU, self.preparedGPU, np.int32(self.tSize)))
+
+        # chi2 without transit, sum of w r^2 as searchChi2 weights the points:
         # it does not depend on the order of the points, so it is the same for every period
         dy2 = cp.maximum(self.dyGPU * self.dyGPU, cp.float32(1e-10))
         weightedResidual = (cp.float32(1.0) / dy2) * self.residualGPU
         self.base = float(cp.sum(weightedResidual.astype(cp.float64) * self.residualGPU.astype(cp.float64)))
 
-        # Fixed-point scale 2^E of the residual prefix sums (scanResidual): the largest E with
+        # Fixed-point scale 2^E of the residual prefix sums: the largest E with
         # patchedDatasSize * max|r| * 2^E < 2^62, so no prefix sum can overflow int64
         bound = self.patchedDatasSize * float(cp.max(cp.abs(self.residualGPU)))
         exponent = 62 - int(np.ceil(np.log2(bound))) if bound > 0 else 62
@@ -189,16 +230,74 @@ class GPUSearch:
         # every-point fit and small curves retain the adjacent-window path.
         self.screening = (self.tSize >= 8192 and self.maxWidth >= MIN_WIDTH
                           and min(T0_fit_margin, T0_refine_margin) > 0)
+        self.uniformWeight = None
+        self.screenPrefixStride = 1
+        self.screenQuantization = None
         if self.screening:
             max_z = float(cp.max(cp.abs(weightedResidual)))
             max_w = float(cp.max(cp.float32(1) / dy2))
             self.screening = bool(np.isfinite(max_z) and np.isfinite(max_w))
-            if self.screening:
-                pos, coef, meta, self.screenMassError = certificates(
-                    signal, durations, max_z, max_w, self.patchedDatasSize)
-                self.screenPositions = cp.asarray(pos)
-                self.screenCoefficients = cp.asarray(coef)
-                self.screenMetadata = cp.asarray(meta)
+        # First-time Numba compilation can retain its caller frame until GC.
+        # Drop temporary device arrays before entering that compiler.
+        del dy2, weightedResidual
+        if self.screening:
+            self.screenPrefixStride = GENERAL_PREFIX_STRIDE
+            # Check this call's actual FP32 weights, including the variance
+            # floor. No uniform-weight assumption survives across searches.
+            if bool(cp.all(self.preparedGPU[:, 1] == self.preparedGPU[0, 1])):
+                self.uniformWeight = np.float32(self.preparedGPU[0, 1].get())
+                self.screenPrefixStride = UNIFORM_PREFIX_STRIDE
+            stride = self.screenPrefixStride
+            certificateSize = (self.patchedDatasSize+stride-1)//stride*stride
+            if cp.cuda.Device().attributes.get("SingleToDoublePrecisionPerfRatio", 64) > 2:
+                self.screenQuantization = prefix_quantization(certificateSize, max_z, max_w)
+            point_error = None if self.screenQuantization is None else self.screenQuantization[2]
+            prefix_maxima = (np.array([max_z, max_w]) if point_error is None else
+                             np.nextafter(np.array([max_z, max_w])+point_error, np.inf))
+            self.screenCertificates = []
+            for tolerance in SCREEN_TOLERANCES:
+                pos, coef, meta, mass_error = certificates(
+                    signal, durations, max_z, max_w, certificateSize, tolerance, point_error)
+                if self.uniformWeight is not None:
+                    pos, coef, meta = uniform_sparse_certificate(
+                        pos, coef, meta, stride, certificateSize, prefix_maxima[0])
+                else:
+                    pos, coef, meta = sparse_certificate(
+                        pos, coef, meta, stride, certificateSize, *prefix_maxima)
+                self.screenCertificates.append((cp.asarray(pos), cp.asarray(coef),
+                                                cp.asarray(meta), *map(np.float64, mass_error)))
+        self.workspace = None
+        self.screenMapKey = None
+        self.screenMapGPU = None
+        self.screenBudgetsGPU = None
+        self.uniformSquareGPU = (cp.empty(len(self.durations), dtype=cp.float32)
+                                 if self.uniformWeight is not None else None)
+        self.screenPrefixBytes = 12 if self.uniformWeight is not None else 24
+        self.screenPrefixSize = ((self.patchedDatasSize+self.screenPrefixStride-1)//self.screenPrefixStride+1
+                                 if self.screenPrefixStride > 1 else self.patchedDatasSize)
+        self.weightedPointBytes = 4 if self.uniformWeight is not None else 8
+        self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
+            self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
+
+    def close(self):
+        """Release device resources even if a compiler/debugger retains this object."""
+        self.workspace = None
+        if hasattr(self, 'screenCertificates'):
+            self.screenCertificates.clear()
+        for name, value in vars(self).items():
+            if isinstance(value, cp.ndarray):
+                setattr(self, name, None)
+
+    def reserve_workspace(self, capacity):
+        """Keep the largest batch allocation for the search, including short tail/refit calls."""
+        if self.workspace is None or self.workspace.capacity < capacity:
+            self.workspace = None
+            self.workspace = BatchWorkspace(capacity, self.tSize, self.patchedDatasSize,
+                                            self.maxScreenStarts, self.screening,
+                                            prefix_bytes=self.screenPrefixBytes,
+                                            weighted_bytes=self.weightedPointBytes,
+                                            prefix_points=self.screenPrefixSize)
+        return self.workspace
 
     def duration_mask(self, periods):
         """Boolean array (periods x durations) of physically plausible durations per period."""
@@ -233,6 +332,10 @@ class GPUSearch:
         tSize = self.tSize
         patchedSize = self.patchedDatasSize
         nPeriods = len(periods)
+        workspace = self.reserve_workspace(nPeriods)
+        # Offsets use the allocated capacity; active views have tightly packed rows
+        # for the current (possibly shorter) batch, as expected by the CUDA kernels.
+        index_bytes = workspace.index_bytes
 
         durationsBool = cp.any(periodMaskGPU, axis=0).get()
         selected = np.flatnonzero(durationsBool).astype(np.int32)
@@ -243,42 +346,42 @@ class GPUSearch:
 
         # Phase fold and sort (bucket sort, equal to a stable argsort of the phases)
         inversePeriodsGPU = cp.asarray(1.0 / np.asarray(periods, dtype=np.float64))
-        phasesGPU = cp.empty((nPeriods, tSize), dtype=cp.float64)
-        countsGPU = cp.zeros((nPeriods, tSize), dtype=cp.int32)
+        phasesGPU = workspace.view('scratch', (nPeriods, tSize), cp.uint32, index_bytes)
+        nBuckets = self.nBuckets
+        countsGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, 2*index_bytes)
+        countsGPU.fill(0)
         grid = ((tSize + 255) // 256, nPeriods)
-        module.get_function("foldBuckets")(
-            grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize)))
-        cursorGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
-        module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(tSize)))
-        sortIndexGPU = cp.empty((nPeriods, tSize), dtype=cp.int32)
-        module.get_function("bucketScatter")(
-            grid, (256,), (phasesGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
-        module.get_function("sortBuckets")(
-            grid, (256,), (phasesGPU, countsGPU, cursorGPU, sortIndexGPU, np.int32(tSize)))
+        module.get_function("foldBucketsPackedPhase")(
+            grid, (256,), (self.tGPU, inversePeriodsGPU, phasesGPU, countsGPU, np.int32(tSize), np.int32(nBuckets)))
+        cursorGPU = workspace.view('scratch', (nPeriods, nBuckets), cp.int32, workspace.cursor_offset)
+        module.get_function("scanCounts")((nPeriods,), (SCAN_THREADS,), (countsGPU, cursorGPU, np.int32(nBuckets)))
+        sortIndexGPU = workspace.view('scratch', (nPeriods, tSize), cp.int32)
+        module.get_function("bucketScatterPackedPhase")(
+            grid, (256,), (phasesGPU, self.tGPU, inversePeriodsGPU, cursorGPU, sortIndexGPU,
+                          np.int32(tSize), np.int32(nBuckets)))
+        module.get_function("sortBucketsPackedPhase")(
+            ((nBuckets+255)//256, nPeriods), (256,),
+            (phasesGPU, self.tGPU, inversePeriodsGPU, countsGPU, cursorGPU, sortIndexGPU,
+             np.int32(tSize), np.int32(nBuckets)))
         del phasesGPU, countsGPU, cursorGPU
 
         # Folded data, extended by maxDuration points to handle transits at the phase edge
-        residualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.float32)
-        weightedGPU = cp.empty((nPeriods, patchedSize, 2), dtype=cp.float32)
-        module.get_function("patchWeighted")(
-            ((patchedSize + 255) // 256, nPeriods), (256,),
-            (sortIndexGPU, self.residualGPU, self.dyGPU, residualGPU, weightedGPU,
-             np.int32(tSize), np.int32(patchedSize)))
+        packed = self.uniformWeight is not None
+        weightedGPU = workspace.view('weighted', (nPeriods, patchedSize, 1 if packed else 2), cp.float32)
+        cumResidualGPU = workspace.view('cumulative', (nPeriods, patchedSize), cp.int64)
+        patchThreads = min(1024, max(32, 1 << ((patchedSize+1)//2-1).bit_length()))
+        module.get_function("patchScanPacked" if packed else "patchScan")(
+            (nPeriods,), (patchThreads,),
+            (sortIndexGPU, self.preparedGPU, weightedGPU, cumResidualGPU,
+             self.fixedScale, np.int32(tSize), np.int32(patchedSize)))
         del sortIndexGPU
-
-        # Fixed-point prefix sums of the residuals
-        cumResidualGPU = cp.empty((nPeriods, patchedSize), dtype=cp.int64)
-        module.get_function("scanResidual")(
-            (nPeriods,), (SCAN_THREADS,),
-            (residualGPU, cumResidualGPU, self.fixedScale, np.int32(patchedSize)))
-        del residualGPU
 
         # Adjacent windows share input loads for the longer windows. Group within each
         # duration, so an incomplete group never consumes starts from the next duration.
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
         lanes = lanes_per_window(strides)
         screening = self.screening and margin > 0
-        if not screening and np.any(lanes >= 8):
+        if not screening and not packed and np.any(lanes >= 8):
             adjacent = np.where(lanes == 32, 4, np.where(lanes >= 8, 2, 1))
             group_counts = (np.diff(offsets) + adjacent - 1) // adjacent
             offsets = np.concatenate(([0], np.cumsum(group_counts)))
@@ -286,19 +389,67 @@ class GPUSearch:
         offsetsGPU = cp.asarray(offsets.astype(np.int32))
         stridesGPU = cp.asarray(strides)
         if screening:
-            prefixGPU = cp.empty((nPeriods, patchedSize, 4), dtype=cp.float64)
-            module.get_function("scanScreening")(
-                (nPeriods,), (SCAN_THREADS,), (weightedGPU, prefixGPU, np.int32(patchedSize)))
+            # Only geometry is reused, within this search. The latest map suffices
+            # for consecutive batches; weights and bounds are always input-dependent.
+            mapKey = (tuple(selected), tuple(strides))
+            lanesGPU = cp.asarray(lanes)
+            if mapKey != self.screenMapKey:
+                self.screenMapGPU = cp.asarray(screen_block_map(offsets, strides))
+                if self.screenBudgetsGPU is None:
+                    self.screenBudgetsGPU = cp.empty((3*len(self.durations), 4), dtype=cp.float64)
+                module.get_function("prepareScreenBudgetsUniformSparse" if packed else "prepareScreenBudgetsSparse")(
+                    ((len(selected)+63)//64,), (64,),
+                    (self.widthsGPU, selectedGPU, lanesGPU, self.screenCertificates[0][2],
+                     self.screenBudgetsGPU, np.int32(len(selected)), np.int32(len(self.durations))))
+                if self.uniformWeight is not None:
+                    module.get_function("prepareUniformSquare")(
+                        (len(selected),), (32,),
+                        (self.signalGPU, self.widthsGPU, selectedGPU, lanesGPU,
+                         np.int32(self.maxWidth), self.uniformWeight, self.uniformSquareGPU))
+                self.screenMapKey = mapKey
+            prefixGPU = workspace.view('scratch', (nPeriods, self.screenPrefixSize, self.screenPrefixBytes), cp.uint8)
+            prefixKernel = "scanScreeningUniformSparse" if packed else "scanScreeningSparse"
+            prefix_args = (weightedGPU, prefixGPU, np.int32(patchedSize))
+            if self.screenQuantization is not None:
+                prefixKernel = "scanScreeningUniformInteger" if packed else "scanScreeningInteger"
+                prefix_args += (*self.screenQuantization[0], *self.screenQuantization[1])
+            module.get_function(prefixKernel)(
+                (nPeriods,), (SCREEN_SCAN_THREADS,), prefix_args)
             nBounds = int(offsets[-1])
-            lowerGPU = cp.empty((nPeriods, nBounds), dtype=cp.float32)
+            lowerGPU = workspace.view('lower', (nPeriods, nBounds), cp.float32)
             upperGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
-            module.get_function("screenCandidates")(
-                ((nBounds + 255)//256, nPeriods), (256,),
-                (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
-                 self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
-                 cp.asarray(lanes), periodMaskGPU, self.screenPositions, self.screenCoefficients,
-                 self.screenMetadata, *map(np.float64, self.screenMassError), np.int32(len(selected)),
-                 np.int32(len(self.durations)), np.int32(tSize), np.int32(patchedSize), self.transit_depth_min))
+            if len(selected)*tSize < 2**32:
+                # Reuse the upper-bound buffer for the chosen original-grid
+                # location, then replace it with that candidate's exact delta.
+                module.get_function("seedScreenCandidates")(
+                    (nPeriods,), (256,),
+                    (upperGPU, cumResidualGPU, self.fixedInvScale, self.widthsGPU,
+                     selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
+                     np.int32(len(selected)), np.int32(len(self.durations)),
+                     np.int32(tSize), np.int32(patchedSize), self.transit_depth_min))
+                module.get_function("evaluateScreenSeedPacked" if packed else "evaluateScreenSeed")(
+                    (nPeriods,), (32,),
+                    (upperGPU, cumResidualGPU, self.fixedInvScale, weightedGPU,
+                     self.signalGPU, self.overshootGPU, self.widthsGPU, selectedGPU,
+                     lanesGPU, np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth),
+                     self.uniformWeight if packed else np.float32(0)))
+            screen_before = (lowerGPU, upperGPU, prefixGPU, cumResidualGPU, self.fixedInvScale,
+                             self.overshootGPU, self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU,
+                             lanesGPU, periodMaskGPU)
+            screen_after = (np.int32(len(selected)), np.int32(len(self.durations)), np.int32(tSize),
+                            np.int32(patchedSize), self.transit_depth_min)
+            # Tight certificates only visit survivors of the preceding pass. All
+            # passes reuse the same prefix and bound buffers; final FP32 evaluation
+            # and tie ordering are unchanged.
+            for level, certificate in enumerate(self.screenCertificates):
+                kernel = "refineCandidates" if level else "screenCandidates"
+                kernel += "UniformSparse" if self.uniformWeight is not None else "MappedSparse"
+                uniform_args = ((self.uniformSquareGPU, self.uniformWeight)
+                                if self.uniformWeight is not None else ())
+                module.get_function(kernel)(
+                    (len(self.screenMapGPU), nPeriods), (SCREEN_THREADS,),
+                    screen_before + certificate + screen_after
+                    + (self.screenMapGPU, self.screenBudgetsGPU) + uniform_args)
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):
@@ -309,13 +460,35 @@ class GPUSearch:
             nGroups = int(offsets[yEnd] - offsets[yBegin])
             kernel = (f"searchChi2ScreenedG{G}" if screening else
                       f"searchChi2AdjacentG{G}" if G >= 8 else f"searchChi2G{G}")
-            module.get_function(kernel)(
-                ((nGroups * G + 255) // 256, nPeriods), (256,),
-                (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
-                 self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
-                 np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
-                 np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min)
-                + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()))
+            if packed:
+                kernel = f"searchChi2PackedScreenedG{G}" if screening else f"searchChi2PackedG{G}"
+            work_items = nGroups
+            compact_args = ()
+            # Prefix data are dead after screening. Reuse their arena for the
+            # surviving indices and row counts, retaining the original path if
+            # this layout does not fit or the candidate set is dense.
+            if screening and 4*nPeriods*(nGroups+1) <= workspace.regions['scratch'][1]:
+                candidatesGPU = workspace.view('scratch', (nPeriods, nGroups), cp.int32)
+                countsGPU = workspace.view('scratch', (nPeriods,), cp.int32, 4*nPeriods*nGroups)
+                countsGPU.fill(0)
+                module.get_function("compactCandidates")(
+                    ((nGroups + 255)//256, nPeriods), (256,),
+                    (lowerGPU, upperGPU, candidatesGPU, countsGPU, np.int32(offsets[yBegin]),
+                     np.int32(offsets[yEnd]), np.int32(nBounds), np.int32(nGroups)))
+                survivors = int(cp.max(countsGPU))
+                if survivors*4 <= nGroups:
+                    kernel = f"searchChi2{'Packed' if packed else ''}CompactedG{G}"
+                    work_items = survivors
+                    compact_args = (candidatesGPU, countsGPU, np.int32(nGroups))
+            if work_items:
+                module.get_function(kernel)(
+                    ((work_items * G + 255) // 256, nPeriods), (256,),
+                    (bestGPU, cumResidualGPU, self.fixedInvScale, weightedGPU, self.signalGPU, self.overshootGPU,
+                     self.widthsGPU, selectedGPU, offsetsGPU, stridesGPU, periodMaskGPU,
+                     np.int32(yBegin), np.int32(yEnd), np.int32(len(self.durations)),
+                     np.int32(tSize), np.int32(patchedSize), np.int32(self.maxWidth), self.transit_depth_min)
+                    + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()) + compact_args
+                    + ((self.uniformWeight,) if packed else ()))
             yBegin = yEnd
         return bestGPU
 
@@ -356,35 +529,34 @@ class MultiGPUSearch:
         return self.searches[0]
 
     def bytes_per_period(self):
-        """Peak device memory of one period of a best_keys batch, in bytes.
+        """Persistent workspace plus small per-period masks, scalars and decoded results.
 
-        Live arrays peak in scanResidual at 20 P + 16 (P = patchedDatasSize): residual (4 P),
-        weighted (8 P), cumResidual (8 P) and periods (bounded by 16 bytes). The memory pool places residual
-        inside the freed 8 N phase buffer of the sort and cannot return that buffer to the
-        driver, so the device footprint is 8 N + 16 P + 16 (N = tSize), plus one byte per
-        duration for the period mask of searchChi2. Independent of T0_fit_margin.
+        One allocation owns the workspace across all batches. Its stage aliases
+        are explicit, so pool splitting cannot change its physical footprint.
+        Layout padding is budgeted separately in batch_size.
         """
         s = self.primary
-        base = 8 * s.tSize + 16 * s.patchedDatasSize + len(s.durations) + 16
-        if s.screening:
-            margin = min(s.T0_fit_margin, s.T0_refine_margin)
-            starts = np.sum(-(-s.tSize // start_strides(s.durations, margin)))
-            return base + 32*s.patchedDatasSize + 4*int(starts) + 8
-        return base
+        return (workspace_bytes_per_period(s.tSize, s.patchedDatasSize, s.maxScreenStarts, s.screening,
+                                           prefix_bytes=s.screenPrefixBytes,
+                                           weighted_bytes=s.weightedPointBytes,
+                                           prefix_points=s.screenPrefixSize)
+                + len(s.durations) + 128)
 
     @staticmethod
     def available_memory(device_id):
         """Free device memory, including blocks cached but unused by the CuPy memory pool."""
         with cp.cuda.Device(device_id):
             pool = cp.get_default_memory_pool()
-            return cp.cuda.Device(device_id).mem_info[0] + pool.total_bytes() - pool.used_bytes()
+            free = cp.cuda.Device(device_id).mem_info[0] + pool.total_bytes() - pool.used_bytes()
+            limit = pool.get_limit()
+            return min(free, max(0, limit-pool.used_bytes())) if limit else free
 
     def batch_size(self, n_periods):
         """Periods per batch: at least BATCHES_MIN batches (progress bar and balance between
         devices), within the memory of the fullest device. Results do not depend on it."""
         free = min(self.available_memory(device_id) for device_id in self.device_ids)
-        by_memory = int(MEMORY_FRACTION * free // self.bytes_per_period())
-        if free < self.bytes_per_period():
+        by_memory = int((MEMORY_FRACTION * free - LAYOUT_ALLOWANCE) // self.bytes_per_period())
+        if free < self.bytes_per_period() + LAYOUT_ALLOWANCE:
             raise MemoryError(
                 f"One period needs {self.bytes_per_period() / 2**20:.0f} MiB of GPU memory, "
                 f"{free / 2**20:.0f} MiB are free")
@@ -401,13 +573,31 @@ class MultiGPUSearch:
 
         def worker(device_id, search):
             with cp.cuda.Device(device_id):
+                capacity = singleCalcPeriods
                 while True:
                     with lock:
                         start_idx = next(batches, None)
                     if start_idx is None:
                         return
-                    end_idx = start_idx + singleCalcPeriods
-                    chi2[start_idx:end_idx] = search.chi2_batch(periods[start_idx:end_idx], singleCalcPeriods, refine)
+                    end_idx = min(start_idx + singleCalcPeriods, len(periods))
+                    cursor = start_idx
+                    while cursor < end_idx:
+                        stop = min(cursor+capacity, end_idx)
+                        failed = False
+                        try:
+                            chi2[cursor:stop] = search.chi2_batch(periods[cursor:stop], capacity, refine)
+                        except cp.cuda.memory.OutOfMemoryError:
+                            if stop-cursor == 1:
+                                raise
+                            failed = True
+                        if failed:
+                            # Leave the except block before releasing storage: the
+                            # exception traceback otherwise keeps failed arrays alive.
+                            search.workspace = None
+                            cp.get_default_memory_pool().free_all_blocks()
+                            capacity = max(1, (stop-cursor)//2)
+                            continue
+                        cursor = stop
                     if pbar is not None:
                         with lock:
                             pbar.update(1)
@@ -424,7 +614,8 @@ class MultiGPUSearch:
 
     def close(self):
         """Release the GPU arrays and return the cached memory to the driver."""
-        self.searches = []
+        while self.searches:
+            self.searches.pop().close()
         for device_id in self.device_ids:
             with cp.cuda.Device(device_id):
                 cp.get_default_memory_pool().free_all_blocks()
@@ -548,23 +739,25 @@ def search_single_period(search, period, t, y, dy):
 
     dataOutTransit = np.concatenate((bestFlux[0:bestRowT0], bestFlux[bestRowT0 + durationPointsNum:]))
 
-    snrFit = transitDepth * (durationPointsNum ** 0.5) / np.std(dataOutTransit)
+    whiteNoise = np.std(dataOutTransit)
+    snrFit = transitDepth * (durationPointsNum ** 0.5) / whiteNoise
     DataCumsum = np.cumsum(dataOutTransit)
     DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum]) / durationPointsNum
     redNoise = np.std(DataSlideAvg)
 
     Tx = bestTime[bestRowT0]
-    T0 = Tx - int((Tx - min(t)) / period) * period - period
+    minTime = min(t)
+    T0 = Tx - int((Tx - minTime) / period) * period - period
     transit_times = all_transit_times(T0, t, period)
 
     snrFitPink = transitDepth / (
-        (np.std(dataOutTransit) ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
+        (whiteNoise ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
 
     transit_duration_in_days = calcDurationDays(t, period, T0, rawDuration)
 
     T0 = T0 + transit_duration_in_days / 2
     transit_times = transit_times + transit_duration_in_days / 2
-    if T0 < min(t):
+    if T0 < minTime:
         T0 = T0 + period
 
     # SNR
@@ -579,6 +772,7 @@ def search_single_period(search, period, t, y, dy):
         transit_times=transit_times,
         transit_duration_in_days=transit_duration_in_days,
         per_transit_count=per_transit_count,
+        window_std=search.window_standard_deviations,
     )
 
     all_flux_intransit = np.concatenate([all_flux_intransit_odd, all_flux_intransit_even])
