@@ -12,6 +12,13 @@ in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 
 ## Features
 
+Version 2.2.4 aligns the final candidate's epoch fit and duration conversion
+with TLS2 2.0.4. The reported transit times and noise statistics now use those
+windows. This adds one CPU epoch fit after the GPU search; periodograms and
+the default 0.01 epoch-search margins are unchanged. Native template/depth
+selection remains on the GPU, so this does not promise bitwise equality of
+every output with TLS2.
+
 Version 2.2.3 corrects the out-of-transit noise masks used by `snr` and
 `snrPink`: their duration is now expressed in days, matching the time array.
 Earlier versions passed a fractional duration, which could bias the reported
