@@ -12,6 +12,12 @@ in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 
 ## Features
 
+Version 2.2.3 corrects the out-of-transit noise masks used by `snr` and
+`snrPink`: their duration is now expressed in days, matching the time array.
+Earlier versions passed a fractional duration, which could bias the reported
+signal-to-noise ratios. Period searches, periodograms, and the default 0.01
+epoch-search margins are unchanged by this correction.
+
 - Drop-in replacement for the `transitleastsquares` search API
 - Limb-darkened transit templates (default, grazing and box-shaped)
 - Batches trial periods automatically to fit the free GPU memory
