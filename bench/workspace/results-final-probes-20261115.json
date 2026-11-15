@@ -1,0 +1,125 @@
+{
+  "radix": [
+    {
+      "offset": 0,
+      "algorithm": "bucket",
+      "median_ms": 10.691583633422852
+    },
+    {
+      "offset": 0,
+      "algorithm": "sort32",
+      "median_ms": 13.11359977722168,
+      "temp_bytes": 645857535,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 0,
+      "algorithm": "sort64",
+      "median_ms": 37.14460754394531,
+      "temp_bytes": 968786175,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 0,
+      "algorithm": "sort_global",
+      "median_ms": 15.767552375793457,
+      "temp_bytes": 990320127,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 16000,
+      "algorithm": "bucket",
+      "median_ms": 10.609663963317871
+    },
+    {
+      "offset": 16000,
+      "algorithm": "sort32",
+      "median_ms": 12.962207794189453,
+      "temp_bytes": 645857535,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 16000,
+      "algorithm": "sort64",
+      "median_ms": 37.01145553588867,
+      "temp_bytes": 968786175,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 16000,
+      "algorithm": "sort_global",
+      "median_ms": 15.777791976928711,
+      "temp_bytes": 990320127,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 40000,
+      "algorithm": "bucket",
+      "median_ms": 9.899007797241211
+    },
+    {
+      "offset": 40000,
+      "algorithm": "sort32",
+      "median_ms": 12.929023742675781,
+      "temp_bytes": 645857535,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 40000,
+      "algorithm": "sort64",
+      "median_ms": 37.03910446166992,
+      "temp_bytes": 968786175,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    },
+    {
+      "offset": 40000,
+      "algorithm": "sort_global",
+      "median_ms": 15.814656257629395,
+      "temp_bytes": 990320127,
+      "different_indices": 0,
+      "note": "Radix timing excludes folding and collision repair"
+    }
+  ],
+  "certificate_tree": {
+    "times": {
+      "original": 0.26632309705018997,
+      "tree": 0.22777692880481482
+    },
+    "all_certificate_arrays_bitwise_equal": true
+  },
+  "additional_candidates": {
+    "adaptive-seed3-mixed": {
+      "times_seconds": [
+        9.332927510142326,
+        9.355917422100902,
+        9.394607225432992
+      ],
+      "median_seconds": 9.355917422100902,
+      "thermal_throttled": false,
+      "all_fields_bitwise_equal": true,
+      "decision": "Not retained: no stable end-to-end improvement",
+      "source": "/home/farthing/GTLS/optimization-20261115/adaptive-seed3-mixed/source"
+    },
+    "template-cache-mixed": {
+      "times_seconds": [
+        9.291745672002435,
+        9.3116952534765,
+        9.351587220095098
+      ],
+      "median_seconds": 9.3116952534765,
+      "thermal_throttled": false,
+      "all_fields_bitwise_equal": true,
+      "decision": "Not retained: no stable end-to-end improvement",
+      "source": "/home/farthing/GTLS/optimization-20261115/template-cache-mixed/source"
+    }
+  },
+  "baseline_source_matches_frozen_main": true
+}

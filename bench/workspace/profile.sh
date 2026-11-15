@@ -3,12 +3,14 @@ set -euo pipefail
 WORKSPACE_REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 WORKSPACE_TRACE="${1:?Usage: profile.sh OUTPUT_DIR [run.py options]}"
 shift
-WORKSPACE_NSYS="${NSYS_BIN:-/home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114/bottleneck-analysis-20261114/tools/ncu2025/opt/nvidia/nsight-compute/2025.3.1/host/target-linux-x64/nsys}"
+WORKSPACE_NSYS="$("$WORKSPACE_REPO/.venv/bin/python" "$WORKSPACE_REPO/bench/workspace/find_nsys.py")"
 mkdir -p "$WORKSPACE_TRACE"
 if [[ -e "$WORKSPACE_TRACE/trace.nsys-rep" ]]; then
     echo "Trace already exists: $WORKSPACE_TRACE/trace.nsys-rep"
     exit 1
 fi
+"$WORKSPACE_NSYS" --version > "$WORKSPACE_TRACE/profiler-version.txt"
+printf '%s\n' "$WORKSPACE_NSYS" > "$WORKSPACE_TRACE/profiler-path.txt"
 "$WORKSPACE_NSYS" profile --trace=cuda,nvtx,osrt --sample=none --cpuctxsw=none \
     --capture-range=cudaProfilerApi --capture-range-end=stop --cuda-memory-usage=true \
     --output="$WORKSPACE_TRACE/trace" \
