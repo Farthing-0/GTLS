@@ -1,0 +1,41 @@
+{
+  "status": "running",
+  "benchmark_branch": "main",
+  "benchmark_commit": "7d27e916dd8afb29e2a1129f3fc8dd788f8d494d",
+  "versions": {
+    "gtls": "2.2.1",
+    "cetra": "1.04"
+  },
+  "input_cases": 30,
+  "dy_pattern": "mixed",
+  "repeats": 3,
+  "grid_policy": "Native automatic grid for each engine",
+  "active_lease": {
+    "id": 60727848,
+    "created_utc": "2026-11-15T02:50:21.276948+00:00",
+    "offer_id": 59284724,
+    "accepted_id": 59284724,
+    "quoted_dph": 1.1633333333333333
+  },
+  "gpu": "A100 SXM4 80GB",
+  "cpu": "AMD EPYC 7V12",
+  "prior_failed_instances": [
+    {
+      "id": 60726930,
+      "destroyed": true,
+      "reason": "Host DNS failure during image setup"
+    },
+    {
+      "id": 60727383,
+      "destroyed": true,
+      "reason": "Host DNS failure during image setup"
+    }
+  ],
+  "nsys": "Preinstalled /opt/nvidia/nsight-compute/2025.1.1/host/target-linux-x64/nsys",
+  "premerge_tests": "445 passed, 2 skipped",
+  "completed_jobs": 23,
+  "total_jobs": 60,
+  "source_difference_from_local_2_2_0": [
+    "version.py"
+  ]
+}

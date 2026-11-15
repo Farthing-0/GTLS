@@ -729,3 +729,10 @@ GTLS existing optimized median: 9.339336411096156 s on the same RTX3090.
 User approved 30 mixed-dy A100 cases, 5 lengths x 6 cadences, 3 repeats per engine, native grids; cap $1.50/h, $5 total, 3h.
 User requested patch release 2.2.1, merge to main, remain on main and upload main to A100.
 Premerge GPU checks: 445 passed, 2 skipped; 13.09 s. One existing flat-spectrum SDE warning.
+
+2026-11-15 A100 matrix execution checkpoint
+Main 2.2.1 source frozen at 7d27e916dd8afb29e2a1129f3fc8dd788f8d494d.
+Two DNS-failed leases destroyed; user authorized changing providers/hardware.
+Active A100 SXM4 80GB lease 60727848; quoted $1.1633333333/hour.
+Preinstalled nsys 2025.1.1 found and used; no profiler upload.
+30 varying-dy inputs, native GTLS/CETRA grids, 3 measured calls after full warmup.
