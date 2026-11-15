@@ -42,9 +42,11 @@ def all_transit_times(T0, t, period):
     else:
         transit_times = [T0]
     previous_transit_time = transit_times[0]
+    # Keep the original arithmetic, but avoid three full scans per transit.
+    end = np.min(t) + (np.max(t) - np.min(t))
     while True:
         next_transit_time = previous_transit_time + period
-        if next_transit_time < (np.min(t) + (np.max(t) - np.min(t))):
+        if next_transit_time < end:
             transit_times.append(next_transit_time)
             previous_transit_time = next_transit_time
         else:
@@ -76,6 +78,22 @@ def calcDurationDays(times, period, StartT0, rawDuration):
     return DurationDays
 
 
+def _transit_flux(t, y, transit_times, transit_duration_in_days):
+    """Yield the original strict time windows without changing sample order."""
+    ordered = np.all(t[1:] >= t[:-1])
+    for mid_transit in transit_times:
+        tmin = mid_transit - 0.5 * transit_duration_in_days
+        tmax = mid_transit + 0.5 * transit_duration_in_days
+        if np.isnan(tmin) or np.isnan(tmax):
+            yield np.array([])
+        elif ordered:
+            left = np.searchsorted(t, tmin, side="right")
+            right = np.searchsorted(t, tmax, side="left")
+            yield y[left:right]
+        else:
+            yield y[np.where(np.logical_and(t > tmin, t < tmax))]
+
+
 def intransit_stats(t, y, transit_times, transit_duration_in_days):
     """Return all in-transit flux points of odd and even transits, and the point count per transit"""
 
@@ -83,13 +101,7 @@ def intransit_stats(t, y, transit_times, transit_duration_in_days):
     all_flux_intransit_even = np.array([])
     per_transit_count = np.zeros([len(transit_times)])
 
-    for i, mid_transit in enumerate(transit_times):
-        tmin = mid_transit - 0.5 * transit_duration_in_days
-        tmax = mid_transit + 0.5 * transit_duration_in_days
-        if np.isnan(tmin) or np.isnan(tmax):
-            flux_intransit = np.array([])
-        else:
-            flux_intransit = y[np.where(np.logical_and(t > tmin, t < tmax))]
+    for i, flux_intransit in enumerate(_transit_flux(t, y, transit_times, transit_duration_in_days)):
         per_transit_count[i] = np.size(flux_intransit)
 
         if i % 2 == 0:
@@ -100,20 +112,30 @@ def intransit_stats(t, y, transit_times, transit_duration_in_days):
     return all_flux_intransit_odd, all_flux_intransit_even, per_transit_count
 
 
-def pink_noise(data, width):
+def pink_noise(data, width, window_std=None):
     """Mean standard deviation of all windows of width points, divided by sqrt(width)."""
     std = np.float64(0.0)
     datapoints = len(data) - width + 1
     if datapoints > 0 and width > 0:
-        windows = np.lib.stride_tricks.sliding_window_view(data, width)
         # Bound the temporary memory of np.std to about 2**22 values per chunk
         chunk = max(1, 2 ** 22 // width)
-        for i in range(0, datapoints, chunk):
-            std += np.std(windows[i:i + chunk], axis=1).sum()
+        if (window_std is not None and 4096 <= datapoints <= np.iinfo(np.int32).max
+                and width <= 256 and isinstance(data, np.ndarray)
+                and data.ndim == 1 and data.dtype == np.float64 and np.all(np.isfinite(data))):
+            # The GPU preserves NumPy's per-window pairwise sum order. Retain
+            # the original CPU chunk reductions, including their boundaries.
+            deviations = window_std(data, width)
+            for i in range(0, datapoints, chunk):
+                std += deviations[i:i + chunk].sum()
+        else:
+            windows = np.lib.stride_tricks.sliding_window_view(data, width)
+            for i in range(0, datapoints, chunk):
+                std += np.std(windows[i:i + chunk], axis=1).sum()
     return std / (datapoints * width ** 0.5)
 
 
-def snr_stats(t, y, period, duration, T0, transit_times, transit_duration_in_days, per_transit_count):
+def snr_stats(t, y, period, duration, T0, transit_times, transit_duration_in_days, per_transit_count,
+              window_std=None):
     """Return the pink-noise SNR of each transit"""
 
     snr_pink_per_transit = np.zeros([len(transit_times)])
@@ -121,19 +143,14 @@ def snr_stats(t, y, period, duration, T0, transit_times, transit_duration_in_day
     flux_ootr = y[~intransit]
 
     try:
-        pinknoise = pink_noise(flux_ootr, int(np.mean(per_transit_count)))
+        pinknoise = pink_noise(flux_ootr, int(np.mean(per_transit_count)), window_std)
     except Exception:
         pinknoise = np.nan
 
     if len(flux_ootr) == 0 or np.isnan(np.std(flux_ootr)):
         return snr_pink_per_transit
 
-    for i, mid_transit in enumerate(transit_times):
-        tmin = mid_transit - 0.5 * transit_duration_in_days
-        tmax = mid_transit + 0.5 * transit_duration_in_days
-        if np.isnan(tmin) or np.isnan(tmax):
-            continue
-        flux_intransit = y[np.where(np.logical_and(t > tmin, t < tmax))]
+    for i, flux_intransit in enumerate(_transit_flux(t, y, transit_times, transit_duration_in_days)):
         if len(flux_intransit) > 0:
             try:
                 snr_pink_per_transit[i] = (1 - np.mean(flux_intransit)) / pinknoise

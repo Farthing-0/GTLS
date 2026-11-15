@@ -1,0 +1,13 @@
+{
+  "retained": false,
+  "times_seconds": [
+    36.94213030021638,
+    37.214073677547276,
+    37.319848728366196
+  ],
+  "median_seconds": 37.214073677547276,
+  "thermal_throttled": true,
+  "speedup": 0.9890240423056614,
+  "all_fields_bitwise_equal": true,
+  "reason": "No measured gain; restore 512-thread screening scan."
+}

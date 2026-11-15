@@ -1,0 +1,39 @@
+{
+  "periods": 64,
+  "baseline_sha256": "72ff14cd19facce8c02a9dfaad48ec483a917a02ef658c0bc69514058ca779d6",
+  "candidate_sha256": "7f7ad1c7821c117dbe3efa4a0ccf1e290c54afab221b01d4dd67645ea89c8b9c",
+  "timing": "CUDA event kernel time only",
+  "bounds_bitwise_equal": true,
+  "upper_keys_bitwise_equal": true,
+  "times_ms": {
+    "baseline": [
+      17.958911895751953,
+      17.879039764404297,
+      17.977344512939453,
+      17.949695587158203,
+      17.87494468688965,
+      17.939456939697266
+    ],
+    "candidate": [
+      17.982463836669922,
+      17.941503524780273,
+      17.992704391479492,
+      17.893375396728516,
+      17.989599227905273,
+      17.916927337646484
+    ]
+  },
+  "median_ms": {
+    "baseline": 17.944576263427734,
+    "candidate": 17.961983680725098
+  },
+  "candidates": 17080576,
+  "grid": [
+    1043,
+    64
+  ],
+  "block": [
+    256
+  ],
+  "speedup": 0.9990308744509081
+}

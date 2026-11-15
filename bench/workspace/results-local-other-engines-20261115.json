@@ -1,0 +1,59 @@
+{
+  "input_case": "730 days / 100 s",
+  "n_points": 630720,
+  "dy": "mixed",
+  "period_bounds_days": [
+    1,
+    12
+  ],
+  "input_sha256": {
+    "t": "982ecd0c8f550abb8029f2f1c61b9fd4edba1b2c6c3932e0bbc1b420df9d1dd7",
+    "y": "91509630a2fe3a7e635a503aae09f813cdacafcca0fe0b12392a1950de81ad23",
+    "dy": "840e0489b6ccb53708a6c8b6f8d30ce7c1cc551c7d45b01c8a644fb730f60d5c"
+  },
+  "tls2": {
+    "seconds": 2208.2700257832184,
+    "version": "2.0.4",
+    "cpu": "Xeon E5-2680 v4",
+    "workers": 14,
+    "repetitions": 1,
+    "warmup": "30-day compilation warmup only",
+    "result_output_retained": false
+  },
+  "cetra": {
+    "median_seconds": 45.913158763200045,
+    "times_seconds": [
+      45.88515186589211,
+      45.913158763200045,
+      46.01907672453672
+    ],
+    "version": "1.04",
+    "settings": {
+      "min_duration": 0.02,
+      "max_duration": 0.5,
+      "duration_log_step": 1.1,
+      "t0_stride_fraction": 0.1
+    },
+    "period_count": 48926,
+    "native_grid": true,
+    "recovered": true
+  },
+  "gtls": {
+    "median_seconds": 9.339336411096156,
+    "times_seconds": [
+      9.306646337732673,
+      9.339336411096156,
+      9.35269204992801
+    ],
+    "version": "2.2.0",
+    "period_count": 48935
+  },
+  "gpu": "RTX 3090, physical GPU1",
+  "gtls_speedup_vs_tls2": 236.44827946871595,
+  "gtls_speedup_vs_cetra": 4.91610503596917,
+  "notes": [
+    "Identical t/y/dy hashes for every engine",
+    "CETRA uses its native grid and phase/template rules; work is not algorithmically identical",
+    "TLS2 timing is one complete power() call after compilation warmup; extra repeat cancelled; raw periodogram not retained by original warmup path"
+  ]
+}

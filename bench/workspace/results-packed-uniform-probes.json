@@ -1,0 +1,106 @@
+{
+  "baseline_commit": "2b6067a",
+  "prototype_sha256": "c8bbb68660ef6b14816758d48eeaa6a681a4e0d1d30c865f172a58858c4968b1",
+  "results": {
+    "gpu0": [
+      {
+        "mode": "baseline",
+        "kernel_ms": {
+          "durationsGrid": 0.13107199780642986,
+          "durationBool": 0.0655359998345375,
+          "foldBuckets": 96.4403190612793,
+          "scanCounts": 11.648032188415527,
+          "bucketScatter": 164.36425590515137,
+          "sortBuckets": 89.6358413696289,
+          "patchScan": 116.19635200500488,
+          "prepareScreenBudgets": 0.10848000086843967,
+          "prepareUniformSquare": 0.8878080025315285,
+          "scanScreeningUniform": 213.46918106079102,
+          "screenCandidatesUniform": 142.16191864013672,
+          "refineCandidatesUniform": 122.1743996143341,
+          "compactCandidates": 3.371008053421974,
+          "searchChi2CompactedG32": 14.570271611213684,
+          "searchChi2CompactedG16": 0.08687999844551086
+        },
+        "target_ms": 344.3226846754551,
+        "total_kernel_ms": 975.3113555088639,
+        "elapsed_seconds": 0.9954572841525078,
+        "keys_bitwise_equal": true
+      },
+      {
+        "mode": "packed",
+        "kernel_ms": {
+          "durationsGrid": 0.14131199941039085,
+          "durationBool": 0.06860799994319677,
+          "foldBuckets": 96.3430404663086,
+          "scanCounts": 11.649983882904053,
+          "bucketScatter": 164.3950710296631,
+          "sortBuckets": 89.86518287658691,
+          "patchScan": 101.62377548217773,
+          "prepareScreenBudgets": 0.10649599879980087,
+          "prepareUniformSquare": 0.9000959992408752,
+          "scanScreeningUniform": 208.46489715576172,
+          "screenCandidatesUniform": 142.56332874298096,
+          "refineCandidatesUniform": 122.00956678390503,
+          "compactCandidates": 3.3751039803028107,
+          "searchChi2CompactedG32": 7.548768132925034,
+          "searchChi2CompactedG16": 0.06239999830722809
+        },
+        "target_ms": 317.6998407691717,
+        "total_kernel_ms": 949.1176305292174,
+        "elapsed_seconds": 0.9692293964326382,
+        "keys_bitwise_equal": true
+      }
+    ],
+    "gpu1": [
+      {
+        "mode": "baseline",
+        "kernel_ms": {
+          "durationsGrid": 0.13824000023305416,
+          "durationBool": 0.07270399946719408,
+          "foldBuckets": 110.17011260986328,
+          "scanCounts": 11.58243203163147,
+          "bucketScatter": 234.86259078979492,
+          "sortBuckets": 93.89356994628906,
+          "patchScan": 115.29216003417969,
+          "prepareScreenBudgets": 0.11177600175142288,
+          "prepareUniformSquare": 0.8673279881477356,
+          "scanScreeningUniform": 223.47158432006836,
+          "screenCandidatesUniform": 142.32370948791504,
+          "refineCandidatesUniform": 122.05363321304321,
+          "compactCandidates": 3.372032016515732,
+          "searchChi2CompactedG32": 14.883488416671753,
+          "searchChi2CompactedG16": 0.08867199718952179
+        },
+        "target_ms": 353.7359047681093,
+        "total_kernel_ms": 1073.1840328527614,
+        "elapsed_seconds": 1.0939953941851854,
+        "keys_bitwise_equal": true
+      },
+      {
+        "mode": "packed",
+        "kernel_ms": {
+          "durationsGrid": 0.1341439988464117,
+          "durationBool": 0.07577599864453077,
+          "foldBuckets": 109.9601936340332,
+          "scanCounts": 11.569152116775513,
+          "bucketScatter": 234.85337829589844,
+          "sortBuckets": 93.90080070495605,
+          "patchScan": 99.66386985778809,
+          "prepareScreenBudgets": 0.10985599830746651,
+          "prepareUniformSquare": 0.8663040027022362,
+          "scanScreeningUniform": 214.50751876831055,
+          "screenCandidatesUniform": 142.6983995437622,
+          "refineCandidatesUniform": 122.94748830795288,
+          "compactCandidates": 3.372032016515732,
+          "searchChi2CompactedG32": 7.6335999965667725,
+          "searchChi2CompactedG16": 0.06329599767923355
+        },
+        "target_ms": 321.86828462034464,
+        "total_kernel_ms": 1042.3558092387393,
+        "elapsed_seconds": 1.0627868482843041,
+        "keys_bitwise_equal": true
+      }
+    ]
+  }
+}

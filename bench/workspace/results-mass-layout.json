@@ -1,0 +1,243 @@
+{
+  "results": [
+    {
+      "batch": 128,
+      "median_ms": {
+        "double-row": 8.044544219970703,
+        "float-flat": 10.631168365478516,
+        "double-flat": 8.062975883483887,
+        "float-row-padded": 10.586112022399902,
+        "float-row-compact": 10.61683177947998,
+        "high-word": 8.695808410644531
+      },
+      "times_ms": {
+        "double-row": [
+          8.93228816986084,
+          8.075263977050781,
+          8.044544219970703,
+          7.979008197784424,
+          8.018943786621094
+        ],
+        "float-flat": [
+          12.025856018066406,
+          10.631168365478516,
+          10.632160186767578,
+          10.609663963317871,
+          10.61580753326416
+        ],
+        "double-flat": [
+          8.888319969177246,
+          8.078335762023926,
+          7.997439861297607,
+          8.062975883483887,
+          7.994368076324463
+        ],
+        "float-row-padded": [
+          10.784768104553223,
+          10.688511848449707,
+          10.583040237426758,
+          10.586112022399902,
+          10.565631866455078
+        ],
+        "float-row-compact": [
+          10.764287948608398,
+          10.661888122558594,
+          10.61683177947998,
+          10.590208053588867,
+          10.599424362182617
+        ],
+        "high-word": [
+          8.748031616210938,
+          8.715264320373535,
+          8.690688133239746,
+          8.695808410644531,
+          8.676351547241211
+        ]
+      }
+    },
+    {
+      "batch": 629,
+      "median_ms": {
+        "double-row": 32.16486358642578,
+        "float-flat": 39.13113784790039,
+        "double-flat": 31.951871871948242,
+        "float-row-padded": 38.70710372924805,
+        "float-row-compact": 38.386688232421875,
+        "high-word": 30.429183959960938
+      },
+      "times_ms": {
+        "double-row": [
+          32.20889663696289,
+          32.13926315307617,
+          32.257022857666016,
+          32.138240814208984,
+          32.16486358642578
+        ],
+        "float-flat": [
+          39.13113784790039,
+          39.009281158447266,
+          39.96672058105469,
+          39.027713775634766,
+          39.2017936706543
+        ],
+        "double-flat": [
+          32.00409698486328,
+          31.951871871948242,
+          32.22937774658203,
+          31.931392669677734,
+          31.869951248168945
+        ],
+        "float-row-padded": [
+          38.617088317871094,
+          38.33651351928711,
+          39.70560073852539,
+          38.70710372924805,
+          39.06355285644531
+        ],
+        "float-row-compact": [
+          38.126590728759766,
+          38.32831954956055,
+          38.99494552612305,
+          39.01747131347656,
+          38.386688232421875
+        ],
+        "high-word": [
+          30.046207427978516,
+          30.429183959960938,
+          30.731264114379883,
+          31.15622329711914,
+          30.18854331970215
+        ]
+      }
+    },
+    {
+      "batch": 752,
+      "median_ms": {
+        "double-row": 44.5296630859375,
+        "float-flat": 58.254337310791016,
+        "double-flat": 44.38937759399414,
+        "float-row-padded": 57.66963195800781,
+        "float-row-compact": 56.866817474365234,
+        "high-word": 36.45132827758789
+      },
+      "times_ms": {
+        "double-row": [
+          44.57881546020508,
+          44.47343826293945,
+          44.638206481933594,
+          44.430335998535156,
+          44.5296630859375
+        ],
+        "float-flat": [
+          58.15091323852539,
+          58.12937545776367,
+          58.254337310791016,
+          58.59737777709961,
+          58.3004150390625
+        ],
+        "double-flat": [
+          44.23068618774414,
+          44.28799819946289,
+          44.54092788696289,
+          44.38937759399414,
+          44.57164764404297
+        ],
+        "float-row-padded": [
+          57.66963195800781,
+          56.73267364501953,
+          57.87955093383789,
+          57.439231872558594,
+          57.81708908081055
+        ],
+        "float-row-compact": [
+          56.866817474365234,
+          57.816062927246094,
+          56.551361083984375,
+          57.77305603027344,
+          56.669185638427734
+        ],
+        "high-word": [
+          36.45132827758789,
+          37.94432067871094,
+          36.41856002807617,
+          37.989376068115234,
+          36.44108963012695
+        ]
+      }
+    }
+  ],
+  "attributes": {
+    "double-row": {
+      "max_threads_per_block": 384,
+      "shared_size_bytes": 0,
+      "const_size_bytes": 0,
+      "local_size_bytes": 0,
+      "num_regs": 168,
+      "ptx_version": 86,
+      "binary_version": 86,
+      "cache_mode_ca": 0,
+      "max_dynamic_shared_size_bytes": 49152,
+      "preferred_shared_memory_carveout": -1
+    },
+    "float-flat": {
+      "max_threads_per_block": 256,
+      "shared_size_bytes": 0,
+      "const_size_bytes": 0,
+      "local_size_bytes": 0,
+      "num_regs": 176,
+      "ptx_version": 86,
+      "binary_version": 86,
+      "cache_mode_ca": 0,
+      "max_dynamic_shared_size_bytes": 49152,
+      "preferred_shared_memory_carveout": -1
+    },
+    "double-flat": {
+      "max_threads_per_block": 384,
+      "shared_size_bytes": 0,
+      "const_size_bytes": 0,
+      "local_size_bytes": 0,
+      "num_regs": 168,
+      "ptx_version": 86,
+      "binary_version": 86,
+      "cache_mode_ca": 0,
+      "max_dynamic_shared_size_bytes": 49152,
+      "preferred_shared_memory_carveout": -1
+    },
+    "float-row-padded": {
+      "max_threads_per_block": 256,
+      "shared_size_bytes": 0,
+      "const_size_bytes": 0,
+      "local_size_bytes": 0,
+      "num_regs": 176,
+      "ptx_version": 86,
+      "binary_version": 86,
+      "cache_mode_ca": 0,
+      "max_dynamic_shared_size_bytes": 49152,
+      "preferred_shared_memory_carveout": -1
+    },
+    "float-row-compact": {
+      "max_threads_per_block": 256,
+      "shared_size_bytes": 0,
+      "const_size_bytes": 0,
+      "local_size_bytes": 0,
+      "num_regs": 176,
+      "ptx_version": 86,
+      "binary_version": 86,
+      "cache_mode_ca": 0,
+      "max_dynamic_shared_size_bytes": 49152,
+      "preferred_shared_memory_carveout": -1
+    },
+    "high-word": {
+      "max_threads_per_block": 384,
+      "shared_size_bytes": 0,
+      "const_size_bytes": 0,
+      "local_size_bytes": 0,
+      "num_regs": 162,
+      "ptx_version": 86,
+      "binary_version": 86,
+      "cache_mode_ca": 0,
+      "max_dynamic_shared_size_bytes": 49152,
+      "preferred_shared_memory_carveout": -1
+    }
+  }
+}

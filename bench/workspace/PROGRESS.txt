@@ -1,0 +1,731 @@
+GTLS workspace and performance work — 2026-11-14
+
+Branch: perf/gtls-memory-speed
+Baseline: 8f6c36c4a4ab5b18d1cb3201966f498ded44e7b2 (GTLS 2.2.0)
+Experiment root: /home/farthing/GTLS/GTLS-Compare/tls2-gtls-delta001-20261114v2/workspace-optimization
+Frozen baseline source: ../sources/gtls/gputls relative to the experiment root
+
+Objective
+  Fix the 730-day / 100-second OOM with reusable per-device storage, preserving
+  every numerical result, then profile with Nsight Systems and optimize measured
+  bottlenecks. Keep the stopped TLS2 comparison stopped. Commit each milestone.
+
+Evidence before changes
+  N=630720, P=706406, 48935 periods. Native batch=551 on GPU0 RTX 3090.
+  Batch 2 reuses 2.90 GiB of an 11.60 GiB prefix allocation for cumResidual.
+  The remaining 8.70 GiB is trapped in that split block; the next prefix needs
+  another 11.60 GiB. Required holding+request=26.12 GiB versus estimate=20.54 GiB.
+  Trimming free blocks at batch boundaries passes eight native-sized batches.
+  Diagnosis: ../memory-analysis-730d-100s relative to the experiment root.
+
+Milestones
+  [done] Create branch and record constraints / original failure.
+  [done] Preallocate/reuse workspace; single-GPU regression: 42 passed, 2 skipped.
+  [done] Complete 730-day / 100-second run; all 24 result fields/masks bitwise equal.
+  [pending] Profile warmed search with nsys; optimize dominant cost and remeasure.
+  [pending] Final correctness, results and reproducible commands using shared varying dy.
+
+Acceptance
+  Preserve raw_chi2, chi2, power, masks and fitted/statistical fields against the
+  frozen baseline. Per user clarification, use one shared varying-dy input for
+  subsequent main measurements; do not expand a separate dy validation matrix.
+  Exercise consecutive batches, tail batches, refinement, final every-point fit,
+  multiple GPUs where available, and memory release after successful/failed search.
+  Keep floating-point reduction/FMA order unless exact equality is demonstrated.
+  Performance measurements use warmup, synchronized API wall time and repetitions;
+  profiler measurements are separate and never used as the unprofiled runtime.
+
+Workspace implementation checkpoint
+  One aligned arena per GPU aliases the sort, patch-residual and screening-prefix
+  storage; weighted data, cumulative residuals and lower bounds have fixed regions.
+  Tail/refinement calls retain capacity and use tightly packed active views.
+  Batch sizing respects pool limits; OOM retries smaller chunks without dropping
+  periods. Existing kernels and their arithmetic are unchanged.
+  Test command: PYTHONPATH=src CUDA_VISIBLE_DEVICES=<GPU0 UUID> .venv/bin/python
+    -m pytest tests/test_gtls.py tests/test_candidate_screening.py
+    tests/test_window_reuse.py tests/test_workspace.py -q
+  Result: 42 passed, 2 skipped (multiple GPUs hidden), 1 pre-existing flat-SDE warning.
+  Evidence: workspace-optimization/tests-workspace.txt under the experiment root's parent.
+  run.py freezes the selected source and all input/settings hashes in each output;
+  compare.py checks every result field/mask bitwise. The old source uses batch cap
+  256 to obtain a complete numerical reference despite its native-batch OOM.
+
+730-day result checkpoint
+  Workspace times: 54.611403, 55.381574, 55.248526 seconds; median 55.248526.
+  Frozen 2.2.0 with cap=256: median 56.810362 seconds; ratio 1.02827x.
+  Period 7.1229777249928725 d; SDE 82.44850158691406; no thermal throttling.
+  All 24 saved fields/masks match bitwise, including every one of 48935 periods.
+  Compact evidence: results-workspace.json. Full artifacts: workspace-730-constant
+  and reference-730-constant under the experiment root.
+  Export-only fix: cast the recovery flag to Python bool. The first run's final
+  metadata was reconstructed from the already-saved fields/telemetry after NumPy
+  bool JSON serialization failed; all three timing and repeat checks completed.
+  Its unpersisted final pool counters are explicitly null, not inferred.
+
+nsys checkpoint (before further optimization)
+  Constant dy: GPU kernels total ~53.44s, of which coarse search ~53.32s,
+  200-period refinement ~0.085s, aliases ~0.017s, final fit ~0.019s.
+  searchChi2ScreenedG32 is an exact window evaluation kernel used inside both
+  coarse and refinement searches; its aggregate time does not mean stage 2 time.
+  Shared mixed dy input (user requested simplifying dy validation):
+    screenCandidates 13.849s (39.58%), scanScreening 7.059s (20.17%),
+    searchChi2ScreenedG32 6.098s (17.43%). Profiled API time 36.594s.
+  Profiled times are diagnostic only; upcoming speed comparisons use untraced repeats.
+  Traces: nsys-workspace-730 and nsys-workspace-730-mixed under experiment root.
+
+Attempt: grouped independent FP64 scans (not retained)
+  Shared barriers between channels while preserving each scalar addition tree.
+  Six direct FP64 bitwise checks and the search regression passed (48 passed,
+  2 skipped); all 24 full-run fields matched the mixed-dy workspace baseline.
+  Baseline median 36.805614s; attempt median 36.688714s: 1.00319x, within noise.
+  Reverted implementation and its dedicated tests rather than retain complexity
+  without a demonstrated gain. Patch, source snapshot and tests are preserved in
+  grouped-scan-730-mixed/ under the experiment root; compact result is committed.
+
+Cheap absolute-mass bound evaluation (in progress)
+  Full varying-dy output matches all 24 baseline fields bitwise. All 44 regression
+  tests pass with both RTX 3090 devices visible (one existing flat-SDE warning).
+  Median 36.969757s vs 36.805614s; thermal flags occurred in the new untraced run.
+  nsys screening 13.976961s vs 13.849242s: no demonstrated gain yet.
+  User confirmed grouped scan stays reverted, cheap bound continues evaluation.
+
+A100 extension authorized by user
+  Rent one A100 through Vast.ai, compare identical frozen source/input/settings
+  and separate profiler captures. Include matched batch cap and default capacity.
+  User explicitly requires DESTROY after saving artifacts, not merely stop.
+  Lease 60654842: NVIDIA A100 PCIe 40GB, Japan, actual quoted $0.61985185/hour
+  including 40GB disk. Local lease/access records stay outside the Git repository.
+
+Attempt: 1024-thread screening scan (not retained)
+  All 24 varying-dy full-run fields remain bitwise equal; single-GPU regression
+  passes 42 tests with 2 multi-GPU skips. Median 37.214074s vs 36.805614s; thermal
+  flags occurred. No demonstrated improvement, so restore the 512-thread launch.
+  Artifact source and patch: scan1024-730-mixed; compact evidence: results-scan1024.json.
+
+Device-specific cheap-bound candidate
+  A100 experiment: mixed-dy median 14.942229s with the cheap bound vs 15.436590s
+  without (1.03309x). Median SM clocks 1320 vs 1350MHz; no thermal flags.
+  Compile the bound only when CUDA reports an FP32:FP64 throughput ratio <=2.
+  RTX 3090 (ratio 64) retains the original kernel; unknown devices default to it.
+  C preprocessor output is byte-identical to each already-measured implementation
+  when selecting 0/1. Final candidate regression: 68 passed with both 3090s visible.
+  A100 final mixed/constant confirmation and artifact retrieval remain in progress.
+
+A100 checkpoint complete; optimization continues
+  Final device-specific source: mixed median 15.013236s, constant 22.992988s.
+  Compared with A100 workspace-only: +2.82% speed on mixed dy, +1.86% on constant.
+  Frozen original 2.2.0 (cap 256) mixed median 15.846283s, versus final 15.013236s.
+  All 24 fields match bitwise in every GPU/version comparison. A100 tests: 66 passed,
+  2 multi-GPU skips; local both-GPU tests: 68 passed. One existing flat-SDE warning.
+  A100 default batch 1078 vs RTX 3090 629. A100 cap=629 median 15.314520s vs default
+  15.436590s: larger memory capacity does not explain the observed speed gain.
+  A100 screening kernel 4.242773s -> 3.816164s with cheap bound.
+  Results archive verified SHA256 a14d338b83c09a8f4b09f5a5b1aba900d37567b76931e92e786408bc92866c85.
+  Instance 60654842 DESTROYED, API list empty at 2026-11-14T14:29:50.487139Z.
+  Lease duration ~24.1 minutes; quoted compute/disk estimate ~$0.25, not an invoice.
+  After noticing brief thermal flags in the old 3090 mixed run (2/114 samples),
+  a cooled repeat was started, then stopped immediately at user's direction.
+  User requests focusing on performance-changing code, not repeated end-to-end
+  timing. Continue kernel-level optimization; one full validation after a gain.
+
+Kernel-focused work after user stopped timing reruns
+  Precomputing gamma/tiny: 17.944576ms -> 17.961984ms; no gain, reverted.
+  Two double2 prefix planes: screening 18.082816ms -> 13.751296ms (1.315x),
+  with prefix values, candidate bounds and upper keys all bitwise identical.
+  One full 730-day mixed-dy validation: 33.510078s, all 24 fields match bitwise.
+  Original double4 data interleaved the correlation prefixes with mass prefixes;
+  separate contiguous planes reduce the memory footprint of sparse prefix gathers.
+  Full source snapshot: prefix-planes-730-mixed. Screening kernel probe: prefix-planes-probe.
+
+Four samples per thread in screening scan
+  Scan only the totals of four-point chunks, then reconstruct each point prefix.
+  Keep a 512-point tile (128 threads); increase the conservative prefix budget
+  from 16 to 24 rounding operations per level for local sums and reconstruction.
+  Exact FP32 candidate evaluation is unchanged; prefixes only certify pruning.
+  Independent long-double checks cover odd lengths, tile boundaries and P=706406.
+  Scan kernel 41.915394ms -> 22.292480ms (1.880x) on 256 rows.
+  Full mixed-dy validation 30.477027s, every one of 24 result fields bitwise equal.
+  Regression: 77 passed on both GPUs, one existing flat-SDE warning.
+  Raw timing is a single new-code validation, not a repeated performance campaign.
+
+Long optimization authorization, 2026-11-14 14:49:51 UTC
+  User expects to return 10-12 hours later (2026-11-15 00:49-02:49 UTC), requests
+  continued varied optimization, online research when blocked, and alternating
+  GPU0/GPU1 if hot. Do not stop optimization early merely because a milestone passes.
+  Device monitor now resolves the CUDA-visible GPU by PCI address before querying
+  NVML. scan16-730-mixed ran correctly on GPU1, but its old monitor read GPU0;
+  its telemetry is explicitly invalidated, while timing and bitwise checks remain valid.
+  GPU1 scan16 full validation: 31.773633s, 24 fields match; not directly comparable
+  to GPU0 scan4 timing. Same-GPU native-batch tuning is the selection evidence.
+  Further research: https://research.nvidia.com/publication/2016-03_single-pass-parallel-prefix-scan-decoupled-look-back
+  PTX release/acquire reference: https://docs.nvidia.com/cuda/parallel-thread-execution/index.html
+  External lookback prototype uses per-row dynamic tile IDs and separate immutable
+  aggregate/complete states. Release flags publish states; acquire flags precede
+  reads. Bounded waits report failures rather than leaving an unbounded GPU spin.
+
+16-point scan checkpoint
+  GPU0, actual batch=629: scan4 46.471680ms, scan8 37.020639ms,
+  scan16 34.933249ms, scan16 warp-only 31.956463ms. Warp-only was slower
+  on the smaller GPU1 probe; retain the general scan16 implementation for now.
+  Update conservative rounding depth to 48 per level; keep the 512-point tile.
+  Regression remains 77 passed; GPU1 full output matches all 24 baseline fields.
+  The final FP32 candidate sums and tie selection remain unchanged.
+  Block-mapped screening improves kernel time only 2.47%; keep as a secondary
+  candidate pending larger bottleneck work, not yet merged.
+  Lookback scan passed ten independent high-precision sizes but was 5.5% slower
+  at block 128 and 17% slower at block 256; block 512 exceeded register resources.
+  Keep that experiment outside production and pursue fixed-point prefix scans.
+
+Sparse prefix prefetch checkpoint
+  NCU: screenCandidates 74.5% long-scoreboard stalls, DRAM 382.64 GB/s,
+  81.48% achieved occupancy but only 0.03 eligible warps per scheduler.
+  Prefetch four double2 values/coefficients, then retain the original sequential
+  FMA accumulation, including the scalar tail. Both hardware-bound paths use it.
+  GPU0 batch64: 14.027264ms -> 12.695520ms (1.105x); actual batch629:
+  134.170113ms -> 121.044479ms (1.108x). Bounds/upper keys bitwise identical.
+  Block128 is another 0.7% faster but keep256 until other workloads justify it.
+  Fixed-point prefix scans (including exact bounded magic conversion) passed
+  independent checks but did not outperform FP64 scan16; remain external probes.
+  Tolerance sweep indicates data-dependent screening/exact tradeoffs; no fixed
+  tolerance change merged. Prior sweep per-kernel dictionaries were accidentally
+  mutated by the next warmup; scalar totals/survivor counts remain valid.
+  One full nsys validation: 29.028012s, every result field bitwise equal;
+  70 focused tests passed. Profile: screen10.148s, exactG32 6.156s, prefix3.122s.
+  Relative to workspace mixed reference36.805614s: 1.268x, with prior reference
+  containing a small number of thermal flags; this is one new-code validation.
+
+Hierarchical certificate checkpoint (full verification in progress)
+  Four tolerances 0.05 -> 0.015 -> 0.005 -> 0.00025 reuse the same prefix
+  and lower-bound arrays. Later passes only evaluate surviving candidates and
+  retain max(previous lower, new lower); all upper bounds remain conservative.
+  Exact FP32 chains and strict tie-preserving pruning are unchanged.
+  Same real batches, five groups of629 periods:
+    Mixed screening+exact: 1019.823ms -> 591.300ms; total1675.391 ->1239.104ms.
+    Constant screening+exact: 2008.409ms ->763.715ms; total2798.084 ->1553.543ms.
+  Every packed candidate key bitwise equal across tested configurations.
+  Existing tests extended to certify every candidate at each refinement stage
+  and check monotonic bounds, both hardware branches, overflow and ties.
+  80 tests pass on both GPUs (one existing flat-SDE warning).
+  Initial candidate compaction with loose screening did not help due to the
+  sequential work per persistent warp; retrying after tighter certificates.
+  Full verification completed: mixed22.937620s (1.605x workspace reference),
+  constant25.547004s (2.163x workspace reference), all24 fields bitwise equal.
+  Mixed nsys: coarse-screen6.038s, refinement-screen1.333s, exactG32 1.261s,
+  prefix3.084s. Host setup is now a material remaining overhead.
+  After hierarchical pruning, native-batch G32 compaction probe improves
+  16.687103ms ->1.202176ms including compaction, keys bitwise equal.
+
+Compaction and CPU certificate checkpoint
+  Compact surviving work items per lane group into the now-dead prefix arena.
+  Read the largest row count to launch only the necessary original FP32 windows.
+  Keep the original dense path when survivors exceed25% or the scratch view
+  would not fit. No extra large allocation and no change in FMA or tie order.
+  Five629-period mixed batches: exact+compaction118.627ms ->6.857ms; warmed
+  measured wall1.3982s ->1.2877s. Every batch's packed keys unchanged.
+  The first prototype indexed-only wall included CuPy compilation; not a timing
+  result. Reproduction script now warms the reduction path before measuring.
+  Profiled CPU certificate cost2.2s, mostly per-segment temporary array reductions.
+  Strict Numba knot selection:2.20045 ->0.58983s; all148 certificates' positions,
+  coefficients, errors and peaks bitwise equal. Fastmath is disabled; preserve
+  first-maximum and NaN behavior. Keep existing long-double reconstruction.
+  Extended compaction checks cover every exact candidate, allG, empty rows,
+  strict ties, NaN/infinite bounds, subrange and nonmultiple tails.81 tests pass.
+  Full combined730-day validation is the next step.
+  Combined full mixed validation19.275394s, all24 fields bitwise equal,1.909x
+  workspace reference. Nsys: exactG32 .074s, compaction .030s, other exact
+  groups negligible. Remaining screen6.042s, refine1.332s, prefix3.049s,
+  scatter2.710s, fold1.243s, sort1.126s, patch1.115s.
+  The latest constant full result25.547004s belongs to preceding d78df2c.
+  Further candidates: singleton bucket scatter; reuse bucket IDs; outward-rounded
+  FP32 certificate arithmetic (not final statistic), using NVIDIA directed-rounding
+  intrinsics: https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__INTRINSIC__SINGLE.html
+
+Memory-kernel checkpoint
+  Independent loads were being interleaved with the dependent FMA chain.
+  A warp synchronization point after13 loads preserves actual overlap:
+  initial-screen72.779778 ->55.046143ms,1.322x; bounds/keys bitwise identical.
+  Five629-period batches: combined screening469.530 ->369.765ms.
+  Use on sm70+ without the A100 cheap-bound branch; retain the existing four-
+  point implementation on fast-FP64 devices and older architectures.
+  CUDA12.9 synccheck:0 errors for divergent term counts9/568/19, masked rows
+  and partial warps. System12.0 checker could not attach; an official12.9
+  package is extracted only under workspace-optimization/tools/sanitizer.
+  One-warp prefix specialization35.785185 ->31.996287ms,1.118x; prefix arrays
+  bitwise equal across7 sizes including706406 and mixed/zero signed inputs.
+  Smaller histogram: native629-period sort87.799 ->64.256ms,1.366x at three
+  points/bucket. Stable indices match for every tested bucket count.
+  Counts/cursors now useceil(N/3); their aligned reusable offsets and memory
+  budget are updated. Screened prefix arena size is unchanged.
+  82 existing/updated regression checks plus5 stable-sort edge cases pass.
+  Other trials kept outside production: singleton scatter slower; bucket-ID
+  storage no net gain; cache modifiers and forced asm loads no gain; directed
+  FP32 error budgets pass63 checks but no timing gain; lookback scan all slower.
+  Full combined730-day validation is next.
+  Full validation: mixed15.563057s, constant17.543514s; all24 fields bitwise
+  equal for both. Speedups2.365x and3.149x versus workspace references.
+  Mixed nsys: screen4.599s, prefix2.620s, scatter1.509s, sort1.318s,
+  refine1.155s, patch1.131s, fold.891s; total GPU14.006s.
+  Next experiments target phase sorting and remaining prefix/screen traffic.
+
+Compressed mass-prefix checkpoint
+  Keep dot-product prefixes in FP64; store only nonnegative mass prefixes in
+  FP32, adding endpoint storage-roundoff allowances before any bound uses them.
+  The exact FP32 statistic and its FMA/reduction order are unchanged. Infinite
+  storage/error falls back to the exact path. All dy-dependent budgets remain
+  computed from each input. Scratch reduces32P ->24P bytes per period.
+  Five629-period mixed batches: prefix+screens674.359 ->602.286ms,1.120x;
+  all packed exact winner keys bitwise equal.67 checks pass, one second-GPU
+  test skipped under single-device visibility. Overflow case now also overflows
+  compressed mass storage while original weighted input remains finite.
+  Broad22-configuration hierarchy trial retained the existing four levels.
+  CUB segmented24-bit radix sorting63.256 ->54.288ms with exact phase fixup;
+  further work required before considering its dependency and scratch costs.
+  Full compressed-FP32 validation: mixed16.790174s, constant18.821096s,
+  both24 fields bitwise equal and no thermal throttling, but a regression from
+  the preceding15.563/17.544s. Prefix rises2.620 ->4.074s. A controlled scan
+  probe confirms FP32 conversion costs and a larger-batch throughput cliff;
+  changing plane layout alone does not fix it. Testing direct high-word storage
+  to avoid FP64-to-FP32 conversion before deciding whether to retain compression.
+  Direct FP64 high-word storage removes conversion instructions and keeps
+  the full FP64 exponent range. Add2^-19*(|end|+|first|)+2^-1020 to each
+  mass bound, conservatively covering truncated low bits and FP64 arithmetic.
+  67 checks pass; one multi-GPU check skipped. A controlled scan at752 rows
+  improves58.254 ->36.451ms; old FP64 storage44.530ms at the same row count.
+  Full validation of the revised representation is next.
+  Full high-word validation15.660368s, all24 fields bitwise equal; no thermal
+  throttling. Prefix2.728s; similar total speed to15.563s before compression,
+  with25% smaller prefix storage. Retain pending combined optimization results.
+
+FP32 cheap-bound checkpoint
+  First-pass nonnegative bound operands are rounded upward in FP32, then
+  negated for a lower bound. Check original-statistic overflow limits before
+  discarding. Keep the existing FP64 cheap path on fast-FP64 devices.
+  Later refinement passes retain their existing bound calculation.
+  Five629-period mixed batches: screen351.282 ->316.846ms,1.109x; exact
+  winner keys unchanged.63 candidate/prefix checks pass, multi-GPU skipped.
+  Seeding exact box winners adds complexity for only8.2ms extra improvement;
+  retain outside production. FP64 shortcut on3090 remains slower.
+  CUB90-configuration search:59 compilable layouts all indices equal; GPU1
+  best1.222x, but GPU0 at752 periods regresses61.908 ->68.106ms. Not adopted.
+  Register/write-order tuning also differs between devices: GPU0 gains under
+  3%, so keep current scan. No new dependency or register restriction added.
+  Full FP32-shortcut validation: mixed15.172459s (thermal flag recorded),
+  constant16.706262s (no thermal flag), all24 fields bitwise equal for both.
+  Coarse screen3.731s; refinement regresses1.150 ->1.482s because moving its
+  dot product behind the mass reads serialized memory access. Restored the
+  original refinement ordering via an inline shared dot helper. Five629-period
+  probe improves refinement91.688 ->69.725ms, exact keys equal;63 checks pass.
+  Current node is ready for a fresh A100 comparison with no active rental yet.
+  Restored-order full validation at21fc9ae: mixed14.911319s, constant
+  16.826603s; all24 fields bitwise equal, neither run thermal-throttled.
+  Mixed nsys refinement1.153s, restoring the preceding load overlap.
+  A100 comparison lease60674743 created17:18:18UTC Nov14; PCIe40GB,
+  quote0.4148148USD/h including40GB disk. Temporary; destroy after retrieval.
+
+Fused weighted gather / integer prefix checkpoint
+  Prepare (residual,weight) once per GPUSearch, rebuilding from the supplied dy.
+  Fuse the sorted gather, weighted output and integer scan; two points/thread,
+  up to1024 threads/row. Preserve FP32 multiply/divide and exact int64 prefixes.
+  No patched-residual scratch remains. No dy-dependent cache was introduced.
+  GPU0 genuine752-row probe: patch+scan26.735 ->16.720ms; one row1.409 ->1.035ms.
+  A100 short probe also improves19.447 ->11.043ms. More than two points/thread
+  regresses, so retain two. Across these probes sampled row outputs are bitwise
+  equal; five-batch512-thread prototype also preserves every candidate key.
+  89 tests pass, two single-device/optional skips; synchronization sanitizer
+  reports zero errors in four wrap/tail/integer-prefix tests. Full730d next.
+
+A100 comparison completed at source21fc9ae
+  Same source/input/settings as3090: mixed9.739804s vs14.911319s (1.531x);
+  constant10.887720s vs16.826603s (1.545x). Both24 fields bitwise equal,
+  no thermal flags. One measured run per input, after warm-up. A100 GPU
+  stages total8.18s; prefix1.928s, coarse screen1.482s, scatter1.199s.
+  Native AVX512 NumPy changed1920 grid values by1-2ULP and mixed dy; native
+  runs excluded. Disable AVX512 dispatch to reproduce AVX2 CPU math exactly.
+  85 checks pass after installing missing astropy;2 optional/device skips.
+  ArchiveSHA2560d2697bf9b428b00059abaaf04abbe27afab7872697b173729d07e70cf3ea582.
+  Instance60674743 DESTROYED at18:02:48UTC; API confirms no remaining instances.
+  Lease44.50min, estimated$0.308 at quoted rate (not final invoice).
+  Full fused-patch validation at48ac580: mixed14.192267s, constant16.129551s;
+  both24 fields bitwise equal. Mixed patch/scan1.724 ->1.144s; other stages
+  essentially unchanged. Relative to OOM-fixed workspace:2.593x/3.425x.
+
+Screening locality checkpoint
+  Schedule each32-candidate block by its physical start time across durations,
+  preserving the original item IDs, FP32 exact statistic, and tie ordering.
+  Cache only the latest geometry map within a search; no input-dependent cache.
+  GPU0 five752-period batches: coarse291.468 ->151.366ms, refinements83.856
+  ->76.040ms; all exact winner keys equal. GPU1 total376.738 ->225.650ms.
+  90 tests pass;2 optional/device skips. Sync sanitizer: zero errors in mapped
+  bounds/refinement tests. Full730d validation follows this source checkpoint.
+  Full locality validation at32d63c7: mixed12.345733s, constant13.136678s;
+  both24 fields bitwise equal, neither run thermally throttled. Mixed coarse
+  screen3.738 ->1.936s; refinements1.154 ->1.017s. Prefix2.634s is now largest.
+  NCU representative64-row coarse pass: L2 hit8.90% ->78.99%, DRAM traffic
+  rate661.83 ->270.05GB/s while duration8.52 ->4.91ms. Cache reuse confirmed.
+  Prefetch tuning after locality:8 vs13 sync gives only~1%; retain13 pending
+  stronger evidence. Removing sync and increasing beyond16 both regress.
+
+CPU certificate reconstruction checkpoint
+  Replace dense long-double double-cumsum temporaries with one Numba reverse
+  pass over the sparse impulses. Keep knots, coefficients, and peaks unchanged.
+  The existing32*eps*N^2*sum|c| budget covers both FP64 prefix rounding paths;
+  nextafter also covers the measured final subtraction before adding the budget.
+  148 representative certificates:0.603398 ->0.251445s,2.40x. Largest budget
+  change7.24e-13; every bound covers independent long-double reconstruction.
+  64 candidate/certificate checks pass; one multi-GPU skip. Combined full check
+  follows the GPU budget-hoisting change now under evaluation.
+
+Screening rounding-budget checkpoint
+  Compute FP64/FP32 gamma, tiny allowances and template peak multipliers once
+  per selected-duration/stride geometry on the GPU, preserving the original
+  directed FP32 operations. Reuse the small three-plane buffer across all
+  hierarchy levels; rebuild when selected widths/strides change.
+  GPU0 five752-period batches: screen228.940 ->208.359ms; GPU1226.184
+  ->205.743ms. Every exact winner key unchanged. Combined CPU/GPU changes
+  pass92 tests with both3090s visible; no skips. Full730d validation next.
+  Full budget/reconstruction validation at7894587: mixed11.816806s,
+  constant12.508825s. Both24 fields bitwise equal, no thermal flags.
+  Mixed timing overlapped NCU on GPU1 (possible shared host/PCIe contention);
+  retain that qualification rather than repeating the same unchanged run.
+  Mixed coarse screen1.936 ->1.659s. Prefix2.640s remains largest.
+  Prefix NCU on GPU1:752 rows form0.8 occupancy waves,162 registers/thread,
+  49.5% DRAM utilization. Shared transpose regresses on GPU0, while packing
+  mass writes gives only~4%; exploring independent row sections next.
+
+Uniform-input screening checkpoint
+  Inspect actual prepared FP32 weights on every GPUSearch. Only exactly equal
+  weights enable this path; changing dy rechecks the condition and rebuilds all
+  weighted state. Variable weights continue through the general implementation.
+  Compute template A2 once using the original per-lane FP32 FMA and XOR tree.
+  Its value is identical for all windows at that duration/G; eA2 can be zero.
+  Keep only D_z and S_abs_z in12P prefix bytes (general path remains24P).
+  Sorted data, exact final kernels, window IDs, and tie comparisons are unchanged.
+  GPU0 five752-period batches: prefix+screens452.043 ->354.126ms;
+  GPU1519.072 ->352.418ms. Every exact winner key equal.
+  104 checks passed before six independent A2 tests were added; the15 targeted
+  prefix/A2 checks also pass. Precomputed A2 is bitwise equal to the original
+  exact kernel for all G; compact prefixes match the corresponding general
+  prefix columns bitwise, including odd lengths and tails. Full730d next.
+  Memory sanitizer:27 uniform/prefix checks pass, zero errors.
+  Full uniform-path validation atba518d1: constant11.055481s (4.997x vs
+  OOM-fixed workspace), mixed11.705346s. Both24 fields bitwise equal.
+  Constant has no thermal flag; mixed records a thermal flag. Do not repeat
+  the unchanged test solely for that flag. Constant prefix2.068s, coarse1.311s,
+  refinements1.132s. Native constant capacity benefits from12P prefix storage.
+
+Postprocessing checkpoint
+  Hoist the unchanged transit end expression outside the transit loop; locate
+  sorted strict time windows by searchsorted(right,left), keeping the mask path
+  for unsorted inputs. Reuse identical white-noise and minimum-time scalars.
+  Real730d CPU probe: in-transit0.1196 ->0.00169s, transit times0.0778 ->0.0319s;
+  outputs are bitwise equal. Timing is a short probe, not a new end-to-end claim.
+  Add FP64 GPU window standard deviations using NumPy's eight accumulators and
+  recursive128-point split. Explicit RN add/sub/mul/div/sqrt preserves operation
+  order; original CPU chunk sums remain unchanged. Reuse completed weighted and
+  cumulative arena regions, with no new device allocation. Other dtypes, widths
+  above256, nonfinite data and short arrays keep the existing NumPy path.
+  All widths1..256 match NumPy bitwise for normal, near-unit, wide-magnitude,
+  constant and signed-zero data. Real627085-sample,125-point pink-noise value
+  matches bitwise: CPU0.28555s -> GPU0.00337s including copies/outer reductions.
+  Source algorithm: https://github.com/numpy/numpy/blob/main/numpy/_core/src/umath/loops_utils.h.src
+  Twelve targeted checks pass, including split249, strict duplicate boundaries,
+  multiple original outer chunks and zero new device allocations.
+
+Rejected prefix and uniform-knot experiments
+  General prefix shared transposes regress (36.81 ->38.07/38.25ms on GPU0).
+  Vectorized mass writes give only~4%, retained as a possible later small gain.
+  Independent segmented prefix sections fit high-precision error budgets, but
+  the extra weighted read and carry stage regress53.07 ->57.96ms on GPU1.
+  Uniform AR-only knot selection reduces some term counts but weakens the useful
+  approximation: three-batch screen165.74 ->187.31..204.26ms. Keep joint knots.
+  Full stats validation atb940584: constant10.633588s, mixed11.419133s;
+  all24 fields match bitwise in both runs. See results-stats-full.json for
+  per-run thermal flags. Constant final-fit GPU windowStd takes0.001243s.
+  Related regression suite:116 passed, one multi-GPU skip.
+
+Register bucket-sort checkpoint
+  Keep up to8 phase/index pairs in registers and sort with a fixed network.
+  Nonnegative finite phase doubles are compared by their complete64-bit IEEE
+  order; ties retain the original point index. Larger buckets retain insertion
+  sort with the same exact integer comparator. Bucket count stays ceil(N/3).
+  Three752-row batches, offsets0/16000/40000, all indices bitwise identical.
+  GPU0 sort20.62/22.18/15.77 ->12.74/13.71/11.80ms; complete fold-sort pipeline
+  61.65/61.85/55.99 ->53.40/54.08/52.41ms. GPU1 also improves.
+  Four-point average buckets help GPU1 but do not consistently help GPU0, so
+  leave histogram sizing unchanged. Network16 and rank variants are weaker.
+  Carrying phase values or packed keys during scatter regresses due to added
+  random writes. Warp cooperative sorting spends too much on comparisons and
+  shuffle traffic even with exact integer comparison. These are not adopted.
+  Fixed-point screening prefixes passed independent long-double error coverage,
+  but their additional registers/conversions regress general scans53 ->64.6ms;
+  uniform31.2 ->31.3ms. Keep the existing FP64 prefixes.
+  Full register-sort validation at2b6067a: constant10.276813s, mixed10.968826s;
+  both24 fields bitwise equal, neither run thermally throttled. Constant sort
+  falls1.344655 ->0.862432s; total time10.633588 ->10.276813s. Related regression
+  suite:116 passed, one multi-GPU skip. The new source is committed separately
+  from this measurement checkpoint.
+
+Packed uniform-weight workspace checkpoint
+  Once this search confirms identical prepared FP32 weights, store only w*r in
+  four bytes per point. Supply the common weight to the unchanged per-lane FMA
+  order in dense, screened and compacted exact kernels. Do not change G selection.
+  General variable weights keep the existing eight-byte pair layout. Budget the
+  actual four/eight-byte allocation, so native uniform batch capacity can grow.
+  Share scan/exact implementations through compile-time layout flags; retain old
+  kernel exports for independent reference checks. Postprocessing now uses dead
+  scratch storage for its FP64 input because the weighted region is smaller.
+  Five1019-period batches: GPU0 patch/prefix/exact344.323 ->317.700ms;
+  GPU1353.736 ->321.868ms. Exact winner keys agree in every batch.
+  Related regression120 passed, one multi-GPU skip; packed prefixes match the
+  original uniform columns bitwise, and all G1..32 exact variants match original
+  weighted-pair kernels. Compute-sanitizer40 checks pass with zero memory errors.
+  Full constant-dy validation follows. Variable-dy timings remain the previous
+  validated measurement; this layout change affects only confirmed equal weights.
+
+Other probes rejected during this checkpoint
+  Adding exact uniform A2 and a positive-residual mass bound to the cheap screen
+  passes12 candidate checks but increases five-batch screens264.6 ->265.5..271.3ms.
+  Applying the stronger bound only after the original shortcut also regresses.
+  L2 set-aside across the whole pipeline severely hurts later prefix screening;
+  scoped reserve/reset and streaming cache hints give no useful net gain.
+  Direct index gathers avoid a weighted buffer but increase mixed patch/prefix/
+  exact356.8 ->499.8ms even with cache hints. Keep the contiguous weighted buffer.
+  Full packed-layout validation at6d433f5: constant9.964720s, all24 fields
+  bitwise equal, no thermal flag;5.544x vs55.248526s OOM-fixed workspace.
+  Coarse prefix launches51 ->45, prefix2.147950 ->2.070006s, patch1.130635
+  ->0.989399s, compacted exact G320.142589 ->0.077695s. Full result improves
+  10.276813 ->9.964720s. No unchanged variable-dy full rerun for this node.
+
+Exact phase-fraction checkpoint
+  Extract the fractional bits of nonnegative int32-range cycle counts with
+  integer operations; retain the original arithmetic for other values. No phase
+  precision changes.100012 random/boundary values and three752-row batches
+  match original phase bits/counts. GPU0 fold13.8 ->11.5ms; GPU115.5 ->14.8ms.
+  Directed FP32 bucket intervals preserve3000040 edge/random cases and complete
+  sort indices, but offer no stable pipeline gain; leave bucket arithmetic intact.
+  Recomputing phases in scatter/sort removes a buffer but adds sort cost; the
+  simple fractional extraction provides the better time/complexity tradeoff.
+  Follow-up128-bit prefix conversion passed19399 signed/rounding cases, but
+  regressed general52.89 ->65.60ms and uniform31.82 ->33.93ms; not adopted.
+
+Compact exact phase-sort checkpoint
+  Store floor(phase*2^32) as a four-byte monotone key. When two keys agree,
+  recompute their original FP64 phases and retain the original index tie break.
+  Compute bucket intervals with integer products, including a conservative FP64
+  product-rounding allowance; ambiguous intervals use the original expression.
+  Scratch sort layout decreases14.667N ->10.667N bytes. Full double exports
+  remain available as independent references; both layouts share a sorting network.
+  5285770 boundary/random bucket cases and seven stable-sort sizes agree exactly.
+  Five752-period mixed batches, relative to543ad02: GPU0 fold/scatter/sort
+  248.193 ->229.034ms; GPU1320.808 ->289.850ms, exact winner keys unchanged.
+  Related regression133 passed, one multi-GPU skip, including forced compact-key
+  collisions, int32-maximum bucket counts, arena reuse and synthetic OOM retry.
+  Sanitizer12.9 default host backtraces retain Python frames/arrays, causing
+  a pool-release assertion despite zero device errors. Weak-reference tracing
+  identifies retained frames; normal GPU1 and --show-backtrace device both pass.
+  NVIDIA documents a Python launch memory-leak fix in2025.4.1 release notes:
+  https://docs.nvidia.com/compute-sanitizer/ReleaseNotes/index.html
+  Keep device memory instrumentation active and disable only host backtraces.
+  Compact-key bucket factors2/4/5/6/8 and integer folding show no consistent
+  gain across period ranges on GPU0; keep factor3 and original bucket multiply.
+  Final device-backtrace memcheck:28 passed, zero memory errors.
+  Full packed-phase validation at071e95a: constant9.581133s, mixed10.590583s; both24 fields bitwise equal.
+  Both runs release all pool memory. Thermal flags are retained in the result
+  JSON. Constant coarse prefix launches45 ->43, fold0.936 ->0.701s and
+  sort0.863 ->0.737s. Constant9.964720 ->9.581133s.
+
+Sparse uniform-prefix checkpoint
+  For confirmed uniform weights, retain D_z and S_abs_z at16-point grid nodes.
+  Preserve the original scan arithmetic at retained nodes and zero-pad the final
+  cell. Precompute interpolation coefficients for each start residue, combining
+  equal nodes; the GPU directly applies the sparse dot with no interpolation work.
+  If |second difference| <= M, linear interpolation error is <= M*h^2/8.
+  Add this times coefficient absolute mass plus outward FP64 split/merge/FMA
+  allowances to each certificate. Mass windows use outward grid endpoints.
+  Final exact candidate kernels, G selection and reduction order are unchanged.
+  Allocate12*(ceil(P/16)+1) prefix bytes instead of12P, within the persistent arena.
+  Actual dy is still inspected/rebuilt per search; variable weights retain24P.
+  Five1019-period batches: GPU0 prefix/screens469.929 ->343.795ms; GPU1
+  482.249 ->348.937ms. Exact keys equal; strides4/8/32/64 were also compared.
+  Direct long-double template dots and prefix/interpolation bounds pass; retained
+  grid values match original prefix bits, including the706406-point test.
+  Related regression196 passed, one multi-GPU skip; memcheck68 checks pass with
+  zero errors using device-only backtraces. Original full-prefix exports remain
+  available for references. Full constant-dy validation is next.
+  Integer-residual prefix reuse was rejected: direct conversion215 ->224/236ms,
+  exact128-bit accumulation216 ->302/331ms. No such path enters production.
+  Full validation ata7d917b: constant8.399009s, all24 fields bitwise
+  equal, thermal=False, used/total pool bytes after=2523648/2716160.
+  Investigate these remaining references before accepting resource cleanup.
+  Short65-period searches of the same730d data release0/0, both normally and
+  under the same nsys options; the full-run residual is not yet explained.
+  Variable-dy algorithm remains unchanged and is not rerun at this node.
+  Instrumented full initialization plus two complete searches also release0/0,
+  with no surviving tracked reduction inputs/outputs. Keep the original2.5MB
+  observation in the result; do not overwrite it or claim an identified cause.
+  Further resource diagnostics will accompany the next changed workload.
+
+Sparse general-prefix checkpoint
+  Extend certified prefix resampling to variable weights: D_z and D_w use8-point
+  nodes, with separate interpolation/split/merge/FMA allowances. Window masses
+  use outward grid endpoints. Final exact candidate kernels and G are unchanged.
+  Prefix storage is24*(ceil(P/8)+1), down from24P; the reused sort arena now
+  dominates scratch capacity. Uniform stride16 coefficients remain bitwise equal
+  to a7d917b in16 CPU comparisons, so no unchanged uniform full rerun is needed.
+  Five752-period batches, GPU0 prefix/screens408.990 ->347.914ms; GPU1
+  471.432 ->353.287ms. All exact keys equal. Stride16 saves a little scan time
+  but increases exact survivors; stride8 retains tighter bounds.
+  Related regression244 passed, one multi-GPU skip;20 expanded direct-dot and
+  prefix tests passed. Compute-sanitizer61 tests passed, zero device errors.
+  Optional benchmark memory diagnostics preserve observed post-search bytes and
+  separately report surviving array shapes/referrer types and post-GC bytes.
+  Full mixed-dy validation is next.
+  Full mixed validation atcbb2e82:9.560614s, all24 fields bitwise equal,
+  no thermal throttling. Previous10.590583s,9.73% lower elapsed time.
+  Prefix1.516553s, coarse1.925331s, refine0.984658s, scatter1.535602s.
+  Observed pool2,043,392bytes belongs to the25920-point initialization search;
+  diagnostic found retained __init__ frames. Explicit GC releases all bytes.
+  This is a reference-cycle investigation, not an additional arena allocation.
+
+Explicit device-resource release
+  Cold Numba compilation retains GPUSearch.__init__ through compiler frame cycles.
+  Reproduced with GC disabled: the short25920-point initialization holds2,043,392B.
+  Drop temporary device arrays before entering Numba and explicitly clear device
+  attributes/certificates when closing each GPUSearch. The same fresh-compilation
+  diagnostic now reports0 used bytes while the compiler frames are still retained.
+  Targeted retained-frame, batch-reuse and OOM-recovery checks pass. No numerical
+  calculation changed, and no global/periodic GC call was added to the search.
+  Segmented sparse-prefix experiment: baseline124.276ms;1/8/32/128 tiles per
+  segment135.379/135.022/135.289/137.766ms on GPU0. Extra carry-add memory traffic
+  outweighs local scan savings; no segmented path enters production.
+
+Certified integer screening prefixes
+  On slow-FP64 devices, quantize screening inputs with per-search binary scales
+  and scan exact int64 first/double prefixes. The original weighted buffers and
+  final candidate kernels remain unchanged. Each reconstructed point is within
+  half a quantization step; add width*template_peak*radius to dot certificates,
+  maximum_window_width*radius to mass bounds, and use rounded-input maxima for
+  interpolation/FP64 conversion bounds. All additions include outward slack.
+  Scales bound every triangular prefix below2**61, including full512-point tiles.
+  Unsafe scales/sizes fall back to FP64; fast-FP64 GPUs retain their existing path.
+  Five752-period batches on GPU0: mixed prefix124.953 ->38.620ms, overall
+  target362.516 ->288.438ms; constant prefix68.653 ->17.846ms, target266.551
+  ->219.965ms. A tighter window-mass radius on GPU1 gives123.768 ->37.959ms,
+  target359.794 ->282.257ms. All exact keys equal.
+  Independent int64 prefix bits and long-double quantization bounds pass24 cases,
+  including706406 points. Regression399 passed, one multi-GPU skip;22 final
+  range/long-curve-dot checks passed; sanitizer142 checks passed with zero errors.
+  Sparse hierarchy tuning tried14 schedules: original four levels remain best
+  for uniform weights; removing one level helps mixed screening only modestly.
+  Interleaved/padded coefficients improve local screening by under2%, with no
+  consistent overall gain. Neither experiment changes production scheduling.
+  Full constant/mixed validation is next.
+  Full validation at59393fb: mixed8.723703s and constant7.891801s.
+  Both runs match all24 fields bitwise, have no thermal flags, and release0/0
+  used/total pool bytes without diagnostic GC. Mixed prefix1.516553 ->0.508431s;
+  constant prefix1.017921 ->0.272412s. Looser quantization bounds modestly increase
+  screening time; net API elapsed still improves8.75% mixed and6.04% constant.
+
+Follow-up profiling and local experiments
+  NCU on the current coarse mixed screening kernel: FP64 pipeline82.5%, DRAM8.5%,
+  L2 hit91.0%, registers134/thread and achieved occupancy21.1%. FP64 arithmetic
+  remains the principal measured bottleneck after integer prefix acceleration.
+  Local32 integer accumulation: prefix37.768 ->35.026ms, but total666.061
+  ->665.961ms in the same short batches. Keep the simpler64-bit implementation.
+  Exact seed upper bounds preserve original FP32 statistics in36 independent
+  comparisons (all G, packed/unpacked, three sample grids). Mixed target243.785
+  ->231.185ms for32 samples/duration;128/512 give232.040/240.917ms. Several seeds
+  add work without a larger gain. Uniform-path evaluation remains experimental.
+
+Exact initial upper bound
+  Sample32 original-grid starts per selected duration, choose the strongest
+  depth-squared*width proxy, and evaluate that one candidate with the original
+  FP32 FMA/XOR order for its G. Reuse the existing upper buffer for selection and
+  the resulting exact upper bound. Invalid/overflowing proxies and nonfinite
+  exact values leave an empty upper bound; large encoded locations skip seeding.
+  This does not supply the final result or discard equal candidates.
+  Five752-period batches: mixed total668.894 ->655.165ms; constant540.151
+  ->511.421ms. Constant refinement70.54 ->44.33ms accounts for most of the gain.
+  More samples and multiple seeds did not improve the overall tradeoff.
+  Regression439 passed, one multi-GPU skip; sanitizer37 passed with zero errors.
+  Dedicated two-device checks pass for both ordinary and screened searches.
+  Full constant/mixed validation is next.
+  Full validation at7a27d01: mixed8.550335s and constant7.448810s, both under
+  nsys. All24 fields bitwise equal; no thermal flags; used/total pool0/0 bytes.
+  Previous integer-prefix checkpoint8.723703/7.891801s; elapsed decreases1.99%
+  mixed and5.61% constant. Both complete traces and source hashes are preserved.
+
+New verification and A100 campaign — 2026-11-15
+  Freeze main8f6c36c and optimization3fab6cc; four30-day comparisons cover
+  600s constant/random dy and100s mixed/spike dy. All24 fields/masks match
+  bitwise in all four cases. No numerical discrepancy found.
+  Added explicit frozen-source/experiment/device options to the benchmark runner
+  and a reproducible main-vs-branch short comparison driver.
+  Nsight Systems smoke capture succeeds:1679 CUDA kernel events, SQLite export
+  verified. Driver RmProfilingAdminOnly=0. Full artifacts are under
+  /home/farthing/GTLS/optimization-20261115.
+  Next: current-source730d/100s A100 capture and local comparison, then optimize
+  measured bottlenecks while preserving variable-dy results. Destroy each lease.
+
+Fresh local baseline and rejected probes
+  GPU1 current730d/100s mixed:9.306646/9.339336/9.352692s, median9.339336s;
+  no thermal flags; pool0/0. Separate nsys:scatter2.154s, coarse screen2.018s,
+  patch1.153s, refinement0.882s, fold0.865s, sort0.763s, integer prefix0.499s.
+  Scatter64..1024-thread sweep has no consistent gain. Power-of-two histogram
+ 131072 improves short/mid periods but regresses long periods; retain factor3.
+  Early outward-FP32 mass shortcut preserves all24 full fields, but median
+ 9.605874s is2.85% slower. Candidate remains outside production.
+  A100 SXM4 lease60719464 created2026-11-15T01:31:44Z at0.677778USD/h.
+  Several less expensive live offers disappeared at creation; no other lease
+  was created. Uploading frozen source/input and nsys. Destroy after retrieval.
+
+A100 campaign complete
+  A100 SXM4 40GB: optimized6.545202/6.560583/6.279369s, median6.545202s.
+  Same-device main cap256:15.842276s after warm-up (one measurement):2.420x.
+  RTX3090 GPU1: main39.855844s (one), optimized median9.339336s:4.268x.
+  Same current source/input/settings across devices; optimized A100 is1.427x
+  faster than GPU1. All24 fields match bitwise in main/optimized and cross-GPU
+  comparisons, all observed thermal flags false, optimized pool0/0.
+  A100 nsys:screen1.173s, scatter1.155s, patch0.857s, refine0.621s,
+  fold0.574s, sort0.567s, prefix0.329s. Full traces saved outside Git.
+  Native nsys2025.1.1 exists under bundled Nsight Compute (not on PATH).
+  Uploaded verified version was used this time; inspect installed tools first.
+  Archive c1507f945477e38ffe52db3d7a2ec8d2700693be07f5c2054d48eb919cdf1c28.
+  Instance60719464 DESTROYED at2026-11-15T01:42:20.441375+00:00; API list empty.
+  Approximate lease10.61min, cost$0.120 at quoted rate, not invoice.
+  Adaptive3-pass seeds:9.355917s; global pure-template cache:9.311695s.
+  Both preserve24 fields but no stable gain; neither merged. Shared knot tree
+  CPU probe0.2663 ->0.2278s is too small to justify added production complexity.
+  Next: one alternative segmented radix-sort experiment at the measured bottleneck.
+
+Final alternative-sort probe and profiler discovery
+  Genuine730d phases,128 rows at three period ranges: current full sort pipeline
+  10.69/10.61/9.90ms. CUB segmented32-bit radix alone13.11/12.96/12.93ms;
+  exact64-bit radix37.14/37.01/37.04ms; global row+compact-key radix15.77/15.78/15.81ms.
+  Radix timings exclude folding/collision repair, yet are already slower. All
+  sampled indices agree, but compact-key collision fallback would still be
+  required for general inputs. No radix dependency or code enters production.
+  Source and reproduction scripts:optimization-20261115/radix; CUDA12.0/CUB
+  compiled forsm86 withgcc12. Output results-final-probes-20261115.json.
+  Added nsys discovery: respectNSYS_BIN; otherwise select newest installed
+  version, including the binary bundled in Nsight Compute; record its path
+  and version alongside each trace. This avoids assuming an absent PATH entry
+  means the cloud image lacks nsys.
+  This campaign found no new stable compute speedup over3fab6cc. All candidate
+  compute changes remain in frozen experiment directories; production numerical
+  code is unchanged. Four short cases and full mixed-dy cross-GPU/main checks
+  are bitwise equal. Full experiment uses1..12d periods (48935 trials), not
+  the full unconstrained730d period range. No active cloud lease remains.
+  Automatic nsys discovery smoke:success,1679 CUDA kernel events and complete
+  .nsys-rep/SQLite export. Shell syntax and git diff whitespace checks pass.
+
+2026-11-15 local TLS2/CETRA comparison and approved A100 matrix
+Exact mixed-dy 730d/100s input (630720 samples), P=1..12 days.
+TLS2 2.0.4 fused: 2208.2700257832184 s, 14 CPU workers, one complete call after 30-day compilation warmup.
+The initial harness called this full warmup; its complete elapsed time was retained, then the extra repeat cancelled. Output periodogram was not retained by that path.
+CETRA 1.04: 45.88515186589211, 45.913158763200045, 46.01907672453672 s; median 45.913158763200045 s.
+Native CETRA grid: 48926 periods; GTLS: 48935. CETRA recovered injected period. Same input hashes in all engines.
+GTLS existing optimized median: 9.339336411096156 s on the same RTX3090.
+User approved 30 mixed-dy A100 cases, 5 lengths x 6 cadences, 3 repeats per engine, native grids; cap $1.50/h, $5 total, 3h.
+User requested patch release 2.2.1, merge to main, remain on main and upload main to A100.
+Premerge GPU checks: 445 passed, 2 skipped; 13.09 s. One existing flat-spectrum SDE warning.

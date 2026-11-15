@@ -1,0 +1,2266 @@
+{
+  "hierarchy-mixed": [
+    {
+      "tolerances": [
+        0.01
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11673600226640701,
+        "durationBool": 0.06860799994319677,
+        "foldBuckets": 8.276992082595825,
+        "scanCounts": 4.959231972694397,
+        "bucketScatter": 17.805311918258667,
+        "sortBuckets": 6.747103929519653,
+        "patchWeighted": 7.577600002288818,
+        "scanResidual": 7.152639985084534,
+        "scanScreening": 50.39411163330078,
+        "screen0": 67.84307193756104,
+        "searchChi2ScreenedG32": 40.88768005371094,
+        "searchChi2ScreenedG16": 3.284960001707077,
+        "searchChi2ScreenedG8": 1.3248000144958496,
+        "searchChi2ScreenedG4": 0.33641600608825684
+      },
+      "screen_and_exact_ms": 113.67692801356316,
+      "total_kernel_ms": 216.77526353951544,
+      "survivors": 208108,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.23304271046072245
+    },
+    {
+      "tolerances": [
+        0.005
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11059200018644333,
+        "durationBool": 0.06963199935853481,
+        "foldBuckets": 8.037375926971436,
+        "scanCounts": 4.6591039299964905,
+        "bucketScatter": 17.723392009735107,
+        "sortBuckets": 6.512639999389648,
+        "patchWeighted": 7.307264089584351,
+        "scanResidual": 6.678528070449829,
+        "scanScreening": 46.186463356018066,
+        "screen0": 96.81005001068115,
+        "searchChi2ScreenedG32": 9.376831769943237,
+        "searchChi2ScreenedG16": 3.11081600189209,
+        "searchChi2ScreenedG8": 1.2787519991397858,
+        "searchChi2ScreenedG4": 0.33155199885368347
+      },
+      "screen_and_exact_ms": 110.90800178050995,
+      "total_kernel_ms": 208.19299316219985,
+      "survivors": 23837,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.2237857086583972
+    },
+    {
+      "tolerances": [
+        0.015
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10751999914646149,
+        "durationBool": 0.06758399959653616,
+        "foldBuckets": 8.043520092964172,
+        "scanCounts": 4.707328021526337,
+        "bucketScatter": 17.742815732955933,
+        "sortBuckets": 6.5597440004348755,
+        "patchWeighted": 7.344096064567566,
+        "scanResidual": 6.782912015914917,
+        "scanScreening": 47.816704750061035,
+        "screen0": 59.099135875701904,
+        "searchChi2ScreenedG32": 38.3536319732666,
+        "searchChi2ScreenedG16": 3.1538240909576416,
+        "searchChi2ScreenedG8": 1.3244159817695618,
+        "searchChi2ScreenedG4": 0.33449599146842957
+      },
+      "screen_and_exact_ms": 102.26550391316414,
+      "total_kernel_ms": 201.43772859033197,
+      "survivors": 216854,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.21715452335774899
+    },
+    {
+      "tolerances": [
+        0.01,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11974399909377098,
+        "durationBool": 0.06652799993753433,
+        "foldBuckets": 8.012799978256226,
+        "scanCounts": 4.64384001493454,
+        "bucketScatter": 17.73363208770752,
+        "sortBuckets": 6.492160081863403,
+        "patchWeighted": 7.2898560762405396,
+        "scanResidual": 6.6416637897491455,
+        "scanScreening": 45.82499122619629,
+        "screen0": 68.38579225540161,
+        "screen1": 1.6292160153388977,
+        "searchChi2ScreenedG32": 8.910784006118774,
+        "searchChi2ScreenedG16": 3.094239979982376,
+        "searchChi2ScreenedG8": 1.2790080308914185,
+        "searchChi2ScreenedG4": 0.3312320113182068
+      },
+      "screen_and_exact_ms": 83.63027229905128,
+      "total_kernel_ms": 180.45548755303025,
+      "survivors": 17506,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.19606342632323503
+    },
+    {
+      "tolerances": [
+        0.01,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10956799983978271,
+        "durationBool": 0.08499199990183115,
+        "foldBuckets": 8.003584027290344,
+        "scanCounts": 4.629472017288208,
+        "bucketScatter": 17.746943950653076,
+        "sortBuckets": 6.494208097457886,
+        "patchWeighted": 7.29801607131958,
+        "scanResidual": 6.628255844116211,
+        "scanScreening": 45.766655921936035,
+        "screen0": 68.358145236969,
+        "screen1": 2.3326719999313354,
+        "searchChi2ScreenedG32": 8.096960067749023,
+        "searchChi2ScreenedG16": 3.0950719714164734,
+        "searchChi2ScreenedG8": 1.2741119861602783,
+        "searchChi2ScreenedG4": 0.3293440043926239
+      },
+      "screen_and_exact_ms": 83.48630526661873,
+      "total_kernel_ms": 180.24800119642168,
+      "survivors": 4973,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.19585895258933306
+    },
+    {
+      "tolerances": [
+        0.01,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11059200018644333,
+        "durationBool": 0.0685439994558692,
+        "foldBuckets": 7.996384143829346,
+        "scanCounts": 4.630464017391205,
+        "bucketScatter": 17.735680103302002,
+        "sortBuckets": 6.505376100540161,
+        "patchWeighted": 7.301024079322815,
+        "scanResidual": 6.6375041007995605,
+        "scanScreening": 45.8218879699707,
+        "screen0": 68.50752019882202,
+        "screen1": 4.265984058380127,
+        "searchChi2ScreenedG32": 7.891872048377991,
+        "searchChi2ScreenedG16": 3.0941439867019653,
+        "searchChi2ScreenedG8": 1.271008014678955,
+        "searchChi2ScreenedG4": 0.3314560055732727
+      },
+      "screen_and_exact_ms": 85.36198431253433,
+      "total_kernel_ms": 182.16944082733244,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.19793250784277916
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12371199950575829,
+        "durationBool": 0.06860799994319677,
+        "foldBuckets": 7.996416091918945,
+        "scanCounts": 4.632544040679932,
+        "bucketScatter": 17.718175888061523,
+        "sortBuckets": 6.497216105461121,
+        "patchWeighted": 7.3010560274124146,
+        "scanResidual": 6.652927875518799,
+        "scanScreening": 45.83936023712158,
+        "screen0": 59.1278076171875,
+        "screen1": 1.6814400106668472,
+        "searchChi2ScreenedG32": 8.914112091064453,
+        "searchChi2ScreenedG16": 3.094591945409775,
+        "searchChi2ScreenedG8": 1.2717439830303192,
+        "searchChi2ScreenedG4": 0.3306559920310974
+      },
+      "screen_and_exact_ms": 74.42035163938999,
+      "total_kernel_ms": 171.25036790501326,
+      "survivors": 17506,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.18694467935711145
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10956799983978271,
+        "durationBool": 0.06758400052785873,
+        "foldBuckets": 8.00051200389862,
+        "scanCounts": 4.635648012161255,
+        "bucketScatter": 17.745919942855835,
+        "sortBuckets": 6.4942721128463745,
+        "patchWeighted": 7.315392017364502,
+        "scanResidual": 6.631423830986023,
+        "scanScreening": 45.75430488586426,
+        "screen0": 59.074559688568115,
+        "screen1": 2.400191977620125,
+        "searchChi2ScreenedG32": 8.104640007019043,
+        "searchChi2ScreenedG16": 3.097759962081909,
+        "searchChi2ScreenedG8": 1.2756479680538177,
+        "searchChi2ScreenedG4": 0.33049601316452026
+      },
+      "screen_and_exact_ms": 74.28329561650753,
+      "total_kernel_ms": 171.03792042285204,
+      "survivors": 4973,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.1868650931864977
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12390400096774101,
+        "durationBool": 0.06956799887120724,
+        "foldBuckets": 8.002560019493103,
+        "scanCounts": 4.620288014411926,
+        "bucketScatter": 17.73151993751526,
+        "sortBuckets": 6.4931840896606445,
+        "patchWeighted": 7.307264089584351,
+        "scanResidual": 6.621183753013611,
+        "scanScreening": 45.69907188415527,
+        "screen0": 59.31001567840576,
+        "screen1": 4.4359680116176605,
+        "searchChi2ScreenedG32": 7.885568022727966,
+        "searchChi2ScreenedG16": 3.095360040664673,
+        "searchChi2ScreenedG8": 1.2732159793376923,
+        "searchChi2ScreenedG4": 0.33049601316452026
+      },
+      "screen_and_exact_ms": 76.33062374591827,
+      "total_kernel_ms": 172.9991675335914,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.18871499598026276
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12697600200772285,
+        "durationBool": 0.0726399989798665,
+        "foldBuckets": 7.991296052932739,
+        "scanCounts": 4.645887970924377,
+        "bucketScatter": 17.705984115600586,
+        "sortBuckets": 6.48908805847168,
+        "patchWeighted": 7.304096221923828,
+        "scanResidual": 6.626304030418396,
+        "scanScreening": 45.768672943115234,
+        "screen0": 56.22476768493652,
+        "screen1": 5.398528039455414,
+        "searchChi2ScreenedG32": 8.906816124916077,
+        "searchChi2ScreenedG16": 3.1022719144821167,
+        "searchChi2ScreenedG8": 1.2758399844169617,
+        "searchChi2ScreenedG4": 0.3314880132675171
+      },
+      "screen_and_exact_ms": 75.23971176147461,
+      "total_kernel_ms": 171.97065715584904,
+      "survivors": 17506,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.1886279620230198
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12384000048041344,
+        "durationBool": 0.06764800008386374,
+        "foldBuckets": 7.993344068527222,
+        "scanCounts": 4.629408061504364,
+        "bucketScatter": 17.72537612915039,
+        "sortBuckets": 6.478847980499268,
+        "patchWeighted": 7.3093119859695435,
+        "scanResidual": 6.620159864425659,
+        "scanScreening": 45.6744966506958,
+        "screen0": 56.15919876098633,
+        "screen1": 8.233984112739563,
+        "searchChi2ScreenedG32": 8.088480114936829,
+        "searchChi2ScreenedG16": 3.097279965877533,
+        "searchChi2ScreenedG8": 1.2736959755420685,
+        "searchChi2ScreenedG4": 0.3296639919281006
+      },
+      "screen_and_exact_ms": 77.18230292201042,
+      "total_kernel_ms": 173.80473566334695,
+      "survivors": 4973,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.1896068137139082
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10956799983978271,
+        "durationBool": 0.06755200028419495,
+        "foldBuckets": 7.9974400997161865,
+        "scanCounts": 4.63152003288269,
+        "bucketScatter": 17.722367763519287,
+        "sortBuckets": 6.484992027282715,
+        "patchWeighted": 7.324607968330383,
+        "scanResidual": 6.625279784202576,
+        "scanScreening": 45.776896476745605,
+        "screen0": 56.176575660705566,
+        "screen1": 16.204800128936768,
+        "searchChi2ScreenedG32": 7.924191951751709,
+        "searchChi2ScreenedG16": 3.114784002304077,
+        "searchChi2ScreenedG8": 1.273503988981247,
+        "searchChi2ScreenedG4": 0.3306559920310974
+      },
+      "screen_and_exact_ms": 85.02451172471046,
+      "total_kernel_ms": 181.76473587751389,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.1974207079038024
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10751999914646149,
+        "durationBool": 0.06857599969953299,
+        "foldBuckets": 7.994336009025574,
+        "scanCounts": 4.622336030006409,
+        "bucketScatter": 17.707008123397827,
+        "sortBuckets": 6.511616110801697,
+        "patchWeighted": 7.312320113182068,
+        "scanResidual": 6.628352046012878,
+        "scanScreening": 45.76255989074707,
+        "screen0": 40.911871910095215,
+        "screen1": 14.537599921226501,
+        "searchChi2ScreenedG32": 8.926944017410278,
+        "searchChi2ScreenedG16": 3.1235199868679047,
+        "searchChi2ScreenedG8": 1.2765119969844818,
+        "searchChi2ScreenedG4": 0.3303680121898651
+      },
+      "screen_and_exact_ms": 69.10681584477425,
+      "total_kernel_ms": 165.82144016679376,
+      "survivors": 17506,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.18159604910761118
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10956799983978271,
+        "durationBool": 0.07270400039851665,
+        "foldBuckets": 7.996415972709656,
+        "scanCounts": 4.622336030006409,
+        "bucketScatter": 17.697792053222656,
+        "sortBuckets": 6.496256113052368,
+        "patchWeighted": 7.293952107429504,
+        "scanResidual": 6.6231677532196045,
+        "scanScreening": 45.69494438171387,
+        "screen0": 40.931328773498535,
+        "screen1": 22.32214379310608,
+        "searchChi2ScreenedG32": 8.31382405757904,
+        "searchChi2ScreenedG16": 3.158143997192383,
+        "searchChi2ScreenedG8": 1.2844479978084564,
+        "searchChi2ScreenedG4": 0.33136001229286194
+      },
+      "screen_and_exact_ms": 76.34124863147736,
+      "total_kernel_ms": 172.94838504306972,
+      "survivors": 4973,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.18852891586720943
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1085439994931221,
+        "durationBool": 0.06758399959653616,
+        "foldBuckets": 7.988224029541016,
+        "scanCounts": 4.628480017185211,
+        "bucketScatter": 17.730528116226196,
+        "sortBuckets": 6.486016035079956,
+        "patchWeighted": 7.3144320249557495,
+        "scanResidual": 6.6211838722229,
+        "scanScreening": 45.68771266937256,
+        "screen0": 40.82585620880127,
+        "screen1": 44.30336046218872,
+        "searchChi2ScreenedG32": 7.906399965286255,
+        "searchChi2ScreenedG16": 3.1024959683418274,
+        "searchChi2ScreenedG8": 1.2789440155029297,
+        "searchChi2ScreenedG4": 0.33049601316452026
+      },
+      "screen_and_exact_ms": 97.74755263328552,
+      "total_kernel_ms": 194.38025739695877,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.21024181134998798
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11366399936378002,
+        "durationBool": 0.06774399988353252,
+        "foldBuckets": 7.9974400997161865,
+        "scanCounts": 4.62336003780365,
+        "bucketScatter": 17.72441577911377,
+        "sortBuckets": 6.491135954856873,
+        "patchWeighted": 7.308288097381592,
+        "scanResidual": 6.622207880020142,
+        "scanScreening": 45.684736251831055,
+        "screen0": 36.957183837890625,
+        "screen1": 39.82540798187256,
+        "searchChi2ScreenedG32": 8.959392070770264,
+        "searchChi2ScreenedG16": 3.1256320774555206,
+        "searchChi2ScreenedG8": 1.2882240116596222,
+        "searchChi2ScreenedG4": 0.32998400926589966
+      },
+      "screen_and_exact_ms": 90.48582398891449,
+      "total_kernel_ms": 187.11881608888507,
+      "survivors": 17506,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.20278176292777061
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10751999914646149,
+        "durationBool": 0.06656000018119812,
+        "foldBuckets": 7.985152006149292,
+        "scanCounts": 4.62336003780365,
+        "bucketScatter": 17.71007990837097,
+        "sortBuckets": 6.48800003528595,
+        "patchWeighted": 7.2949440479278564,
+        "scanResidual": 6.617087960243225,
+        "scanScreening": 45.72262477874756,
+        "screen0": 36.85580801963806,
+        "screen1": 60.72009563446045,
+        "searchChi2ScreenedG32": 8.276384115219116,
+        "searchChi2ScreenedG16": 3.146016001701355,
+        "searchChi2ScreenedG8": 1.2833919823169708,
+        "searchChi2ScreenedG4": 0.33055999875068665
+      },
+      "screen_and_exact_ms": 110.61225575208664,
+      "total_kernel_ms": 207.2275845259428,
+      "survivors": 4973,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.222970275208354
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12489599734544754,
+        "durationBool": 0.06860799994319677,
+        "foldBuckets": 8.00051200389862,
+        "scanCounts": 4.628480017185211,
+        "bucketScatter": 17.715199947357178,
+        "sortBuckets": 6.491136074066162,
+        "patchWeighted": 7.313408017158508,
+        "scanResidual": 6.606752157211304,
+        "scanScreening": 45.67238426208496,
+        "screen0": 36.91929626464844,
+        "screen1": 119.65228462219238,
+        "searchChi2ScreenedG32": 7.908800005912781,
+        "searchChi2ScreenedG16": 3.1097280085086823,
+        "searchChi2ScreenedG8": 1.2811840176582336,
+        "searchChi2ScreenedG4": 0.33129599690437317
+      },
+      "screen_and_exact_ms": 169.2025889158249,
+      "total_kernel_ms": 265.8239653920755,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.28163136821240187
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12595199793577194,
+        "durationBool": 0.06860799994319677,
+        "foldBuckets": 8.00051212310791,
+        "scanCounts": 4.6325759291648865,
+        "bucketScatter": 17.731584072113037,
+        "sortBuckets": 6.48908805847168,
+        "patchWeighted": 7.310335993766785,
+        "scanResidual": 6.628351807594299,
+        "scanScreening": 45.72364807128906,
+        "screen0": 40.795135498046875,
+        "screen1": 11.956192135810852,
+        "screen2": 0.9472000151872635,
+        "searchChi2ScreenedG32": 7.993088006973267,
+        "searchChi2ScreenedG16": 3.0953279435634613,
+        "searchChi2ScreenedG8": 1.273663967847824,
+        "searchChi2ScreenedG4": 0.3314239978790283
+      },
+      "screen_and_exact_ms": 66.39203156530857,
+      "total_kernel_ms": 163.1026876186952,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.17906795535236597
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12492800131440163,
+        "durationBool": 0.06755200121551752,
+        "foldBuckets": 7.991296052932739,
+        "scanCounts": 4.628480017185211,
+        "bucketScatter": 17.737631797790527,
+        "sortBuckets": 6.4890559911727905,
+        "patchWeighted": 7.310336112976074,
+        "scanResidual": 6.622047781944275,
+        "scanScreening": 45.71750354766846,
+        "screen0": 36.84044790267944,
+        "screen1": 32.869375705718994,
+        "screen2": 0.951296016573906,
+        "searchChi2ScreenedG32": 7.895424008369446,
+        "searchChi2ScreenedG16": 3.1060479879379272,
+        "searchChi2ScreenedG8": 1.2919359803199768,
+        "searchChi2ScreenedG4": 0.3301120102405548
+      },
+      "screen_and_exact_ms": 83.28463961184025,
+      "total_kernel_ms": 179.97347091604024,
+      "survivors": 1898,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.19609032664448023
+    }
+  ],
+  "hierarchy-constant": [
+    {
+      "tolerances": [
+        0.01
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11462400108575821,
+        "durationBool": 0.06454399973154068,
+        "foldBuckets": 12.01254415512085,
+        "scanCounts": 4.930560052394867,
+        "bucketScatter": 21.65555214881897,
+        "sortBuckets": 6.837248086929321,
+        "patchWeighted": 7.361536026000977,
+        "scanResidual": 7.103487968444824,
+        "scanScreening": 50.25894355773926,
+        "screen0": 68.00486469268799,
+        "searchChi2ScreenedG32": 134.67097687721252,
+        "searchChi2ScreenedG16": 3.2599680423736572,
+        "searchChi2ScreenedG8": 1.335231989622116,
+        "searchChi2ScreenedG4": 0.33398398756980896
+      },
+      "screen_and_exact_ms": 207.6050255894661,
+      "total_kernel_ms": 317.94406558573246,
+      "survivors": 750368,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.33406672067940235
+    },
+    {
+      "tolerances": [
+        0.005
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1085439994931221,
+        "durationBool": 0.06665599998086691,
+        "foldBuckets": 12.010496139526367,
+        "scanCounts": 4.6724159717559814,
+        "bucketScatter": 20.68777585029602,
+        "sortBuckets": 6.644736051559448,
+        "patchWeighted": 7.1270400285720825,
+        "scanResidual": 6.68777596950531,
+        "scanScreening": 46.881792068481445,
+        "screen0": 97.35987091064453,
+        "searchChi2ScreenedG32": 18.403968334197998,
+        "searchChi2ScreenedG16": 3.0703680217266083,
+        "searchChi2ScreenedG8": 1.3070399761199951,
+        "searchChi2ScreenedG4": 0.3288640081882477
+      },
+      "screen_and_exact_ms": 120.47011125087738,
+      "total_kernel_ms": 225.35734333004802,
+      "survivors": 90576,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.2407190715894103
+    },
+    {
+      "tolerances": [
+        0.015
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12595200166106224,
+        "durationBool": 0.06553600076586008,
+        "foldBuckets": 12.01356840133667,
+        "scanCounts": 4.798464000225067,
+        "bucketScatter": 20.933536291122437,
+        "sortBuckets": 6.742015957832336,
+        "patchWeighted": 7.229440093040466,
+        "scanResidual": 6.921184062957764,
+        "scanScreening": 48.74854373931885,
+        "screen0": 59.158432960510254,
+        "searchChi2ScreenedG32": 131.75795221328735,
+        "searchChi2ScreenedG16": 3.2258880138397217,
+        "searchChi2ScreenedG8": 1.3212479948997498,
+        "searchChi2ScreenedG4": 0.3319680094718933
+      },
+      "screen_and_exact_ms": 195.79548919200897,
+      "total_kernel_ms": 303.3737297402695,
+      "survivors": 779901,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.318762943148613
+    },
+    {
+      "tolerances": [
+        0.01,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10844799876213074,
+        "durationBool": 0.07788800075650215,
+        "foldBuckets": 12.003328084945679,
+        "scanCounts": 4.640767931938171,
+        "bucketScatter": 20.64896035194397,
+        "sortBuckets": 6.611871957778931,
+        "patchWeighted": 7.093248009681702,
+        "scanResidual": 6.6385921239852905,
+        "scanScreening": 46.371840476989746,
+        "screen0": 68.37145662307739,
+        "screen1": 5.066752016544342,
+        "searchChi2ScreenedG32": 14.233279824256897,
+        "searchChi2ScreenedG16": 3.05471995472908,
+        "searchChi2ScreenedG8": 1.271487981081009,
+        "searchChi2ScreenedG4": 0.32873600721359253
+      },
+      "screen_and_exact_ms": 92.32643240690231,
+      "total_kernel_ms": 196.52137734368443,
+      "survivors": 65204,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.211881666444242
+    },
+    {
+      "tolerances": [
+        0.01,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10947199910879135,
+        "durationBool": 0.06656000018119812,
+        "foldBuckets": 12.002304077148438,
+        "scanCounts": 4.600831985473633,
+        "bucketScatter": 20.54748797416687,
+        "sortBuckets": 6.579104065895081,
+        "patchWeighted": 7.071743965148926,
+        "scanResidual": 6.566911935806274,
+        "scanScreening": 45.65913486480713,
+        "screen0": 68.48307180404663,
+        "screen1": 7.708639919757843,
+        "searchChi2ScreenedG32": 8.80076801776886,
+        "searchChi2ScreenedG16": 3.0505599677562714,
+        "searchChi2ScreenedG8": 1.272031992673874,
+        "searchChi2ScreenedG4": 0.328031986951828
+      },
+      "screen_and_exact_ms": 89.6431036889553,
+      "total_kernel_ms": 192.84665455669165,
+      "survivors": 14766,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.20824794191867113
+    },
+    {
+      "tolerances": [
+        0.01,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10847999900579453,
+        "durationBool": 0.07478399947285652,
+        "foldBuckets": 11.993088006973267,
+        "scanCounts": 4.6202879548072815,
+        "bucketScatter": 20.591615915298462,
+        "sortBuckets": 6.586367964744568,
+        "patchWeighted": 7.0799360275268555,
+        "scanResidual": 6.599680066108704,
+        "scanScreening": 45.863871574401855,
+        "screen0": 68.52300691604614,
+        "screen1": 15.175583958625793,
+        "searchChi2ScreenedG32": 8.170431852340698,
+        "searchChi2ScreenedG16": 3.0504959523677826,
+        "searchChi2ScreenedG8": 1.2711039781570435,
+        "searchChi2ScreenedG4": 0.3286080062389374
+      },
+      "screen_and_exact_ms": 96.5192306637764,
+      "total_kernel_ms": 200.03734217211604,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.21561391185969114
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11974399909377098,
+        "durationBool": 0.06454400066286325,
+        "foldBuckets": 12.01145601272583,
+        "scanCounts": 4.5988160371780396,
+        "bucketScatter": 20.554720163345337,
+        "sortBuckets": 6.5873600244522095,
+        "patchWeighted": 7.061504006385803,
+        "scanResidual": 6.572991847991943,
+        "scanScreening": 45.83628749847412,
+        "screen0": 59.39302349090576,
+        "screen1": 5.239808022975922,
+        "searchChi2ScreenedG32": 14.079360008239746,
+        "searchChi2ScreenedG16": 3.058527946472168,
+        "searchChi2ScreenedG8": 1.2755520045757294,
+        "searchChi2ScreenedG4": 0.3280639946460724
+      },
+      "screen_and_exact_ms": 83.3743354678154,
+      "total_kernel_ms": 186.78175905812532,
+      "survivors": 65204,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.20227614976465702
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12390400096774101,
+        "durationBool": 0.06451200135052204,
+        "foldBuckets": 12.011520147323608,
+        "scanCounts": 4.611008048057556,
+        "bucketScatter": 20.586464166641235,
+        "sortBuckets": 6.590464115142822,
+        "patchWeighted": 7.079872012138367,
+        "scanResidual": 6.5843199491500854,
+        "scanScreening": 45.80959987640381,
+        "screen0": 59.348992347717285,
+        "screen1": 7.9534080028533936,
+        "searchChi2ScreenedG32": 8.788671970367432,
+        "searchChi2ScreenedG16": 3.0504319965839386,
+        "searchChi2ScreenedG8": 1.2723200023174286,
+        "searchChi2ScreenedG4": 0.32707199454307556
+      },
+      "screen_and_exact_ms": 80.74089631438255,
+      "total_kernel_ms": 184.2025606315583,
+      "survivors": 14766,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.19959053862839937
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.11775999888777733,
+        "durationBool": 0.06553600076586008,
+        "foldBuckets": 12.002304077148438,
+        "scanCounts": 4.603872001171112,
+        "bucketScatter": 20.56393599510193,
+        "sortBuckets": 6.590368032455444,
+        "patchWeighted": 7.083967924118042,
+        "scanResidual": 6.592512011528015,
+        "scanScreening": 45.84956741333008,
+        "screen0": 59.24147129058838,
+        "screen1": 15.741952300071716,
+        "searchChi2ScreenedG32": 8.170112133026123,
+        "searchChi2ScreenedG16": 3.0492159724235535,
+        "searchChi2ScreenedG8": 1.2729600071907043,
+        "searchChi2ScreenedG4": 0.32841598987579346
+      },
+      "screen_and_exact_ms": 87.80412769317627,
+      "total_kernel_ms": 191.27395114768296,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.20676051452755928
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12287999875843525,
+        "durationBool": 0.06563200056552887,
+        "foldBuckets": 12.011520147323608,
+        "scanCounts": 4.617215991020203,
+        "bucketScatter": 20.579328060150146,
+        "sortBuckets": 6.594528079032898,
+        "patchWeighted": 7.075711965560913,
+        "scanResidual": 6.593503952026367,
+        "scanScreening": 45.948927879333496,
+        "screen0": 56.29235124588013,
+        "screen1": 15.907776117324829,
+        "searchChi2ScreenedG32": 14.210591912269592,
+        "searchChi2ScreenedG16": 3.0650240182876587,
+        "searchChi2ScreenedG8": 1.277536004781723,
+        "searchChi2ScreenedG4": 0.32793599367141724
+      },
+      "screen_and_exact_ms": 91.08121529221535,
+      "total_kernel_ms": 194.69046336598694,
+      "survivors": 65204,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.21012516412883997
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10751999914646149,
+        "durationBool": 0.06652799993753433,
+        "foldBuckets": 12.01356816291809,
+        "scanCounts": 4.601760029792786,
+        "bucketScatter": 20.554752111434937,
+        "sortBuckets": 6.567935943603516,
+        "patchWeighted": 7.07369601726532,
+        "scanResidual": 6.567935943603516,
+        "scanScreening": 45.73491096496582,
+        "screen0": 56.21247863769531,
+        "screen1": 24.455071926116943,
+        "searchChi2ScreenedG32": 8.794560194015503,
+        "searchChi2ScreenedG16": 3.0536960065364838,
+        "searchChi2ScreenedG8": 1.274592012166977,
+        "searchChi2ScreenedG4": 0.327455997467041
+      },
+      "screen_and_exact_ms": 94.11785477399826,
+      "total_kernel_ms": 197.40646194666624,
+      "survivors": 14766,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.21302862651646137
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10745599865913391,
+        "durationBool": 0.07891200017184019,
+        "foldBuckets": 12.003328084945679,
+        "scanCounts": 4.607840001583099,
+        "bucketScatter": 20.555776357650757,
+        "sortBuckets": 6.578176021575928,
+        "patchWeighted": 7.064575910568237,
+        "scanResidual": 6.568959951400757,
+        "scanScreening": 45.70623970031738,
+        "screen0": 56.25129556655884,
+        "screen1": 48.60716724395752,
+        "searchChi2ScreenedG32": 8.173535943031311,
+        "searchChi2ScreenedG16": 3.0500159859657288,
+        "searchChi2ScreenedG8": 1.2742080092430115,
+        "searchChi2ScreenedG4": 0.32761600613594055
+      },
+      "screen_and_exact_ms": 117.68383875489235,
+      "total_kernel_ms": 220.95510278176516,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.23649252206087112
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.10956799983978271,
+        "durationBool": 0.06752000004053116,
+        "foldBuckets": 12.009472131729126,
+        "scanCounts": 4.60700798034668,
+        "bucketScatter": 20.546559810638428,
+        "sortBuckets": 6.5914881229400635,
+        "patchWeighted": 7.0830079317092896,
+        "scanResidual": 6.58841598033905,
+        "scanScreening": 45.92742347717285,
+        "screen0": 40.846304416656494,
+        "screen1": 41.124863624572754,
+        "searchChi2ScreenedG32": 13.996992111206055,
+        "searchChi2ScreenedG16": 3.069504052400589,
+        "searchChi2ScreenedG8": 1.2761280238628387,
+        "searchChi2ScreenedG4": 0.3285120129585266
+      },
+      "screen_and_exact_ms": 100.64230424165726,
+      "total_kernel_ms": 204.17276767641306,
+      "survivors": 65204,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.21968653798103333
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13619199767708778,
+        "durationBool": 0.06656000018119812,
+        "foldBuckets": 11.985919952392578,
+        "scanCounts": 4.620288014411926,
+        "bucketScatter": 20.54963183403015,
+        "sortBuckets": 6.597568154335022,
+        "patchWeighted": 7.103487968444824,
+        "scanResidual": 6.608767986297607,
+        "scanScreening": 46.02675247192383,
+        "screen0": 40.80947160720825,
+        "screen1": 63.08659267425537,
+        "searchChi2ScreenedG32": 8.835615754127502,
+        "searchChi2ScreenedG16": 3.066463977098465,
+        "searchChi2ScreenedG8": 1.2806399762630463,
+        "searchChi2ScreenedG4": 0.32873600721359253
+      },
+      "screen_and_exact_ms": 117.40751999616623,
+      "total_kernel_ms": 221.10268837586045,
+      "survivors": 14766,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.23648876789957285
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12083199992775917,
+        "durationBool": 0.06659200042486191,
+        "foldBuckets": 12.009472131729126,
+        "scanCounts": 4.62336003780365,
+        "bucketScatter": 20.537343978881836,
+        "sortBuckets": 6.600704073905945,
+        "patchWeighted": 7.096320033073425,
+        "scanResidual": 6.609919905662537,
+        "scanScreening": 46.04409599304199,
+        "screen0": 40.8125433921814,
+        "screen1": 124.70272064208984,
+        "searchChi2ScreenedG32": 8.20195209980011,
+        "searchChi2ScreenedG16": 3.0632960498332977,
+        "searchChi2ScreenedG8": 1.2784319818019867,
+        "searchChi2ScreenedG4": 0.3298240005970001
+      },
+      "screen_and_exact_ms": 178.38876816630363,
+      "total_kernel_ms": 282.09740832075477,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.297672051936388
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14847999811172485,
+        "durationBool": 0.06348800100386143,
+        "foldBuckets": 12.018688201904297,
+        "scanCounts": 4.629440069198608,
+        "bucketScatter": 20.57932758331299,
+        "sortBuckets": 6.60371208190918,
+        "patchWeighted": 7.097312092781067,
+        "scanResidual": 6.617088079452515,
+        "scanScreening": 46.08204746246338,
+        "screen0": 37.06777572631836,
+        "screen1": 92.4609603881836,
+        "searchChi2ScreenedG32": 14.193408131599426,
+        "searchChi2ScreenedG16": 3.0725760459899902,
+        "searchChi2ScreenedG8": 1.2817600071430206,
+        "searchChi2ScreenedG4": 0.33078399300575256
+      },
+      "screen_and_exact_ms": 148.40726429224014,
+      "total_kernel_ms": 252.24684786237776,
+      "survivors": 65204,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.2677832515910268
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13619200140237808,
+        "durationBool": 0.06553600076586008,
+        "foldBuckets": 12.023808240890503,
+        "scanCounts": 4.6254079937934875,
+        "bucketScatter": 20.56803250312805,
+        "sortBuckets": 6.603744149208069,
+        "patchWeighted": 7.09008002281189,
+        "scanResidual": 6.611935973167419,
+        "scanScreening": 46.07993412017822,
+        "screen0": 36.83123302459717,
+        "screen1": 137.76684951782227,
+        "searchChi2ScreenedG32": 8.834367871284485,
+        "searchChi2ScreenedG16": 3.067744016647339,
+        "searchChi2ScreenedG8": 1.281279981136322,
+        "searchChi2ScreenedG4": 0.32953599095344543
+      },
+      "screen_and_exact_ms": 188.11101040244102,
+      "total_kernel_ms": 291.9156814077869,
+      "survivors": 14766,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.30760113429278135
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.12073599919676781,
+        "durationBool": 0.06656000018119812,
+        "foldBuckets": 12.018688201904297,
+        "scanCounts": 4.626368045806885,
+        "bucketScatter": 20.621248245239258,
+        "sortBuckets": 6.613920092582703,
+        "patchWeighted": 7.120895981788635,
+        "scanResidual": 6.631424069404602,
+        "scanScreening": 46.24588871002197,
+        "screen0": 37.09849572181702,
+        "screen1": 264.17152404785156,
+        "searchChi2ScreenedG32": 8.211551904678345,
+        "searchChi2ScreenedG16": 3.0704640448093414,
+        "searchChi2ScreenedG8": 1.293472021818161,
+        "searchChi2ScreenedG4": 0.3333759903907776
+      },
+      "screen_and_exact_ms": 314.1788837313652,
+      "total_kernel_ms": 418.2446130774915,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.43375226203352213
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1228800006210804,
+        "durationBool": 0.06659200042486191,
+        "foldBuckets": 11.994112253189087,
+        "scanCounts": 4.634623944759369,
+        "bucketScatter": 20.65510392189026,
+        "sortBuckets": 6.610944151878357,
+        "patchWeighted": 7.097280144691467,
+        "scanResidual": 6.616063952445984,
+        "scanScreening": 46.23660755157471,
+        "screen0": 40.82380723953247,
+        "screen1": 34.103296756744385,
+        "screen2": 2.1964799910783768,
+        "searchChi2ScreenedG32": 8.219007968902588,
+        "searchChi2ScreenedG16": 3.066816031932831,
+        "searchChi2ScreenedG8": 1.2819519937038422,
+        "searchChi2ScreenedG4": 0.3303999900817871
+      },
+      "screen_and_exact_ms": 90.02175997197628,
+      "total_kernel_ms": 194.05596789345145,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.20964154042303562
+    },
+    {
+      "tolerances": [
+        0.1,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.15769600123167038,
+        "durationBool": 0.06860799994319677,
+        "foldBuckets": 12.009472131729126,
+        "scanCounts": 4.630464017391205,
+        "bucketScatter": 20.603872060775757,
+        "sortBuckets": 6.6037760972976685,
+        "patchWeighted": 7.103487968444824,
+        "scanResidual": 6.618048071861267,
+        "scanScreening": 46.07785511016846,
+        "screen0": 36.87116742134094,
+        "screen1": 78.5029125213623,
+        "screen2": 2.189311996102333,
+        "searchChi2ScreenedG32": 8.220735907554626,
+        "searchChi2ScreenedG16": 3.0628480315208435,
+        "searchChi2ScreenedG8": 1.2806719839572906,
+        "searchChi2ScreenedG4": 0.32998400926589966
+      },
+      "screen_and_exact_ms": 130.45763187110424,
+      "total_kernel_ms": 234.3309113299474,
+      "survivors": 4940,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 0.2500758469104767
+    }
+  ],
+  "hierarchy-native-mixed": [
+    {
+      "tolerances": [
+        0.01
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13721599988639355,
+        "durationBool": 0.07270399946719408,
+        "foldBuckets": 82.69107246398926,
+        "scanCounts": 21.683199405670166,
+        "bucketScatter": 173.93663787841797,
+        "sortBuckets": 78.61654376983643,
+        "patchWeighted": 72.2052173614502,
+        "scanResidual": 34.32243204116821,
+        "scanScreening": 191.90374374389648,
+        "screen0": 655.4818725585938,
+        "searchChi2ScreenedG32": 318.28406524658203,
+        "searchChi2ScreenedG16": 30.22601628303528,
+        "searchChi2ScreenedG8": 12.666623592376709,
+        "searchChi2ScreenedG4": 3.164128065109253
+      },
+      "screen_and_exact_ms": 1019.822705745697,
+      "total_kernel_ms": 1675.3914724094793,
+      "survivors": 1772908,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.708577774465084
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13203199952840805,
+        "durationBool": 0.06956799980252981,
+        "foldBuckets": 81.25849533081055,
+        "scanCounts": 21.436383724212646,
+        "bucketScatter": 173.23519897460938,
+        "sortBuckets": 77.91513729095459,
+        "patchWeighted": 72.07219123840332,
+        "scanResidual": 34.27936029434204,
+        "scanScreening": 192.11161422729492,
+        "screen0": 569.0592918395996,
+        "screen1": 19.51129651069641,
+        "searchChi2ScreenedG32": 78.63913631439209,
+        "searchChi2ScreenedG16": 30.84323215484619,
+        "searchChi2ScreenedG8": 12.828287601470947,
+        "searchChi2ScreenedG4": 3.143296003341675
+      },
+      "screen_and_exact_ms": 714.0245404243469,
+      "total_kernel_ms": 1366.5345215043053,
+      "survivors": 49415,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.3990577356889844
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.0005
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.15155200101435184,
+        "durationBool": 0.07177599892020226,
+        "foldBuckets": 81.11616134643555,
+        "scanCounts": 21.402623653411865,
+        "bucketScatter": 173.11634826660156,
+        "sortBuckets": 77.77382469177246,
+        "patchWeighted": 71.96883201599121,
+        "scanResidual": 34.660287857055664,
+        "scanScreening": 192.3665885925293,
+        "screen0": 567.1270179748535,
+        "screen1": 29.5413761138916,
+        "searchChi2ScreenedG32": 76.60198402404785,
+        "searchChi2ScreenedG16": 30.628000259399414,
+        "searchChi2ScreenedG8": 12.728479862213135,
+        "searchChi2ScreenedG4": 3.12227201461792
+      },
+      "screen_and_exact_ms": 719.7491302490234,
+      "total_kernel_ms": 1372.3771246727556,
+      "survivors": 30555,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.4069558922201395
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13718399964272976,
+        "durationBool": 0.07782400026917458,
+        "foldBuckets": 80.9359359741211,
+        "scanCounts": 21.2838397026062,
+        "bucketScatter": 173.1174430847168,
+        "sortBuckets": 77.38662338256836,
+        "patchWeighted": 71.7322244644165,
+        "scanResidual": 34.670592308044434,
+        "scanScreening": 191.4071044921875,
+        "screen0": 569.8652229309082,
+        "screen1": 13.43180799484253,
+        "screen2": 6.290432035923004,
+        "searchChi2ScreenedG32": 75.76937770843506,
+        "searchChi2ScreenedG16": 30.679264783859253,
+        "searchChi2ScreenedG8": 12.713247776031494,
+        "searchChi2ScreenedG4": 3.1195199489593506
+      },
+      "screen_and_exact_ms": 711.8688731789589,
+      "total_kernel_ms": 1362.6176445875317,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.3973711980506778
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13312000036239624,
+        "durationBool": 0.07168000005185604,
+        "foldBuckets": 81.1151351928711,
+        "scanCounts": 21.312512397766113,
+        "bucketScatter": 173.11030197143555,
+        "sortBuckets": 77.36627197265625,
+        "patchWeighted": 71.7967357635498,
+        "scanResidual": 34.65523147583008,
+        "scanScreening": 191.77574157714844,
+        "screen0": 568.0373764038086,
+        "screen1": 11.496448040008545,
+        "screen2": 7.198720097541809,
+        "searchChi2ScreenedG32": 75.86720085144043,
+        "searchChi2ScreenedG16": 30.621280670166016,
+        "searchChi2ScreenedG8": 12.683136463165283,
+        "searchChi2ScreenedG4": 3.1260159015655518
+      },
+      "screen_and_exact_ms": 709.0301784276962,
+      "total_kernel_ms": 1360.3669087793678,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.393625651486218
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13107199780642986,
+        "durationBool": 0.0736640002578497,
+        "foldBuckets": 81.06393337249756,
+        "scanCounts": 21.264383792877197,
+        "bucketScatter": 173.0887680053711,
+        "sortBuckets": 77.50553703308105,
+        "patchWeighted": 71.79779148101807,
+        "scanResidual": 34.803711891174316,
+        "scanScreening": 190.67283248901367,
+        "screen0": 537.9675674438477,
+        "screen1": 37.73952031135559,
+        "screen2": 7.177120089530945,
+        "searchChi2ScreenedG32": 75.83734321594238,
+        "searchChi2ScreenedG16": 30.784991979599,
+        "searchChi2ScreenedG8": 12.775136470794678,
+        "searchChi2ScreenedG4": 3.1317760944366455
+      },
+      "screen_and_exact_ms": 705.4134556055069,
+      "total_kernel_ms": 1355.8151496686041,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.388857831247151
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1443839967250824,
+        "durationBool": 0.07168000005185604,
+        "foldBuckets": 81.35884857177734,
+        "scanCounts": 21.34111976623535,
+        "bucketScatter": 173.16966247558594,
+        "sortBuckets": 77.54342555999756,
+        "patchWeighted": 71.84892749786377,
+        "scanResidual": 34.54156827926636,
+        "scanScreening": 191.24019241333008,
+        "screen0": 392.8135643005371,
+        "screen1": 102.04054355621338,
+        "screen2": 7.197664022445679,
+        "searchChi2ScreenedG32": 76.35020732879639,
+        "searchChi2ScreenedG16": 30.67030382156372,
+        "searchChi2ScreenedG8": 12.682784080505371,
+        "searchChi2ScreenedG4": 3.121471881866455
+      },
+      "screen_and_exact_ms": 624.8765389919281,
+      "total_kernel_ms": 1276.1363475527614,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.3091572178527713
+    },
+    {
+      "tolerances": [
+        0.03,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13302399963140488,
+        "durationBool": 0.08499200083315372,
+        "foldBuckets": 81.0588150024414,
+        "scanCounts": 21.379072666168213,
+        "bucketScatter": 173.1604461669922,
+        "sortBuckets": 77.52908897399902,
+        "patchWeighted": 71.84998416900635,
+        "scanResidual": 34.24460792541504,
+        "scanScreening": 190.67910385131836,
+        "screen0": 531.9270439147949,
+        "screen1": 37.798911333084106,
+        "screen2": 7.194623947143555,
+        "searchChi2ScreenedG32": 75.91036796569824,
+        "searchChi2ScreenedG16": 30.800959587097168,
+        "searchChi2ScreenedG8": 12.712255954742432,
+        "searchChi2ScreenedG4": 3.1305599212646484
+      },
+      "screen_and_exact_ms": 699.4747226238251,
+      "total_kernel_ms": 1349.5938573796302,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.38275524135679
+    }
+  ],
+  "hierarchy-native-constant": [
+    {
+      "tolerances": [
+        0.01
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13619199953973293,
+        "durationBool": 0.0737279998138547,
+        "foldBuckets": 117.47225570678711,
+        "scanCounts": 21.03705596923828,
+        "bucketScatter": 203.1124496459961,
+        "sortBuckets": 77.27820873260498,
+        "patchWeighted": 69.56038284301758,
+        "scanResidual": 34.58960008621216,
+        "scanScreening": 266.4151077270508,
+        "screen0": 656.4791793823242,
+        "searchChi2ScreenedG32": 1305.8202095031738,
+        "searchChi2ScreenedG16": 30.62345576286316,
+        "searchChi2ScreenedG8": 12.397504329681396,
+        "searchChi2ScreenedG4": 3.088831901550293
+      },
+      "screen_and_exact_ms": 2008.409180879593,
+      "total_kernel_ms": 2798.0841615898535,
+      "survivors": 7513679,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 2.830980706959963
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1331199984997511,
+        "durationBool": 0.07987200003117323,
+        "foldBuckets": 117.4886417388916,
+        "scanCounts": 21.160959720611572,
+        "bucketScatter": 204.32793807983398,
+        "sortBuckets": 77.60383987426758,
+        "patchWeighted": 69.94636726379395,
+        "scanResidual": 34.58560037612915,
+        "scanScreening": 266.780517578125,
+        "screen0": 569.4310455322266,
+        "screen1": 78.53568077087402,
+        "searchChi2ScreenedG32": 83.26972770690918,
+        "searchChi2ScreenedG16": 29.65174412727356,
+        "searchChi2ScreenedG8": 12.324607372283936,
+        "searchChi2ScreenedG4": 3.082047939300537
+      },
+      "screen_and_exact_ms": 776.2948534488678,
+      "total_kernel_ms": 1568.4017100790516,
+      "survivors": 144810,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.600920308381319
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.0005
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14950400032103062,
+        "durationBool": 0.07276799995452166,
+        "foldBuckets": 117.46713447570801,
+        "scanCounts": 21.089280128479004,
+        "bucketScatter": 203.09708786010742,
+        "sortBuckets": 77.27820682525635,
+        "patchWeighted": 69.66886329650879,
+        "scanResidual": 34.634719371795654,
+        "scanScreening": 266.3270378112793,
+        "screen0": 569.298942565918,
+        "screen1": 123.72377681732178,
+        "searchChi2ScreenedG32": 78.88179016113281,
+        "searchChi2ScreenedG16": 29.618079900741577,
+        "searchChi2ScreenedG8": 12.319583892822266,
+        "searchChi2ScreenedG4": 3.0805439949035645
+      },
+      "screen_and_exact_ms": 816.92271733284,
+      "total_kernel_ms": 1606.70731910225,
+      "survivors": 84387,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6390176499262452
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1432959996163845,
+        "durationBool": 0.07484799902886152,
+        "foldBuckets": 117.46303939819336,
+        "scanCounts": 21.090304374694824,
+        "bucketScatter": 203.41247940063477,
+        "sortBuckets": 77.19628810882568,
+        "patchWeighted": 69.75171184539795,
+        "scanResidual": 34.655168533325195,
+        "scanScreening": 266.3454704284668,
+        "screen0": 569.9819450378418,
+        "screen1": 51.09247970581055,
+        "screen2": 15.418367981910706,
+        "searchChi2ScreenedG32": 76.90112209320068,
+        "searchChi2ScreenedG16": 29.88348889350891,
+        "searchChi2ScreenedG8": 12.37654447555542,
+        "searchChi2ScreenedG4": 3.0920639038085938
+      },
+      "screen_and_exact_ms": 758.7460120916367,
+      "total_kernel_ms": 1548.8786181798205,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.581602836959064
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13209599815309048,
+        "durationBool": 0.0737279998138547,
+        "foldBuckets": 117.5173110961914,
+        "scanCounts": 21.133280277252197,
+        "bucketScatter": 203.50966262817383,
+        "sortBuckets": 77.42969512939453,
+        "patchWeighted": 69.85113525390625,
+        "scanResidual": 34.62342405319214,
+        "scanScreening": 266.70899200439453,
+        "screen0": 568.8760185241699,
+        "screen1": 41.985023975372314,
+        "screen2": 20.487168073654175,
+        "searchChi2ScreenedG32": 77.17804908752441,
+        "searchChi2ScreenedG16": 29.783168077468872,
+        "searchChi2ScreenedG8": 12.386911869049072,
+        "searchChi2ScreenedG4": 3.0954558849334717
+      },
+      "screen_and_exact_ms": 753.7917954921722,
+      "total_kernel_ms": 1544.771119932644,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.5772742377594113
+    },
+    {
+      "tolerances": [
+        0.02,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13312000036239624,
+        "durationBool": 0.07174399960786104,
+        "foldBuckets": 117.49580574035645,
+        "scanCounts": 21.07695960998535,
+        "bucketScatter": 203.25068283081055,
+        "sortBuckets": 77.38470363616943,
+        "patchWeighted": 69.72825527191162,
+        "scanResidual": 34.669567584991455,
+        "scanScreening": 266.60044860839844,
+        "screen0": 541.7687377929688,
+        "screen1": 126.86336135864258,
+        "screen2": 20.497408390045166,
+        "searchChi2ScreenedG32": 76.19699287414551,
+        "searchChi2ScreenedG16": 29.75196862220764,
+        "searchChi2ScreenedG8": 12.353536128997803,
+        "searchChi2ScreenedG4": 3.098047971725464
+      },
+      "screen_and_exact_ms": 810.5300531387329,
+      "total_kernel_ms": 1600.9413404213265,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6342527400702238
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14124800078570843,
+        "durationBool": 0.0736640002578497,
+        "foldBuckets": 117.49478340148926,
+        "scanCounts": 21.16707181930542,
+        "bucketScatter": 203.74924087524414,
+        "sortBuckets": 77.4850549697876,
+        "patchWeighted": 70.0241928100586,
+        "scanResidual": 34.62656021118164,
+        "scanScreening": 266.7960014343262,
+        "screen0": 391.583740234375,
+        "screen1": 321.5984573364258,
+        "screen2": 20.555776119232178,
+        "searchChi2ScreenedG32": 76.79967975616455,
+        "searchChi2ScreenedG16": 29.746304750442505,
+        "searchChi2ScreenedG8": 12.37497615814209,
+        "searchChi2ScreenedG4": 3.088479995727539
+      },
+      "screen_and_exact_ms": 855.7474143505096,
+      "total_kernel_ms": 1647.305231872946,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.679764175787568
+    },
+    {
+      "tolerances": [
+        0.03,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13305599801242352,
+        "durationBool": 0.07372800074517727,
+        "foldBuckets": 117.49273490905762,
+        "scanCounts": 21.14454460144043,
+        "bucketScatter": 203.90502166748047,
+        "sortBuckets": 77.48300838470459,
+        "patchWeighted": 69.87673568725586,
+        "scanResidual": 34.623488426208496,
+        "scanScreening": 266.22668838500977,
+        "screen0": 535.0000419616699,
+        "screen1": 127.13267135620117,
+        "screen2": 20.546560287475586,
+        "searchChi2ScreenedG32": 76.58640098571777,
+        "searchChi2ScreenedG16": 29.989664316177368,
+        "searchChi2ScreenedG8": 12.372480392456055,
+        "searchChi2ScreenedG4": 3.0851199626922607
+      },
+      "screen_and_exact_ms": 804.7129392623901,
+      "total_kernel_ms": 1595.671945322305,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6280315574258566
+    }
+  ],
+  "hierarchy-deep-mixed": [
+    {
+      "tolerances": [
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13411199860274792,
+        "durationBool": 0.07676799967885017,
+        "foldBuckets": 80.89292621612549,
+        "scanCounts": 21.328896045684814,
+        "bucketScatter": 173.0723876953125,
+        "sortBuckets": 77.1287031173706,
+        "patchWeighted": 71.67078399658203,
+        "scanResidual": 34.486271381378174,
+        "scanScreening": 189.31609344482422,
+        "screen0": 568.1366767883301,
+        "screen1": 19.53382420539856,
+        "searchChi2ScreenedG32": 76.81087970733643,
+        "searchChi2ScreenedG16": 30.543264389038086,
+        "searchChi2ScreenedG8": 12.666143417358398,
+        "searchChi2ScreenedG4": 3.1263039112091064
+      },
+      "screen_and_exact_ms": 710.8170924186707,
+      "total_kernel_ms": 1358.92403431423,
+      "survivors": 49415,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.393230070360005
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13209599815309048,
+        "durationBool": 0.07059200014919043,
+        "foldBuckets": 81.12332820892334,
+        "scanCounts": 21.353472232818604,
+        "bucketScatter": 173.13689804077148,
+        "sortBuckets": 77.36115074157715,
+        "patchWeighted": 71.77004814147949,
+        "scanResidual": 34.61734390258789,
+        "scanScreening": 190.50393676757812,
+        "screen0": 392.1797065734863,
+        "screen1": 102.13270568847656,
+        "screen2": 7.190496206283569,
+        "searchChi2ScreenedG32": 75.58393573760986,
+        "searchChi2ScreenedG16": 30.430975675582886,
+        "searchChi2ScreenedG8": 12.655680179595947,
+        "searchChi2ScreenedG4": 3.1183040142059326
+      },
+      "screen_and_exact_ms": 623.2918040752411,
+      "total_kernel_ms": 1273.3606701092795,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.3069148818030953
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1330879982560873,
+        "durationBool": 0.07270400039851665,
+        "foldBuckets": 80.70246315002441,
+        "scanCounts": 21.264352321624756,
+        "bucketScatter": 173.04473495483398,
+        "sortBuckets": 77.0693130493164,
+        "patchWeighted": 71.51104068756104,
+        "scanResidual": 34.46784019470215,
+        "scanScreening": 189.74003219604492,
+        "screen0": 568.1827850341797,
+        "screen1": 11.443199872970581,
+        "screen2": 7.1761921644210815,
+        "searchChi2ScreenedG32": 75.58659267425537,
+        "searchChi2ScreenedG16": 30.518815517425537,
+        "searchChi2ScreenedG8": 12.664192199707031,
+        "searchChi2ScreenedG4": 3.126944065093994
+      },
+      "screen_and_exact_ms": 708.6987215280533,
+      "total_kernel_ms": 1356.7042900808156,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.3910004692152143
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.015,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.15052799880504608,
+        "durationBool": 0.08598400093615055,
+        "foldBuckets": 80.80179214477539,
+        "scanCounts": 21.232640266418457,
+        "bucketScatter": 173.04780197143555,
+        "sortBuckets": 77.10412979125977,
+        "patchWeighted": 71.65235137939453,
+        "scanResidual": 34.74022436141968,
+        "scanScreening": 188.9884147644043,
+        "screen0": 391.96054458618164,
+        "screen1": 58.13756704330444,
+        "screen2": 11.401216268539429,
+        "screen3": 7.167999982833862,
+        "searchChi2ScreenedG32": 76.27871990203857,
+        "searchChi2ScreenedG16": 30.559840202331543,
+        "searchChi2ScreenedG8": 12.673855781555176,
+        "searchChi2ScreenedG4": 3.120543956756592
+      },
+      "screen_and_exact_ms": 591.3002877235413,
+      "total_kernel_ms": 1239.1041544023901,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.2728480827063322
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.01,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.16588799841701984,
+        "durationBool": 0.09119999874383211,
+        "foldBuckets": 80.7854061126709,
+        "scanCounts": 21.287935733795166,
+        "bucketScatter": 173.1143684387207,
+        "sortBuckets": 77.13379096984863,
+        "patchWeighted": 71.64716911315918,
+        "scanResidual": 34.679808139801025,
+        "scanScreening": 189.26591873168945,
+        "screen0": 392.17663955688477,
+        "screen1": 67.40582323074341,
+        "screen2": 18.84774398803711,
+        "searchChi2ScreenedG32": 77.69043159484863,
+        "searchChi2ScreenedG16": 30.65264058113098,
+        "searchChi2ScreenedG8": 12.683488368988037,
+        "searchChi2ScreenedG4": 3.1250879764556885
+      },
+      "screen_and_exact_ms": 602.5818552970886,
+      "total_kernel_ms": 1250.7533405339345,
+      "survivors": 49415,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.2845310447737575
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.01,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14745599776506424,
+        "durationBool": 0.07475200016051531,
+        "foldBuckets": 80.84377574920654,
+        "scanCounts": 21.34937572479248,
+        "bucketScatter": 173.159423828125,
+        "sortBuckets": 77.338623046875,
+        "patchWeighted": 71.7505931854248,
+        "scanResidual": 34.61017608642578,
+        "scanScreening": 189.7000961303711,
+        "screen0": 391.4250259399414,
+        "screen1": 67.04639863967896,
+        "screen2": 12.905472040176392,
+        "screen3": 6.27916818857193,
+        "searchChi2ScreenedG32": 75.36758422851562,
+        "searchChi2ScreenedG16": 30.5524160861969,
+        "searchChi2ScreenedG8": 12.673279762268066,
+        "searchChi2ScreenedG4": 3.114720106124878
+      },
+      "screen_and_exact_ms": 599.3640649914742,
+      "total_kernel_ms": 1248.3383367406204,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.2821440929546952
+    },
+    {
+      "tolerances": [
+        0.04,
+        0.01,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1320639979094267,
+        "durationBool": 0.0737279998138547,
+        "foldBuckets": 81.19808197021484,
+        "scanCounts": 21.289984226226807,
+        "bucketScatter": 173.10208129882812,
+        "sortBuckets": 77.41539096832275,
+        "patchWeighted": 71.75167942047119,
+        "scanResidual": 34.58044767379761,
+        "scanScreening": 189.0232048034668,
+        "screen0": 391.78239822387695,
+        "screen1": 67.08224058151245,
+        "screen2": 12.958719968795776,
+        "screen3": 6.302655935287476,
+        "searchChi2ScreenedG32": 75.88636684417725,
+        "searchChi2ScreenedG16": 30.716479778289795,
+        "searchChi2ScreenedG8": 12.72387170791626,
+        "searchChi2ScreenedG4": 3.1307520866394043
+      },
+      "screen_and_exact_ms": 600.5834851264954,
+      "total_kernel_ms": 1249.1501474855468,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.2829539822414517
+    },
+    {
+      "tolerances": [
+        0.03,
+        0.01,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.131071999669075,
+        "durationBool": 0.07276799902319908,
+        "foldBuckets": 80.97075080871582,
+        "scanCounts": 21.35043239593506,
+        "bucketScatter": 173.1522560119629,
+        "sortBuckets": 77.41740703582764,
+        "patchWeighted": 71.71276760101318,
+        "scanResidual": 34.37267208099365,
+        "scanScreening": 190.98719787597656,
+        "screen0": 532.2977294921875,
+        "screen1": 25.490431785583496,
+        "screen2": 12.980223894119263,
+        "screen3": 6.323168039321899,
+        "searchChi2ScreenedG32": 76.53827285766602,
+        "searchChi2ScreenedG16": 30.67452907562256,
+        "searchChi2ScreenedG8": 12.724992275238037,
+        "searchChi2ScreenedG4": 3.1367359161376953
+      },
+      "screen_and_exact_ms": 700.1660833358765,
+      "total_kernel_ms": 1350.3334071449935,
+      "survivors": 18637,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.3840734232217073
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.015,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1341439988464117,
+        "durationBool": 0.0726399989798665,
+        "foldBuckets": 81.33222389221191,
+        "scanCounts": 21.40057611465454,
+        "bucketScatter": 173.24236679077148,
+        "sortBuckets": 77.83219242095947,
+        "patchWeighted": 71.96256065368652,
+        "scanResidual": 34.349055767059326,
+        "scanScreening": 191.15622329711914,
+        "screen0": 393.32863998413086,
+        "screen1": 58.23590421676636,
+        "screen2": 13.41542387008667,
+        "searchChi2ScreenedG32": 86.80966377258301,
+        "searchChi2ScreenedG16": 30.82374405860901,
+        "searchChi2ScreenedG8": 12.728224277496338,
+        "searchChi2ScreenedG4": 3.130239963531494
+      },
+      "screen_and_exact_ms": 598.4718401432037,
+      "total_kernel_ms": 1249.9538230774924,
+      "survivors": 165935,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.283905502408743
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.01,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1300479993224144,
+        "durationBool": 0.07471999991685152,
+        "foldBuckets": 81.29433536529541,
+        "scanCounts": 21.408703804016113,
+        "bucketScatter": 173.1696662902832,
+        "sortBuckets": 77.56790447235107,
+        "patchWeighted": 71.91449642181396,
+        "scanResidual": 34.25584030151367,
+        "scanScreening": 191.03743743896484,
+        "screen0": 390.18701553344727,
+        "screen1": 66.9747519493103,
+        "screen2": 12.95359992980957,
+        "searchChi2ScreenedG32": 85.97744083404541,
+        "searchChi2ScreenedG16": 30.78892731666565,
+        "searchChi2ScreenedG8": 12.755167484283447,
+        "searchChi2ScreenedG4": 3.136159896850586
+      },
+      "screen_and_exact_ms": 602.7730629444122,
+      "total_kernel_ms": 1253.6262150378898,
+      "survivors": 165935,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.2873386219143867
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1515519991517067,
+        "durationBool": 0.07270399946719408,
+        "foldBuckets": 81.38649559020996,
+        "scanCounts": 21.367807865142822,
+        "bucketScatter": 173.2341766357422,
+        "sortBuckets": 77.79734420776367,
+        "patchWeighted": 71.94521617889404,
+        "scanResidual": 34.48320007324219,
+        "scanScreening": 192.8109130859375,
+        "screen0": 392.0179252624512,
+        "screen1": 58.20313596725464,
+        "screen2": 19.482624053955078,
+        "searchChi2ScreenedG32": 78.1635513305664,
+        "searchChi2ScreenedG16": 30.77235245704651,
+        "searchChi2ScreenedG8": 12.755295753479004,
+        "searchChi2ScreenedG4": 3.138144016265869
+      },
+      "screen_and_exact_ms": 594.5330288410187,
+      "total_kernel_ms": 1247.78243847657,
+      "survivors": 49415,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.28146384190768
+    }
+  ],
+  "hierarchy-deep-constant": [
+    {
+      "tolerances": [
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1372159980237484,
+        "durationBool": 0.077759999781847,
+        "foldBuckets": 117.45075416564941,
+        "scanCounts": 21.075968742370605,
+        "bucketScatter": 203.1636848449707,
+        "sortBuckets": 77.27616024017334,
+        "patchWeighted": 69.69548797607422,
+        "scanResidual": 34.595839977264404,
+        "scanScreening": 266.2593650817871,
+        "screen0": 570.126277923584,
+        "screen1": 78.65036869049072,
+        "searchChi2ScreenedG32": 82.62112140655518,
+        "searchChi2ScreenedG16": 29.661951541900635,
+        "searchChi2ScreenedG8": 12.364863395690918,
+        "searchChi2ScreenedG4": 3.090303897857666
+      },
+      "screen_and_exact_ms": 776.5148868560791,
+      "total_kernel_ms": 1566.2471238821745,
+      "survivors": 144810,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.5999637925997376
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1320639979094267,
+        "durationBool": 0.07679999992251396,
+        "foldBuckets": 117.52038383483887,
+        "scanCounts": 21.123040676116943,
+        "bucketScatter": 203.49440383911133,
+        "sortBuckets": 77.44307136535645,
+        "patchWeighted": 69.98937606811523,
+        "scanResidual": 34.5569281578064,
+        "scanScreening": 266.74585342407227,
+        "screen0": 393.9737243652344,
+        "screen1": 321.00442123413086,
+        "screen2": 20.543488025665283,
+        "searchChi2ScreenedG32": 76.56415748596191,
+        "searchChi2ScreenedG16": 29.68393635749817,
+        "searchChi2ScreenedG8": 12.354943752288818,
+        "searchChi2ScreenedG4": 3.0892159938812256
+      },
+      "screen_and_exact_ms": 857.2138872146606,
+      "total_kernel_ms": 1648.29580857791,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6814834512770176
+    },
+    {
+      "tolerances": [
+        0.015,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13516799919307232,
+        "durationBool": 0.08704000059515238,
+        "foldBuckets": 117.48249816894531,
+        "scanCounts": 21.13433599472046,
+        "bucketScatter": 203.37151718139648,
+        "sortBuckets": 77.23315238952637,
+        "patchWeighted": 69.81120014190674,
+        "scanResidual": 34.52092885971069,
+        "scanScreening": 266.1242256164551,
+        "screen0": 569.0295143127441,
+        "screen1": 42.03622388839722,
+        "screen2": 20.561920642852783,
+        "searchChi2ScreenedG32": 76.4903678894043,
+        "searchChi2ScreenedG16": 29.77875256538391,
+        "searchChi2ScreenedG8": 12.400383472442627,
+        "searchChi2ScreenedG4": 3.0956480503082275
+      },
+      "screen_and_exact_ms": 753.3928108215332,
+      "total_kernel_ms": 1543.2928771739826,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.5762799195945263
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.015,
+        0.005,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13516799919307232,
+        "durationBool": 0.07574400026351213,
+        "foldBuckets": 117.47122955322266,
+        "scanCounts": 21.104576110839844,
+        "bucketScatter": 203.32032012939453,
+        "sortBuckets": 77.3375997543335,
+        "patchWeighted": 69.86643123626709,
+        "scanResidual": 34.586496353149414,
+        "scanScreening": 265.93071365356445,
+        "screen0": 394.3761863708496,
+        "screen1": 184.60569381713867,
+        "screen2": 42.03622388839722,
+        "screen3": 20.469759702682495,
+        "searchChi2ScreenedG32": 76.90803241729736,
+        "searchChi2ScreenedG16": 29.858432292938232,
+        "searchChi2ScreenedG8": 12.375743389129639,
+        "searchChi2ScreenedG4": 3.084480047225952
+      },
+      "screen_and_exact_ms": 763.7145519256592,
+      "total_kernel_ms": 1553.5428307158872,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.586679082363844
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.01,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14838399924337864,
+        "durationBool": 0.07577600050717592,
+        "foldBuckets": 117.48966217041016,
+        "scanCounts": 21.183488845825195,
+        "bucketScatter": 203.24863815307617,
+        "sortBuckets": 77.38777542114258,
+        "patchWeighted": 69.83680057525635,
+        "scanResidual": 34.571231842041016,
+        "scanScreening": 266.3474235534668,
+        "screen0": 394.81753158569336,
+        "screen1": 212.9202880859375,
+        "screen2": 75.81078338623047,
+        "searchChi2ScreenedG32": 83.03196907043457,
+        "searchChi2ScreenedG16": 29.96329689025879,
+        "searchChi2ScreenedG8": 12.395584106445312,
+        "searchChi2ScreenedG4": 3.095072031021118
+      },
+      "screen_and_exact_ms": 812.0345251560211,
+      "total_kernel_ms": 1602.32370571699,
+      "survivors": 144810,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6351164961233735
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.01,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.1341439988464117,
+        "durationBool": 0.07379200030118227,
+        "foldBuckets": 117.50092887878418,
+        "scanCounts": 21.1179518699646,
+        "bucketScatter": 203.399169921875,
+        "sortBuckets": 77.62227249145508,
+        "patchWeighted": 69.90332794189453,
+        "scanResidual": 34.671616077423096,
+        "scanScreening": 266.6076126098633,
+        "screen0": 394.1938896179199,
+        "screen1": 213.3872299194336,
+        "screen2": 49.344449043273926,
+        "screen3": 15.381503820419312,
+        "searchChi2ScreenedG32": 76.7884464263916,
+        "searchChi2ScreenedG16": 30.033471822738647,
+        "searchChi2ScreenedG8": 12.388607501983643,
+        "searchChi2ScreenedG4": 3.0986239910125732
+      },
+      "screen_and_exact_ms": 794.6162221431732,
+      "total_kernel_ms": 1585.6470379335806,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6185700399801135
+    },
+    {
+      "tolerances": [
+        0.04,
+        0.01,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13414400070905685,
+        "durationBool": 0.07987200003117323,
+        "foldBuckets": 117.52140808105469,
+        "scanCounts": 21.113856315612793,
+        "bucketScatter": 203.86713409423828,
+        "sortBuckets": 77.59667205810547,
+        "patchWeighted": 69.87571144104004,
+        "scanResidual": 34.653183937072754,
+        "scanScreening": 266.4867820739746,
+        "screen0": 394.64038467407227,
+        "screen1": 212.6703338623047,
+        "screen2": 49.42950439453125,
+        "screen3": 15.368192195892334,
+        "searchChi2ScreenedG32": 76.70688056945801,
+        "searchChi2ScreenedG16": 30.08355188369751,
+        "searchChi2ScreenedG8": 12.397600650787354,
+        "searchChi2ScreenedG4": 3.096191883087158
+      },
+      "screen_and_exact_ms": 794.3926401138306,
+      "total_kernel_ms": 1585.7214041156694,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6186097944155335
+    },
+    {
+      "tolerances": [
+        0.03,
+        0.01,
+        0.0025,
+        0.00025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13107200153172016,
+        "durationBool": 0.07168000005185604,
+        "foldBuckets": 117.47635269165039,
+        "scanCounts": 21.083136558532715,
+        "bucketScatter": 203.23321914672852,
+        "sortBuckets": 77.48198413848877,
+        "patchWeighted": 69.88902378082275,
+        "scanResidual": 34.57840013504028,
+        "scanScreening": 265.95935821533203,
+        "screen0": 533.7507057189941,
+        "screen1": 83.20204830169678,
+        "screen2": 49.28512001037598,
+        "screen3": 15.398912191390991,
+        "searchChi2ScreenedG32": 76.41394996643066,
+        "searchChi2ScreenedG16": 29.87062406539917,
+        "searchChi2ScreenedG8": 12.422943592071533,
+        "searchChi2ScreenedG4": 3.1022400856018066
+      },
+      "screen_and_exact_ms": 803.4465439319611,
+      "total_kernel_ms": 1593.35077060014,
+      "survivors": 46440,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6263787196949124
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.015,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14233599975705147,
+        "durationBool": 0.0737279998138547,
+        "foldBuckets": 117.75385475158691,
+        "scanCounts": 21.54700756072998,
+        "bucketScatter": 208.4403190612793,
+        "sortBuckets": 78.93196773529053,
+        "patchWeighted": 70.62835311889648,
+        "scanResidual": 34.445311546325684,
+        "scanScreening": 266.42124938964844,
+        "screen0": 394.7939872741699,
+        "screen1": 184.154052734375,
+        "screen2": 51.45702362060547,
+        "searchChi2ScreenedG32": 134.66147232055664,
+        "searchChi2ScreenedG16": 29.8875834941864,
+        "searchChi2ScreenedG8": 12.406432151794434,
+        "searchChi2ScreenedG4": 3.0964479446411133
+      },
+      "screen_and_exact_ms": 810.456999540329,
+      "total_kernel_ms": 1608.8411267036572,
+      "survivors": 650897,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6416935939341784
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.01,
+        0.0025
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.14950399845838547,
+        "durationBool": 0.07577600050717592,
+        "foldBuckets": 117.78559875488281,
+        "scanCounts": 21.594111919403076,
+        "bucketScatter": 209.26566314697266,
+        "sortBuckets": 79.1561918258667,
+        "patchWeighted": 70.90892696380615,
+        "scanResidual": 34.75558423995972,
+        "scanScreening": 266.102783203125,
+        "screen0": 394.6240043640137,
+        "screen1": 212.77388381958008,
+        "screen2": 49.3506555557251,
+        "searchChi2ScreenedG32": 135.11087894439697,
+        "searchChi2ScreenedG16": 30.304895877838135,
+        "searchChi2ScreenedG8": 12.47331190109253,
+        "searchChi2ScreenedG4": 3.104288101196289
+      },
+      "screen_and_exact_ms": 837.7419185638428,
+      "total_kernel_ms": 1637.5360586168244,
+      "survivors": 650897,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.671350878663361
+    },
+    {
+      "tolerances": [
+        0.05,
+        0.015,
+        0.001
+      ],
+      "kernel_ms": {
+        "durationsGrid": 0.13715199939906597,
+        "durationBool": 0.07475200016051531,
+        "foldBuckets": 117.51423835754395,
+        "scanCounts": 21.294016361236572,
+        "bucketScatter": 204.88191986083984,
+        "sortBuckets": 78.25715160369873,
+        "patchWeighted": 70.29452800750732,
+        "scanResidual": 34.465792179107666,
+        "scanScreening": 266.0761604309082,
+        "screen0": 393.4003105163574,
+        "screen1": 183.83564376831055,
+        "screen2": 78.55922985076904,
+        "searchChi2ScreenedG32": 84.42294406890869,
+        "searchChi2ScreenedG16": 30.028159379959106,
+        "searchChi2ScreenedG8": 12.47324800491333,
+        "searchChi2ScreenedG4": 3.100127935409546
+      },
+      "screen_and_exact_ms": 785.8196635246277,
+      "total_kernel_ms": 1578.8153743250296,
+      "survivors": 144810,
+      "keys_bitwise_equal": true,
+      "elapsed_seconds": 1.6114185862243176
+    }
+  ]
+}

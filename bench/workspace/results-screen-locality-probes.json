@@ -1,0 +1,388 @@
+{
+  "gpu0": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.1341439988464117,
+        "durationBool": 0.07168000005185604,
+        "foldBuckets": 68.63052749633789,
+        "scanCounts": 8.952832102775574,
+        "bucketScatter": 118.88332748413086,
+        "sortBuckets": 105.73516654968262,
+        "patchScan": 87.29286575317383,
+        "scanScreening": 196.1993637084961,
+        "screenCandidates": 291.4682807922363,
+        "refineCandidates": 83.85632038116455,
+        "compactCandidates": 2.456448011100292,
+        "searchChi2CompactedG32": 5.367328107357025,
+        "searchChi2CompactedG8": 0.08105599880218506,
+        "searchChi2CompactedG16": 0.08787199854850769
+      },
+      "screen_ms": 375.3246011734009,
+      "total_kernel_ms": 969.217212382704,
+      "elapsed_seconds": 0.9868557769805193,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-32",
+      "kernel_ms": {
+        "durationsGrid": 0.13619199953973293,
+        "durationBool": 0.07065599970519543,
+        "foldBuckets": 69.27462482452393,
+        "scanCounts": 8.936447978019714,
+        "bucketScatter": 118.76556968688965,
+        "sortBuckets": 106.3055362701416,
+        "patchScan": 87.73119926452637,
+        "scanScreening": 198.5054702758789,
+        "screenCandidates": 151.36623859405518,
+        "refineCandidates": 76.04019153118134,
+        "compactCandidates": 2.4791039675474167,
+        "searchChi2CompactedG32": 5.381567984819412,
+        "searchChi2CompactedG8": 0.07948800176382065,
+        "searchChi2CompactedG16": 0.08569599688053131
+      },
+      "screen_ms": 227.4064301252365,
+      "total_kernel_ms": 825.1579823754728,
+      "elapsed_seconds": 0.8608429171144962,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-64",
+      "kernel_ms": {
+        "durationsGrid": 0.1330879982560873,
+        "durationBool": 0.07270400132983923,
+        "foldBuckets": 68.55679893493652,
+        "scanCounts": 8.921056032180786,
+        "bucketScatter": 118.0344295501709,
+        "sortBuckets": 104.95795440673828,
+        "patchScan": 87.2304630279541,
+        "scanScreening": 195.67916870117188,
+        "screenCandidates": 152.75948905944824,
+        "refineCandidates": 76.89308845996857,
+        "compactCandidates": 2.4554880037903786,
+        "searchChi2CompactedG32": 5.390943944454193,
+        "searchChi2CompactedG8": 0.08140800148248672,
+        "searchChi2CompactedG16": 0.08659200370311737
+      },
+      "screen_ms": 229.6525775194168,
+      "total_kernel_ms": 821.2526721255854,
+      "elapsed_seconds": 0.8468256061896682,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-96",
+      "kernel_ms": {
+        "durationsGrid": 0.13619199953973293,
+        "durationBool": 0.070656000636518,
+        "foldBuckets": 68.61926460266113,
+        "scanCounts": 8.911872029304504,
+        "bucketScatter": 117.75075149536133,
+        "sortBuckets": 105.24358558654785,
+        "patchScan": 87.25606346130371,
+        "scanScreening": 195.74477005004883,
+        "screenCandidates": 156.29516983032227,
+        "refineCandidates": 78.24486434459686,
+        "compactCandidates": 2.4452799782156944,
+        "searchChi2CompactedG32": 5.417792022228241,
+        "searchChi2CompactedG8": 0.0799039974808693,
+        "searchChi2CompactedG16": 0.08511999994516373
+      },
+      "screen_ms": 234.54003417491913,
+      "total_kernel_ms": 826.3012853981927,
+      "elapsed_seconds": 0.8496874766424298,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-128",
+      "kernel_ms": {
+        "durationsGrid": 0.1341439988464117,
+        "durationBool": 0.0737279998138547,
+        "foldBuckets": 68.6305284500122,
+        "scanCounts": 8.917952060699463,
+        "bucketScatter": 118.1839370727539,
+        "sortBuckets": 104.95590400695801,
+        "patchScan": 87.62672138214111,
+        "scanScreening": 196.71142196655273,
+        "screenCandidates": 158.49574375152588,
+        "refineCandidates": 81.49600076675415,
+        "compactCandidates": 2.4586240127682686,
+        "searchChi2CompactedG32": 5.370463877916336,
+        "searchChi2CompactedG8": 0.08073599636554718,
+        "searchChi2CompactedG16": 0.08643200248479843
+      },
+      "screen_ms": 239.99174451828003,
+      "total_kernel_ms": 833.2223373455927,
+      "elapsed_seconds": 0.8550893077626824,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    }
+  ],
+  "gpu1": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.13926399871706963,
+        "durationBool": 0.07059200014919043,
+        "foldBuckets": 78.55615997314453,
+        "scanCounts": 8.868831992149353,
+        "bucketScatter": 172.33344268798828,
+        "sortBuckets": 110.74867248535156,
+        "patchScan": 85.89926338195801,
+        "scanScreening": 264.89344024658203,
+        "screenCandidates": 293.1445770263672,
+        "refineCandidates": 83.59311985969543,
+        "compactCandidates": 2.447296015918255,
+        "searchChi2CompactedG32": 5.511263996362686,
+        "searchChi2CompactedG8": 0.0822720006108284,
+        "searchChi2CompactedG16": 0.10304000228643417
+      },
+      "screen_ms": 376.7376968860626,
+      "total_kernel_ms": 1106.3912356672809,
+      "elapsed_seconds": 1.1238243589177728,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-32",
+      "kernel_ms": {
+        "durationsGrid": 0.13715199753642082,
+        "durationBool": 0.0696000000461936,
+        "foldBuckets": 78.60940837860107,
+        "scanCounts": 8.894464015960693,
+        "bucketScatter": 172.27356338500977,
+        "sortBuckets": 111.18690872192383,
+        "patchScan": 86.51872158050537,
+        "scanScreening": 265.08288192749023,
+        "screenCandidates": 149.53068733215332,
+        "refineCandidates": 76.11900889873505,
+        "compactCandidates": 2.438144013285637,
+        "searchChi2CompactedG32": 5.581696003675461,
+        "searchChi2CompactedG8": 0.07887999713420868,
+        "searchChi2CompactedG16": 0.08374399691820145
+      },
+      "screen_ms": 225.64969623088837,
+      "total_kernel_ms": 956.6048602489755,
+      "elapsed_seconds": 0.9920649640262127,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-64",
+      "kernel_ms": {
+        "durationsGrid": 0.12799999676644802,
+        "durationBool": 0.06860799994319677,
+        "foldBuckets": 78.61862277984619,
+        "scanCounts": 8.863615989685059,
+        "bucketScatter": 172.30233001708984,
+        "sortBuckets": 110.9851188659668,
+        "patchScan": 86.1870059967041,
+        "scanScreening": 265.33570861816406,
+        "screenCandidates": 149.5096321105957,
+        "refineCandidates": 76.65049624443054,
+        "compactCandidates": 2.4309760108590126,
+        "searchChi2CompactedG32": 5.502719938755035,
+        "searchChi2CompactedG8": 0.07945600152015686,
+        "searchChi2CompactedG16": 0.08537600189447403
+      },
+      "screen_ms": 226.16012835502625,
+      "total_kernel_ms": 956.7476665722206,
+      "elapsed_seconds": 0.982015241868794,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-96",
+      "kernel_ms": {
+        "durationsGrid": 0.12902399711310863,
+        "durationBool": 0.06655999924987555,
+        "foldBuckets": 78.4445447921753,
+        "scanCounts": 8.852479934692383,
+        "bucketScatter": 172.30022430419922,
+        "sortBuckets": 111.13875389099121,
+        "patchScan": 85.98118305206299,
+        "scanScreening": 264.6814384460449,
+        "screenCandidates": 153.040864944458,
+        "refineCandidates": 77.92115306854248,
+        "compactCandidates": 2.4380799531936646,
+        "searchChi2CompactedG32": 5.440480023622513,
+        "searchChi2CompactedG8": 0.07891199737787247,
+        "searchChi2CompactedG16": 0.08640000224113464
+      },
+      "screen_ms": 230.9620180130005,
+      "total_kernel_ms": 960.6000984059647,
+      "elapsed_seconds": 0.9835409354418516,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    },
+    {
+      "mode": "start-128",
+      "kernel_ms": {
+        "durationsGrid": 0.12799999676644802,
+        "durationBool": 0.06963200028985739,
+        "foldBuckets": 77.97248077392578,
+        "scanCounts": 8.854528069496155,
+        "bucketScatter": 172.15078353881836,
+        "sortBuckets": 110.6268138885498,
+        "patchScan": 85.86444759368896,
+        "scanScreening": 264.7817916870117,
+        "screenCandidates": 154.94553470611572,
+        "refineCandidates": 80.65123248100281,
+        "compactCandidates": 2.4227839782834053,
+        "searchChi2CompactedG32": 5.452928125858307,
+        "searchChi2CompactedG8": 0.07865600287914276,
+        "searchChi2CompactedG16": 0.08528000116348267
+      },
+      "screen_ms": 235.59676718711853,
+      "total_kernel_ms": 964.08489284385,
+      "elapsed_seconds": 0.9858385054394603,
+      "keys_bitwise_equal": true,
+      "first_pass_bounds_not_narrower": null
+    }
+  ],
+  "ncu": [
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "GPU Speed Of Light Throughput",
+      "Metric Name": "Memory Throughput",
+      "Metric Unit": "%",
+      "Metric Value": "72.63"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "GPU Speed Of Light Throughput",
+      "Metric Name": "DRAM Throughput",
+      "Metric Unit": "%",
+      "Metric Value": "72.63"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "GPU Speed Of Light Throughput",
+      "Metric Name": "Duration",
+      "Metric Unit": "ms",
+      "Metric Value": "8.52"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Memory Workload Analysis",
+      "Metric Name": "Memory Throughput",
+      "Metric Unit": "Gbyte/s",
+      "Metric Value": "661.83"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Memory Workload Analysis",
+      "Metric Name": "L1/TEX Hit Rate",
+      "Metric Unit": "%",
+      "Metric Value": "22.43"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Memory Workload Analysis",
+      "Metric Name": "L2 Hit Rate",
+      "Metric Unit": "%",
+      "Metric Value": "8.90"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Scheduler Statistics",
+      "Metric Name": "Eligible Warps Per Scheduler",
+      "Metric Unit": "warp",
+      "Metric Value": "0.07"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Launch Statistics",
+      "Metric Name": "Block Size",
+      "Metric Unit": "",
+      "Metric Value": "256"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Launch Statistics",
+      "Metric Name": "Registers Per Thread",
+      "Metric Unit": "register/thread",
+      "Metric Value": "134"
+    },
+    {
+      "Kernel Name": "screenCandidates",
+      "Section Name": "Occupancy",
+      "Metric Name": "Achieved Occupancy",
+      "Metric Unit": "%",
+      "Metric Value": "16.48"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "GPU Speed Of Light Throughput",
+      "Metric Name": "Memory Throughput",
+      "Metric Unit": "%",
+      "Metric Value": "43.19"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "GPU Speed Of Light Throughput",
+      "Metric Name": "DRAM Throughput",
+      "Metric Unit": "%",
+      "Metric Value": "29.63"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "GPU Speed Of Light Throughput",
+      "Metric Name": "Duration",
+      "Metric Unit": "ms",
+      "Metric Value": "4.91"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Memory Workload Analysis",
+      "Metric Name": "Memory Throughput",
+      "Metric Unit": "Gbyte/s",
+      "Metric Value": "270.05"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Memory Workload Analysis",
+      "Metric Name": "L1/TEX Hit Rate",
+      "Metric Unit": "%",
+      "Metric Value": "18.89"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Memory Workload Analysis",
+      "Metric Name": "L2 Hit Rate",
+      "Metric Unit": "%",
+      "Metric Value": "78.99"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Scheduler Statistics",
+      "Metric Name": "Eligible Warps Per Scheduler",
+      "Metric Unit": "warp",
+      "Metric Value": "0.11"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Launch Statistics",
+      "Metric Name": "Block Size",
+      "Metric Unit": "",
+      "Metric Value": "32"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Launch Statistics",
+      "Metric Name": "Registers Per Thread",
+      "Metric Unit": "register/thread",
+      "Metric Value": "132"
+    },
+    {
+      "Kernel Name": "screenCandidatesMapped",
+      "Section Name": "Occupancy",
+      "Metric Name": "Achieved Occupancy",
+      "Metric Unit": "%",
+      "Metric Value": "21.38"
+    }
+  ]
+}

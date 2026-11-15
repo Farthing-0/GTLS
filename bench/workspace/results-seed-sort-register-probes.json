@@ -1,0 +1,3734 @@
+{
+  "seed": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.13516799919307232,
+        "durationBool": 0.06966400053352118,
+        "foldBuckets": 57.559041023254395,
+        "scanCounts": 7.081984043121338,
+        "bucketScatter": 99.26134490966797,
+        "sortBuckets": 86.70310306549072,
+        "patchWeighted": 72.00864028930664,
+        "scanResidual": 34.73100805282593,
+        "scanScreening": 161.73055839538574,
+        "screenCandidates": 281.49965476989746,
+        "refineCandidates": 69.67603206634521,
+        "compactCandidates": 2.094048023223877,
+        "searchChi2CompactedG32": 4.592991963028908,
+        "searchChi2CompactedG8": 0.07993599772453308,
+        "searchChi2CompactedG16": 0.08691199868917465
+      },
+      "screen_and_seed_ms": 351.1756868362427,
+      "total_kernel_ms": 877.3100865976885,
+      "elapsed_seconds": 0.8944886550307274,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "cheap",
+      "kernel_ms": {
+        "durationsGrid": 0.14643199928104877,
+        "durationBool": 0.06758399959653616,
+        "foldBuckets": 56.73472023010254,
+        "scanCounts": 7.049215912818909,
+        "bucketScatter": 97.65068817138672,
+        "sortBuckets": 86.34265613555908,
+        "patchWeighted": 72.35891151428223,
+        "scanResidual": 34.462719440460205,
+        "scanScreening": 164.1574420928955,
+        "screenCandidates": 397.9734306335449,
+        "refineCandidates": 69.26735937595367,
+        "compactCandidates": 2.0643840208649635,
+        "searchChi2CompactedG32": 4.6196160316467285,
+        "searchChi2CompactedG8": 0.07849600166082382,
+        "searchChi2CompactedG16": 0.08495999872684479
+      },
+      "screen_and_seed_ms": 467.2407900094986,
+      "total_kernel_ms": 993.0586155587807,
+      "elapsed_seconds": 1.0099143451079726,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "seed",
+      "kernel_ms": {
+        "durationsGrid": 0.1331199984997511,
+        "durationBool": 0.070656000636518,
+        "foldBuckets": 57.37779235839844,
+        "scanCounts": 7.070687890052795,
+        "bucketScatter": 98.77196884155273,
+        "sortBuckets": 86.7594223022461,
+        "patchWeighted": 72.81254386901855,
+        "scanResidual": 34.41254425048828,
+        "scanScreening": 165.66989135742188,
+        "seedBox": 17.368064165115356,
+        "unpackSeeds": 0.08601600117981434,
+        "seedExact": 16.23859193921089,
+        "screenCandidates": 280.2278366088867,
+        "refineCandidates": 47.01696038246155,
+        "compactCandidates": 2.101248025894165,
+        "searchChi2CompactedG32": 4.478495970368385,
+        "searchChi2CompactedG8": 0.08137600123882294,
+        "searchChi2CompactedG16": 0.08630400151014328
+      },
+      "screen_and_seed_ms": 360.93746909685433,
+      "total_kernel_ms": 890.7635199641809,
+      "elapsed_seconds": 0.9114633407443762,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "seed-cheap",
+      "kernel_ms": {
+        "durationsGrid": 0.13209599815309048,
+        "durationBool": 0.06963200028985739,
+        "foldBuckets": 56.98867225646973,
+        "scanCounts": 7.032831907272339,
+        "bucketScatter": 98.00089645385742,
+        "sortBuckets": 86.2371187210083,
+        "patchWeighted": 72.42134380340576,
+        "scanResidual": 34.67670392990112,
+        "scanScreening": 164.88038635253906,
+        "seedBox": 17.107967853546143,
+        "unpackSeeds": 0.0870399996638298,
+        "seedExact": 16.39321595430374,
+        "screenCandidates": 353.91893768310547,
+        "refineCandidates": 46.29785597324371,
+        "compactCandidates": 2.061312034726143,
+        "searchChi2CompactedG32": 4.527808114886284,
+        "searchChi2CompactedG8": 0.08009599894285202,
+        "searchChi2CompactedG16": 0.0854720026254654
+      },
+      "screen_and_seed_ms": 433.8050174638629,
+      "total_kernel_ms": 960.9993870379403,
+      "elapsed_seconds": 0.9810177264735103,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "seed-all-cheap",
+      "kernel_ms": {
+        "durationsGrid": 0.1341439988464117,
+        "durationBool": 0.07174400053918362,
+        "foldBuckets": 56.59340858459473,
+        "scanCounts": 7.037887930870056,
+        "bucketScatter": 97.77663993835449,
+        "sortBuckets": 86.31500816345215,
+        "patchWeighted": 72.62003326416016,
+        "scanResidual": 34.86617565155029,
+        "scanScreening": 165.67193794250488,
+        "seedBox": 17.23084783554077,
+        "unpackSeeds": 0.08704000152647495,
+        "seedExact": 16.265215799212456,
+        "screenCandidates": 353.5390739440918,
+        "refineCandidates": 43.983872056007385,
+        "compactCandidates": 2.067392013967037,
+        "searchChi2CompactedG32": 4.510912016034126,
+        "searchChi2CompactedG8": 0.07926400005817413,
+        "searchChi2CompactedG16": 0.0846719965338707
+      },
+      "screen_and_seed_ms": 431.1060496363789,
+      "total_kernel_ms": 958.9352691378444,
+      "elapsed_seconds": 0.9788835430517793,
+      "keys_bitwise_equal": true
+    }
+  ],
+  "float_shortcut": [
+    {
+      "mode": "baseline",
+      "kernel_ms": {
+        "durationsGrid": 0.13715199939906597,
+        "durationBool": 0.06963200028985739,
+        "foldBuckets": 57.646080017089844,
+        "scanCounts": 7.096319913864136,
+        "bucketScatter": 99.40070533752441,
+        "sortBuckets": 86.95398426055908,
+        "patchWeighted": 72.28825569152832,
+        "scanResidual": 34.6562557220459,
+        "scanScreening": 161.76333045959473,
+        "screenCandidates": 281.62048149108887,
+        "refineCandidates": 69.66172659397125,
+        "compactCandidates": 2.0786560252308846,
+        "searchChi2CompactedG32": 4.605919986963272,
+        "searchChi2CompactedG8": 0.08102399855852127,
+        "searchChi2CompactedG16": 0.08828800171613693
+      },
+      "screen_and_seed_ms": 351.2822080850601,
+      "total_kernel_ms": 878.1478114994243,
+      "elapsed_seconds": 0.895265300758183,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "cheap",
+      "kernel_ms": {
+        "durationsGrid": 0.15052799880504608,
+        "durationBool": 0.07068800088018179,
+        "foldBuckets": 57.30608081817627,
+        "scanCounts": 7.075839996337891,
+        "bucketScatter": 98.50873374938965,
+        "sortBuckets": 85.86441612243652,
+        "patchWeighted": 72.16537475585938,
+        "scanResidual": 34.77500772476196,
+        "scanScreening": 161.37113761901855,
+        "screenCandidates": 247.13011360168457,
+        "refineCandidates": 69.71584010124207,
+        "compactCandidates": 2.0920320451259613,
+        "searchChi2CompactedG32": 4.59984003007412,
+        "searchChi2CompactedG8": 0.08083199709653854,
+        "searchChi2CompactedG16": 0.08614400029182434
+      },
+      "screen_and_seed_ms": 316.84595370292664,
+      "total_kernel_ms": 840.9926085611805,
+      "elapsed_seconds": 0.8579355794936419,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "seed",
+      "kernel_ms": {
+        "durationsGrid": 0.13004799745976925,
+        "durationBool": 0.07164800073951483,
+        "foldBuckets": 56.682496070861816,
+        "scanCounts": 7.035807967185974,
+        "bucketScatter": 97.59846305847168,
+        "sortBuckets": 85.35142421722412,
+        "patchWeighted": 72.01484775543213,
+        "scanResidual": 34.57324838638306,
+        "scanScreening": 160.23859214782715,
+        "seedBox": 17.780735969543457,
+        "unpackSeeds": 0.0829440001398325,
+        "seedExact": 16.26627203822136,
+        "screenCandidates": 281.7463970184326,
+        "refineCandidates": 46.61145627498627,
+        "compactCandidates": 2.075615979731083,
+        "searchChi2CompactedG32": 4.556992083787918,
+        "searchChi2CompactedG8": 0.07948800176382065,
+        "searchChi2CompactedG16": 0.08511999994516373
+      },
+      "screen_and_seed_ms": 362.48780530132353,
+      "total_kernel_ms": 882.9815969681367,
+      "elapsed_seconds": 0.9040723759680986,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "seed-cheap",
+      "kernel_ms": {
+        "durationsGrid": 0.13305599801242352,
+        "durationBool": 0.06864000018686056,
+        "foldBuckets": 57.225215911865234,
+        "scanCounts": 7.064576148986816,
+        "bucketScatter": 98.10527992248535,
+        "sortBuckets": 85.58182334899902,
+        "patchWeighted": 71.9093770980835,
+        "scanResidual": 34.685951709747314,
+        "scanScreening": 160.82431983947754,
+        "seedBox": 16.863232135772705,
+        "unpackSeeds": 0.08403200097382069,
+        "seedExact": 16.24985621869564,
+        "screenCandidates": 228.75443267822266,
+        "refineCandidates": 46.65343987941742,
+        "compactCandidates": 2.086848020553589,
+        "searchChi2CompactedG32": 4.535744071006775,
+        "searchChi2CompactedG8": 0.08038400113582611,
+        "searchChi2CompactedG16": 0.0870399996638298
+      },
+      "screen_and_seed_ms": 308.60499291308224,
+      "total_kernel_ms": 830.9932489832863,
+      "elapsed_seconds": 0.8514330880716443,
+      "keys_bitwise_equal": true
+    },
+    {
+      "mode": "seed-all-cheap",
+      "kernel_ms": {
+        "durationsGrid": 0.1331199984997511,
+        "durationBool": 0.06966400053352118,
+        "foldBuckets": 56.83609580993652,
+        "scanCounts": 7.0481919050216675,
+        "bucketScatter": 97.50118446350098,
+        "sortBuckets": 85.36678314208984,
+        "patchWeighted": 71.91551971435547,
+        "scanResidual": 35.03820753097534,
+        "scanScreening": 161.04243087768555,
+        "seedBox": 17.632256031036377,
+        "unpackSeeds": 0.08396800048649311,
+        "seedExact": 16.167999759316444,
+        "screenCandidates": 228.67250633239746,
+        "refineCandidates": 74.31881523132324,
+        "compactCandidates": 2.0662720054388046,
+        "searchChi2CompactedG32": 4.483615905046463,
+        "searchChi2CompactedG8": 0.07939200103282928,
+        "searchChi2CompactedG16": 0.08428800106048584
+      },
+      "screen_and_seed_ms": 336.87554535456,
+      "total_kernel_ms": 858.5403107097372,
+      "elapsed_seconds": 0.8790206396952271,
+      "keys_bitwise_equal": true
+    }
+  ],
+  "prefix_gpu1": {
+    "results": [
+      {
+        "batch": 629,
+        "median_ms": {
+          "original": 39.21459197998047,
+          "mass-first": 37.145599365234375,
+          "original-min10": 44.260353088378906,
+          "original-min12": 44.17228698730469,
+          "original-min16": 55.13932800292969,
+          "original-min20": 41.81094551086426,
+          "original-min24": 41.662431716918945,
+          "original-min32": 41.69472122192383,
+          "mass-first-min10": 31.990272521972656,
+          "mass-first-min12": 32.35171127319336,
+          "mass-first-min16": 40.324607849121094,
+          "mass-first-min20": 32.756736755371094,
+          "mass-first-min24": 32.86782455444336,
+          "mass-first-min32": 32.95127868652344
+        },
+        "times_ms": {
+          "original": [
+            39.24480056762695,
+            39.153663635253906,
+            39.21510314941406,
+            39.214080810546875
+          ],
+          "mass-first": [
+            37.140480041503906,
+            37.150718688964844,
+            37.301246643066406,
+            37.0780143737793
+          ],
+          "original-min10": [
+            44.26240158081055,
+            43.88044738769531,
+            44.32793426513672,
+            44.258304595947266
+          ],
+          "original-min12": [
+            44.11801528930664,
+            44.226558685302734,
+            44.040191650390625,
+            44.270591735839844
+          ],
+          "original-min16": [
+            55.10451126098633,
+            55.17414474487305,
+            55.200767517089844,
+            55.08505630493164
+          ],
+          "original-min20": [
+            41.58156967163086,
+            41.875457763671875,
+            41.74643325805664,
+            42.09254455566406
+          ],
+          "original-min24": [
+            41.5467529296875,
+            41.589759826660156,
+            41.735103607177734,
+            41.90822219848633
+          ],
+          "original-min32": [
+            41.652225494384766,
+            41.808895111083984,
+            41.64198303222656,
+            41.73721694946289
+          ],
+          "mass-first-min10": [
+            31.896575927734375,
+            32.08396911621094,
+            31.695871353149414,
+            32.30924987792969
+          ],
+          "mass-first-min12": [
+            32.604129791259766,
+            32.1341438293457,
+            32.34809494018555,
+            32.35532760620117
+          ],
+          "mass-first-min16": [
+            40.38041687011719,
+            40.15923309326172,
+            40.32307052612305,
+            40.32614517211914
+          ],
+          "mass-first-min20": [
+            32.888832092285156,
+            32.45772933959961,
+            32.66048049926758,
+            32.85299301147461
+          ],
+          "mass-first-min24": [
+            33.179649353027344,
+            32.84479904174805,
+            32.84889602661133,
+            32.88675308227539
+          ],
+          "mass-first-min32": [
+            33.1960334777832,
+            33.02809524536133,
+            32.87446212768555,
+            32.84377670288086
+          ]
+        }
+      },
+      {
+        "batch": 752,
+        "median_ms": {
+          "original": 53.02574348449707,
+          "mass-first": 49.2574405670166,
+          "original-min10": 59.013105392456055,
+          "original-min12": 58.91836738586426,
+          "original-min16": 72.87753677368164,
+          "original-min20": 69.05753707885742,
+          "original-min24": 69.02783966064453,
+          "original-min32": 69.27508926391602,
+          "mass-first-min10": 41.13203239440918,
+          "mass-first-min12": 41.30611228942871,
+          "mass-first-min16": 53.597185134887695,
+          "mass-first-min20": 47.26220703125,
+          "mass-first-min24": 46.953983306884766,
+          "mass-first-min32": 46.846975326538086
+        },
+        "times_ms": {
+          "original": [
+            53.187583923339844,
+            52.957088470458984,
+            52.853759765625,
+            53.094398498535156
+          ],
+          "mass-first": [
+            49.39775848388672,
+            49.274879455566406,
+            49.09766387939453,
+            49.2400016784668
+          ],
+          "original-min10": [
+            58.89225769042969,
+            58.69363021850586,
+            59.214847564697266,
+            59.13395309448242
+          ],
+          "original-min12": [
+            58.9628791809082,
+            58.83699035644531,
+            59.15238571166992,
+            58.87385559082031
+          ],
+          "original-min16": [
+            72.77362823486328,
+            72.95283508300781,
+            72.85145568847656,
+            72.90361785888672
+          ],
+          "original-min20": [
+            68.85887908935547,
+            69.18144226074219,
+            69.465087890625,
+            68.93363189697266
+          ],
+          "original-min24": [
+            69.19884490966797,
+            69.03910064697266,
+            68.90086364746094,
+            69.0165786743164
+          ],
+          "original-min32": [
+            68.93046569824219,
+            69.84294128417969,
+            68.77184295654297,
+            69.61971282958984
+          ],
+          "mass-first-min10": [
+            40.95180892944336,
+            41.355262756347656,
+            40.969215393066406,
+            41.29484939575195
+          ],
+          "mass-first-min12": [
+            41.47200012207031,
+            41.046016693115234,
+            41.49760055541992,
+            41.14022445678711
+          ],
+          "mass-first-min16": [
+            53.49683380126953,
+            53.69753646850586,
+            53.87980651855469,
+            53.27872085571289
+          ],
+          "mass-first-min20": [
+            47.248382568359375,
+            47.35385513305664,
+            47.19718551635742,
+            47.276031494140625
+          ],
+          "mass-first-min24": [
+            47.60575866699219,
+            46.76300811767578,
+            47.1357421875,
+            46.77222442626953
+          ],
+          "mass-first-min32": [
+            46.56639862060547,
+            46.70463943481445,
+            47.38560104370117,
+            46.98931121826172
+          ]
+        }
+      }
+    ],
+    "attributes": {
+      "original": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 162,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 144,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min10": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 168,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min12": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 168,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min16": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 184,
+        "num_regs": 128,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min20": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 182,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min24": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 182,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min32": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 182,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min10": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 8,
+        "num_regs": 168,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min12": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 8,
+        "num_regs": 168,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min16": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 88,
+        "num_regs": 128,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min20": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 184,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min24": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 184,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min32": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 184,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      }
+    },
+    "errors": {},
+    "prefix_bitwise_equal": true
+  },
+  "prefix_gpu0": {
+    "results": [
+      {
+        "batch": 629,
+        "median_ms": {
+          "original": 30.642687797546387,
+          "mass-first": 30.180864334106445,
+          "original-min10": 29.70368003845215,
+          "mass-first-min10": 30.68723201751709
+        },
+        "times_ms": {
+          "original": [
+            33.105918884277344,
+            30.723072052001953,
+            30.56230354309082,
+            30.510080337524414
+          ],
+          "mass-first": [
+            32.67891311645508,
+            30.257152557373047,
+            29.998079299926758,
+            30.104576110839844
+          ],
+          "original-min10": [
+            31.716320037841797,
+            29.742080688476562,
+            29.663232803344727,
+            29.665279388427734
+          ],
+          "mass-first-min10": [
+            30.952415466308594,
+            30.909439086914062,
+            30.465024948120117,
+            30.39641571044922
+          ]
+        }
+      },
+      {
+        "batch": 752,
+        "median_ms": {
+          "original": 38.34316825866699,
+          "mass-first": 38.15884780883789,
+          "original-min10": 37.34220886230469,
+          "mass-first-min10": 38.34777641296387
+        },
+        "times_ms": {
+          "original": [
+            37.784576416015625,
+            38.69081497192383,
+            39.1096305847168,
+            37.995521545410156
+          ],
+          "mass-first": [
+            37.66169738769531,
+            38.187007904052734,
+            39.10553741455078,
+            38.13068771362305
+          ],
+          "original-min10": [
+            37.1855354309082,
+            37.31660842895508,
+            38.589439392089844,
+            37.3678092956543
+          ],
+          "mass-first-min10": [
+            38.240257263183594,
+            38.0579833984375,
+            38.94169616699219,
+            38.45529556274414
+          ]
+        }
+      }
+    ],
+    "attributes": {
+      "original": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 162,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 144,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "original-min10": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 0,
+        "num_regs": 168,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "mass-first-min10": {
+        "max_threads_per_block": 32,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 0,
+        "local_size_bytes": 8,
+        "num_regs": 168,
+        "ptx_version": 86,
+        "binary_version": 86,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      }
+    },
+    "errors": {},
+    "prefix_bitwise_equal": true
+  },
+  "cub_gpu1": {
+    "baseline_ms": 65.80070480704308,
+    "baseline_times": [
+      {
+        "zero": 0.5939199924468994,
+        "fold": 13.721599578857422,
+        "scan": 1.4335999488830566,
+        "scatter": 29.249536514282227,
+        "sort": 20.83942413330078
+      },
+      {
+        "zero": 0.6113280057907104,
+        "fold": 13.6878080368042,
+        "scan": 1.4335999488830566,
+        "scatter": 29.241344451904297,
+        "sort": 20.824064254760742
+      },
+      {
+        "zero": 0.6031360030174255,
+        "fold": 13.6878080368042,
+        "scan": 1.4305280447006226,
+        "scatter": 29.257728576660156,
+        "sort": 20.824064254760742
+      },
+      {
+        "zero": 0.6041600108146667,
+        "fold": 13.699071884155273,
+        "scan": 1.435647964477539,
+        "scatter": 29.216768264770508,
+        "sort": 20.263935089111328
+      }
+    ],
+    "results": [
+      {
+        "config": [
+          128,
+          7,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 16928,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 89,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 32224,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.304960250854492,
+          "radix": 79.35078430175781,
+          "fix": 2.3900160789489746,
+          "total": 93.04576063156128
+        },
+        "times_ms": [
+          {
+            "fold": 11.308768272399902,
+            "radix": 79.35078430175781,
+            "fix": 2.3941121101379395
+          },
+          {
+            "fold": 11.302816390991211,
+            "radix": 79.36409759521484,
+            "fix": 2.3900160789489746
+          },
+          {
+            "fold": 11.304960250854492,
+            "radix": 79.2985610961914,
+            "fix": 2.3808000087738037
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.7071864893189272
+      },
+      {
+        "config": [
+          128,
+          11,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 16928,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 96,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 32224,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599871635437012,
+          "radix": 64.01741027832031,
+          "fix": 2.63372802734375,
+          "total": 78.25100994110107
+        },
+        "times_ms": [
+          {
+            "fold": 11.599424362182617,
+            "radix": 64.01741027832031,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.599871635437012,
+            "radix": 64.0921630859375,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.603967666625977,
+            "radix": 64.0153579711914,
+            "fix": 2.461695909500122
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8408927227465914
+      },
+      {
+        "config": [
+          128,
+          15,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 16928,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 32224,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599871635437012,
+          "radix": 54.29964828491211,
+          "fix": 2.4975359439849854,
+          "total": 68.3970558643341
+        },
+        "times_ms": [
+          {
+            "fold": 11.606111526489258,
+            "radix": 54.419456481933594,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.599871635437012,
+            "radix": 54.29964828491211,
+            "fix": 2.4975359439849854
+          },
+          {
+            "fold": 11.31827163696289,
+            "radix": 54.2740478515625,
+            "fix": 2.4401919841766357
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9620400173007314
+      },
+      {
+        "config": [
+          128,
+          19,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 16928,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 32224,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.575296401977539,
+          "radix": 50.528255462646484,
+          "fix": 2.50982403755188,
+          "total": 64.6133759021759
+        },
+        "times_ms": [
+          {
+            "fold": 11.611488342285156,
+            "radix": 50.6879997253418,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.575296401977539,
+            "radix": 50.528255462646484,
+            "fix": 2.50982403755188
+          },
+          {
+            "fold": 11.291647911071777,
+            "radix": 50.500606536865234,
+            "fix": 2.451456069946289
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.0183758995453942
+      },
+      {
+        "config": [
+          128,
+          27,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 16928,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 32224,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.598848342895508,
+          "radix": 45.86598587036133,
+          "fix": 2.5128960609436035,
+          "total": 59.97773027420044
+        },
+        "times_ms": [
+          {
+            "fold": 11.608063697814941,
+            "radix": 46.073856353759766,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.598848342895508,
+            "radix": 45.86598587036133,
+            "fix": 2.5128960609436035
+          },
+          {
+            "fold": 11.315199851989746,
+            "radix": 45.83833694458008,
+            "fix": 2.480128049850464
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.0970856100459574
+      },
+      {
+        "config": [
+          128,
+          39,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 20224,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 28928,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.612159729003906,
+          "radix": 42.034175872802734,
+          "fix": 2.634752035140991,
+          "total": 56.28108763694763
+        },
+        "times_ms": [
+          {
+            "fold": 11.614720344543457,
+            "radix": 42.034175872802734,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.612159729003906,
+            "radix": 42.021888732910156,
+            "fix": 2.634752035140991
+          },
+          {
+            "fold": 11.608063697814941,
+            "radix": 42.041343688964844,
+            "fix": 2.634752035140991
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.169144157829778
+      },
+      {
+        "config": [
+          192,
+          7,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 25408,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 87,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 23744,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.597824096679688,
+          "radix": 62.903297424316406,
+          "fix": 2.4944639205932617,
+          "total": 76.99558544158936
+        },
+        "times_ms": [
+          {
+            "fold": 11.606719970703125,
+            "radix": 62.8776969909668,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.597824096679688,
+            "radix": 63.51667022705078,
+            "fix": 2.4944639205932617
+          },
+          {
+            "fold": 11.294719696044922,
+            "radix": 62.903297424316406,
+            "fix": 2.4238080978393555
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8546036039554634
+      },
+      {
+        "config": [
+          192,
+          11,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 25408,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 96,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 23744,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599743843078613,
+          "radix": 53.48249435424805,
+          "fix": 2.623487949371338,
+          "total": 67.705726146698
+        },
+        "times_ms": [
+          {
+            "fold": 11.599743843078613,
+            "radix": 53.48249435424805,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.602944374084473,
+            "radix": 53.529598236083984,
+            "fix": 2.623487949371338
+          },
+          {
+            "fold": 11.491328239440918,
+            "radix": 53.4384651184082,
+            "fix": 2.475008010864258
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.971863216775383
+      },
+      {
+        "config": [
+          192,
+          15,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 25408,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 130,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 23744,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.295743942260742,
+          "radix": 48.39219284057617,
+          "fix": 2.50163197517395,
+          "total": 62.189568758010864
+        },
+        "times_ms": [
+          {
+            "fold": 11.610495567321777,
+            "radix": 48.39219284057617,
+            "fix": 2.5139200687408447
+          },
+          {
+            "fold": 11.295743942260742,
+            "radix": 48.35327911376953,
+            "fix": 2.50163197517395
+          },
+          {
+            "fold": 11.287551879882812,
+            "radix": 48.4771842956543,
+            "fix": 2.4401919841766357
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.0580665877115774
+      },
+      {
+        "config": [
+          192,
+          19,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 25408,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 146,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 23744,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.569727897644043,
+          "radix": 45.91411209106445,
+          "fix": 2.500607967376709,
+          "total": 59.984447956085205
+        },
+        "times_ms": [
+          {
+            "fold": 11.569727897644043,
+            "radix": 46.034942626953125,
+            "fix": 2.6255359649658203
+          },
+          {
+            "fold": 11.590656280517578,
+            "radix": 45.911041259765625,
+            "fix": 2.500607967376709
+          },
+          {
+            "fold": 11.288576126098633,
+            "radix": 45.91411209106445,
+            "fix": 2.4524800777435303
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.0969627469976213
+      },
+      {
+        "config": [
+          192,
+          27,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 25408,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 23744,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.608063697814941,
+          "radix": 43.38585662841797,
+          "fix": 2.6275839805603027,
+          "total": 57.62150430679321
+        },
+        "times_ms": [
+          {
+            "fold": 11.610848426818848,
+            "radix": 43.3172492980957,
+            "fix": 2.6275839805603027
+          },
+          {
+            "fold": 11.608063697814941,
+            "radix": 43.412479400634766,
+            "fix": 2.6275839805603027
+          },
+          {
+            "fold": 11.595775604248047,
+            "radix": 43.38585662841797,
+            "fix": 2.6275839805603027
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.1419470143768111
+      },
+      {
+        "config": [
+          192,
+          39,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 30208,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 18944,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.291647911071777,
+          "radix": 40.45004653930664,
+          "fix": 2.4545280933380127,
+          "total": 54.19622254371643
+        },
+        "times_ms": [
+          {
+            "fold": 11.760671615600586,
+            "radix": 40.45004653930664,
+            "fix": 2.4688639640808105
+          },
+          {
+            "fold": 11.291647911071777,
+            "radix": 40.45619201660156,
+            "fix": 2.4545280933380127
+          },
+          {
+            "fold": 11.290623664855957,
+            "radix": 40.34048080444336,
+            "fix": 2.451456069946289
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.2141197618333288
+      },
+      {
+        "config": [
+          256,
+          7,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 33856,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 95,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 15296,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.603967666625977,
+          "radix": 55.65439987182617,
+          "fix": 2.4883201122283936,
+          "total": 69.74668765068054
+        },
+        "times_ms": [
+          {
+            "fold": 11.6079683303833,
+            "radix": 55.85715103149414,
+            "fix": 2.6275839805603027
+          },
+          {
+            "fold": 11.603967666625977,
+            "radix": 55.65439987182617,
+            "fix": 2.4883201122283936
+          },
+          {
+            "fold": 11.300864219665527,
+            "radix": 55.60115051269531,
+            "fix": 2.436095952987671
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9434240825399404
+      },
+      {
+        "config": [
+          256,
+          11,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 33856,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 103,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 15296,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.602944374084473,
+          "radix": 48.43315124511719,
+          "fix": 2.629631996154785,
+          "total": 62.665727615356445
+        },
+        "times_ms": [
+          {
+            "fold": 11.603936195373535,
+            "radix": 48.51609420776367,
+            "fix": 2.629631996154785
+          },
+          {
+            "fold": 11.602944374084473,
+            "radix": 48.395263671875,
+            "fix": 2.629631996154785
+          },
+          {
+            "fold": 11.475968360900879,
+            "radix": 48.43315124511719,
+            "fix": 2.4821760654449463
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.050026981429613
+      },
+      {
+        "config": [
+          256,
+          15,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 33856,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 15296,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.59881591796875,
+          "radix": 45.18809509277344,
+          "fix": 2.521087884902954,
+          "total": 59.30799889564514
+        },
+        "times_ms": [
+          {
+            "fold": 11.608480453491211,
+            "radix": 45.23417663574219,
+            "fix": 2.628607988357544
+          },
+          {
+            "fold": 11.59881591796875,
+            "radix": 45.18809509277344,
+            "fix": 2.521087884902954
+          },
+          {
+            "fold": 11.32646369934082,
+            "radix": 45.102081298828125,
+            "fix": 2.4821760654449463
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.1094743716243423
+      },
+      {
+        "config": [
+          256,
+          19,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 33856,
+          "const_size_bytes": 0,
+          "local_size_bytes": 48,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 15296,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.373567581176758,
+          "radix": 43.12678527832031,
+          "fix": 2.496511936187744,
+          "total": 56.996864795684814
+        },
+        "times_ms": [
+          {
+            "fold": 11.603008270263672,
+            "radix": 43.37254333496094,
+            "fix": 2.6275839805603027
+          },
+          {
+            "fold": 11.373567581176758,
+            "radix": 43.12678527832031,
+            "fix": 2.496511936187744
+          },
+          {
+            "fold": 11.291647911071777,
+            "radix": 43.052032470703125,
+            "fix": 2.4780800342559814
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.1544618294868878
+      },
+      {
+        "config": [
+          256,
+          27,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 33856,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 203,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 15296,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.607040405273438,
+          "radix": 40.43366241455078,
+          "fix": 2.628607988357544,
+          "total": 54.66931080818176
+        },
+        "times_ms": [
+          {
+            "fold": 11.60268783569336,
+            "radix": 40.43366241455078,
+            "fix": 2.628607988357544
+          },
+          {
+            "fold": 11.608063697814941,
+            "radix": 40.36198425292969,
+            "fix": 2.628607988357544
+          },
+          {
+            "fold": 11.607040405273438,
+            "radix": 40.43571090698242,
+            "fix": 2.6275839805603027
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.2036132125008496
+      },
+      {
+        "config": [
+          256,
+          39,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 40192,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 8960,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.602975845336914,
+          "radix": 39.613441467285156,
+          "fix": 2.6275839805603027,
+          "total": 53.84400129318237
+        },
+        "times_ms": [
+          {
+            "fold": 11.612704277038574,
+            "radix": 39.613441467285156,
+            "fix": 2.6275839805603027
+          },
+          {
+            "fold": 11.601920127868652,
+            "radix": 39.653377532958984,
+            "fix": 2.6275839805603027
+          },
+          {
+            "fold": 11.602975845336914,
+            "radix": 39.59292984008789,
+            "fix": 2.6419200897216797
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.2220619424020154
+      },
+      {
+        "config": [
+          64,
+          7,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 8480,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 84,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 40672,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.481087684631348,
+          "radix": 117.42310333251953,
+          "fix": 2.387968063354492,
+          "total": 131.29215908050537
+        },
+        "times_ms": [
+          {
+            "fold": 11.600576400756836,
+            "radix": 117.3196792602539,
+            "fix": 2.6357760429382324
+          },
+          {
+            "fold": 11.481087684631348,
+            "radix": 117.61663818359375,
+            "fix": 2.387968063354492
+          },
+          {
+            "fold": 11.299839973449707,
+            "radix": 117.42310333251953,
+            "fix": 2.386944055557251
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.5011777189732677
+      },
+      {
+        "config": [
+          64,
+          11,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 8480,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 96,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 40672,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.598591804504395,
+          "radix": 86.7778549194336,
+          "fix": 2.431999921798706,
+          "total": 100.8084466457367
+        },
+        "times_ms": [
+          {
+            "fold": 11.598591804504395,
+            "radix": 86.57202911376953,
+            "fix": 2.634752035140991
+          },
+          {
+            "fold": 11.600895881652832,
+            "radix": 86.7778549194336,
+            "fix": 2.431999921798706
+          },
+          {
+            "fold": 11.300864219665527,
+            "radix": 86.91712188720703,
+            "fix": 2.4002559185028076
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.6527300736840177
+      },
+      {
+        "config": [
+          64,
+          15,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 8480,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 40672,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.612895965576172,
+          "radix": 72.33843231201172,
+          "fix": 2.48524808883667,
+          "total": 86.43657636642456
+        },
+        "times_ms": [
+          {
+            "fold": 11.612895965576172,
+            "radix": 72.2135009765625,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.622400283813477,
+            "radix": 72.3978271484375,
+            "fix": 2.48524808883667
+          },
+          {
+            "fold": 11.305983543395996,
+            "radix": 72.33843231201172,
+            "fix": 2.407423973083496
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.7612599616173913
+      },
+      {
+        "config": [
+          64,
+          19,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 8480,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 40672,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.289600372314453,
+          "radix": 64.33894348144531,
+          "fix": 2.441215991973877,
+          "total": 78.06975984573364
+        },
+        "times_ms": [
+          {
+            "fold": 11.584383964538574,
+            "radix": 64.33894348144531,
+            "fix": 2.4944639205932617
+          },
+          {
+            "fold": 11.281408309936523,
+            "radix": 64.33484649658203,
+            "fix": 2.441215991973877
+          },
+          {
+            "fold": 11.289600372314453,
+            "radix": 64.40652465820312,
+            "fix": 2.417664051055908
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8428449752767999
+      },
+      {
+        "config": [
+          64,
+          27,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 8480,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 40672,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.602720260620117,
+          "radix": 56.24524688720703,
+          "fix": 2.490367889404297,
+          "total": 70.33833503723145
+        },
+        "times_ms": [
+          {
+            "fold": 11.602720260620117,
+            "radix": 56.38041687011719,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.603967666625977,
+            "radix": 56.24524688720703,
+            "fix": 2.490367889404297
+          },
+          {
+            "fold": 11.291647911071777,
+            "radix": 56.04556655883789,
+            "fix": 2.4494080543518066
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9354885180636346
+      },
+      {
+        "config": [
+          64,
+          39,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 10240,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 38912,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599871635437012,
+          "radix": 48.42598342895508,
+          "fix": 2.5241599082946777,
+          "total": 62.55001497268677
+        },
+        "times_ms": [
+          {
+            "fold": 11.616991996765137,
+            "radix": 48.487422943115234,
+            "fix": 2.634752035140991
+          },
+          {
+            "fold": 11.599871635437012,
+            "radix": 48.41676712036133,
+            "fix": 2.5241599082946777
+          },
+          {
+            "fold": 11.313088417053223,
+            "radix": 48.42598342895508,
+            "fix": 2.4729599952697754
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 1.051969449340272
+      },
+      {
+        "config": [
+          384,
+          7,
+          6
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          11,
+          6
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          15,
+          6
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          19,
+          6
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          27,
+          6
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          39,
+          6
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc400 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          7,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x10220 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          11,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x10220 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          15,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x10220 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          19,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x10220 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          27,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x10220 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          39,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x10220 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          192,
+          7,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x18340 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          192,
+          11,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x18340 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          192,
+          15,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x18340 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          192,
+          19,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x18340 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          192,
+          27,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x18340 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          192,
+          39,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x18340 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          256,
+          7,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x20440 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          256,
+          11,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x20440 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          256,
+          15,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x20440 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          256,
+          19,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x20440 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          256,
+          27,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x20440 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          256,
+          39,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x20440 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          64,
+          7,
+          8
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 33056,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 191,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 16096,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.310336112976074,
+          "radix": 243.15699768066406,
+          "fix": 2.3797760009765625,
+          "total": 256.8471097946167
+        },
+        "times_ms": [
+          {
+            "fold": 11.310336112976074,
+            "radix": 242.74636840820312,
+            "fix": 2.3808000087738037
+          },
+          {
+            "fold": 11.300864219665527,
+            "radix": 243.15699768066406,
+            "fix": 2.3797760009765625
+          },
+          {
+            "fold": 11.317248344421387,
+            "radix": 243.43756103515625,
+            "fix": 2.376703977584839
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.2561862769632076
+      },
+      {
+        "config": [
+          64,
+          11,
+          8
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 33056,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 213,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 16096,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.304767608642578,
+          "radix": 175.2279052734375,
+          "fix": 2.3838720321655273,
+          "total": 188.9165449142456
+        },
+        "times_ms": [
+          {
+            "fold": 11.304767608642578,
+            "radix": 174.88485717773438,
+            "fix": 2.381824016571045
+          },
+          {
+            "fold": 11.303839683532715,
+            "radix": 175.28831481933594,
+            "fix": 2.3848960399627686
+          },
+          {
+            "fold": 11.309056282043457,
+            "radix": 175.2279052734375,
+            "fix": 2.3838720321655273
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.34830567559295467
+      },
+      {
+        "config": [
+          64,
+          15,
+          8
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 33056,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 220,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 16096,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.315199851989746,
+          "radix": 137.14022827148438,
+          "fix": 2.381824016571045,
+          "total": 150.83725214004517
+        },
+        "times_ms": [
+          {
+            "fold": 11.610624313354492,
+            "radix": 137.1207733154297,
+            "fix": 2.398207902908325
+          },
+          {
+            "fold": 11.315199851989746,
+            "radix": 137.14022827148438,
+            "fix": 2.381824016571045
+          },
+          {
+            "fold": 11.303936004638672,
+            "radix": 137.2999725341797,
+            "fix": 2.3797760009765625
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.4362364328007664
+      },
+      {
+        "config": [
+          64,
+          19,
+          8
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 33056,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 235,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 16096,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.298815727233887,
+          "radix": 114.1401596069336,
+          "fix": 2.3848960399627686,
+          "total": 127.82387137413025
+        },
+        "times_ms": [
+          {
+            "fold": 11.294143676757812,
+            "radix": 114.43097686767578,
+            "fix": 2.3961598873138428
+          },
+          {
+            "fold": 11.298815727233887,
+            "radix": 113.92921447753906,
+            "fix": 2.381824016571045
+          },
+          {
+            "fold": 11.302911758422852,
+            "radix": 114.1401596069336,
+            "fix": 2.3848960399627686
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.514776341067387
+      },
+      {
+        "config": [
+          64,
+          27,
+          8
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 33056,
+          "const_size_bytes": 0,
+          "local_size_bytes": 24,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 16096,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.321344375610352,
+          "radix": 87.1905288696289,
+          "fix": 2.3930881023406982,
+          "total": 100.90496134757996
+        },
+        "times_ms": [
+          {
+            "fold": 11.615039825439453,
+            "radix": 86.78297424316406,
+            "fix": 2.465791940689087
+          },
+          {
+            "fold": 11.321344375610352,
+            "radix": 87.27244567871094,
+            "fix": 2.3930881023406982
+          },
+          {
+            "fold": 11.316224098205566,
+            "radix": 87.1905288696289,
+            "fix": 2.386944055557251
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.652105743149578
+      },
+      {
+        "config": [
+          64,
+          39,
+          8
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 33056,
+          "const_size_bytes": 0,
+          "local_size_bytes": 224,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 16096,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.316224098205566,
+          "radix": 69.97401428222656,
+          "fix": 2.4053759574890137,
+          "total": 83.69561433792114
+        },
+        "times_ms": [
+          {
+            "fold": 11.6080961227417,
+            "radix": 69.81427001953125,
+            "fix": 2.4883201122283936
+          },
+          {
+            "fold": 11.285504341125488,
+            "radix": 69.97401428222656,
+            "fix": 2.4053759574890137
+          },
+          {
+            "fold": 11.316224098205566,
+            "radix": 70.06924438476562,
+            "fix": 2.4033279418945312
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.7861905946633315
+      },
+      {
+        "config": [
+          384,
+          7,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x30640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          11,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x30640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          15,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x30640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          19,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x30640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          27,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x30640 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          384,
+          39,
+          8
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0x28540 bytes, 0xc000 max)\n\u0000"
+      },
+      {
+        "config": [
+          128,
+          7,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 4640,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 64,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 44512,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.601920127868652,
+          "radix": 69.27769470214844,
+          "fix": 2.629631996154785,
+          "total": 83.50924682617188
+        },
+        "times_ms": [
+          {
+            "fold": 11.611167907714844,
+            "radix": 69.27769470214844,
+            "fix": 2.629631996154785
+          },
+          {
+            "fold": 11.601920127868652,
+            "radix": 69.4312973022461,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.495424270629883,
+            "radix": 69.26028442382812,
+            "fix": 2.5221118927001953
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.787945135513078
+      },
+      {
+        "config": [
+          128,
+          11,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 5696,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 72,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 43456,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.488256454467773,
+          "radix": 64.69734191894531,
+          "fix": 2.5221118927001953,
+          "total": 78.70771026611328
+        },
+        "times_ms": [
+          {
+            "fold": 11.599776268005371,
+            "radix": 64.92160034179688,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.488256454467773,
+            "radix": 64.69734191894531,
+            "fix": 2.5221118927001953
+          },
+          {
+            "fold": 11.302911758422852,
+            "radix": 64.51712036132812,
+            "fix": 2.455552101135254
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.836013455156665
+      },
+      {
+        "config": [
+          128,
+          15,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 7744,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 96,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 41408,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.309056282043457,
+          "radix": 63.19308853149414,
+          "fix": 2.4780800342559814,
+          "total": 76.98022484779358
+        },
+        "times_ms": [
+          {
+            "fold": 11.610912322998047,
+            "radix": 63.64262390136719,
+            "fix": 2.5374720096588135
+          },
+          {
+            "fold": 11.305983543395996,
+            "radix": 63.19308853149414,
+            "fix": 2.4780800342559814
+          },
+          {
+            "fold": 11.309056282043457,
+            "radix": 63.098880767822266,
+            "fix": 2.455552101135254
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8547741311115314
+      },
+      {
+        "config": [
+          128,
+          19,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 9792,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 39360,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599807739257812,
+          "radix": 59.31417465209961,
+          "fix": 2.5538558959960938,
+          "total": 73.46783828735352
+        },
+        "times_ms": [
+          {
+            "fold": 11.599807739257812,
+            "radix": 59.31417465209961,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.601920127868652,
+            "radix": 59.32236862182617,
+            "fix": 2.5538558959960938
+          },
+          {
+            "fold": 11.310079574584961,
+            "radix": 59.161598205566406,
+            "fix": 2.510848045349121
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8956395933371265
+      },
+      {
+        "config": [
+          128,
+          27,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 13888,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 35264,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.607168197631836,
+          "radix": 58.498046875,
+          "fix": 2.632704019546509,
+          "total": 72.73791909217834
+        },
+        "times_ms": [
+          {
+            "fold": 11.607168197631836,
+            "radix": 58.498046875,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.612159729003906,
+            "radix": 58.51443099975586,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.319295883178711,
+            "radix": 58.31782531738281,
+            "fix": 2.5088000297546387
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9046272649573056
+      },
+      {
+        "config": [
+          128,
+          39,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 128,
+          "shared_size_bytes": 20032,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 29120,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.309056282043457,
+          "radix": 57.91852951049805,
+          "fix": 2.4800639152526855,
+          "total": 71.70764970779419
+        },
+        "times_ms": [
+          {
+            "fold": 11.613151550292969,
+            "radix": 58.050559997558594,
+            "fix": 2.539520025253296
+          },
+          {
+            "fold": 11.294719696044922,
+            "radix": 57.91852951049805,
+            "fix": 2.4800639152526855
+          },
+          {
+            "fold": 11.309056282043457,
+            "radix": 57.90003204345703,
+            "fix": 2.4688639640808105
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9176246199000849
+      },
+      {
+        "config": [
+          192,
+          7,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 6976,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 56,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 42176,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.304960250854492,
+          "radix": 64.31641387939453,
+          "fix": 2.4872961044311523,
+          "total": 78.10867023468018
+        },
+        "times_ms": [
+          {
+            "fold": 11.6048002243042,
+            "radix": 64.41471862792969,
+            "fix": 2.554879903793335
+          },
+          {
+            "fold": 11.304960250854492,
+            "radix": 64.23961639404297,
+            "fix": 2.4872961044311523
+          },
+          {
+            "fold": 11.29257583618164,
+            "radix": 64.31641387939453,
+            "fix": 2.4729599952697754
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8424251060649555
+      },
+      {
+        "config": [
+          192,
+          11,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 8512,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 80,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 40640,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.602944374084473,
+          "radix": 60.44364929199219,
+          "fix": 2.5374720096588135,
+          "total": 74.58406567573547
+        },
+        "times_ms": [
+          {
+            "fold": 11.60972785949707,
+            "radix": 60.49484634399414,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.602944374084473,
+            "radix": 60.44364929199219,
+            "fix": 2.5374720096588135
+          },
+          {
+            "fold": 11.281408309936523,
+            "radix": 60.29004669189453,
+            "fix": 2.5088000297546387
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8822354240263695
+      },
+      {
+        "config": [
+          192,
+          15,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 11584,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 96,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 37568,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599648475646973,
+          "radix": 59.1011848449707,
+          "fix": 2.531327962875366,
+          "total": 73.23216128349304
+        },
+        "times_ms": [
+          {
+            "fold": 11.599648475646973,
+            "radix": 59.1011848449707,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.600895881652832,
+            "radix": 59.1011848449707,
+            "fix": 2.531327962875366
+          },
+          {
+            "fold": 11.292672157287598,
+            "radix": 58.99059295654297,
+            "fix": 2.480128049850464
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8985219561159523
+      },
+      {
+        "config": [
+          192,
+          19,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 14656,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 34496,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.601920127868652,
+          "radix": 58.32191848754883,
+          "fix": 2.6316800117492676,
+          "total": 72.55551862716675
+        },
+        "times_ms": [
+          {
+            "fold": 11.602463722229004,
+            "radix": 58.32191848754883,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.601920127868652,
+            "radix": 58.33011245727539,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.568127632141113,
+            "radix": 58.261505126953125,
+            "fix": 2.539520025253296
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9069014466723901
+      },
+      {
+        "config": [
+          192,
+          27,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 20800,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 28352,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.610112190246582,
+          "radix": 58.27686309814453,
+          "fix": 2.6306560039520264,
+          "total": 72.51763129234314
+        },
+        "times_ms": [
+          {
+            "fold": 11.609087944030762,
+            "radix": 58.27686309814453,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.610112190246582,
+            "radix": 58.35366439819336,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.611136436462402,
+            "radix": 58.27481460571289,
+            "fix": 2.521087884902954
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9073752635656029
+      },
+      {
+        "config": [
+          192,
+          39,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 192,
+          "shared_size_bytes": 30016,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 19136,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.603839874267578,
+          "radix": 58.473472595214844,
+          "fix": 2.6306560039520264,
+          "total": 72.70796847343445
+        },
+        "times_ms": [
+          {
+            "fold": 11.603839874267578,
+            "radix": 58.473472595214844,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.600895881652832,
+            "radix": 58.47449493408203,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.615232467651367,
+            "radix": 58.33011245727539,
+            "fix": 2.535423994064331
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9049999083812237
+      },
+      {
+        "config": [
+          256,
+          7,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 9280,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 64,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 39872,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.375616073608398,
+          "radix": 60.845054626464844,
+          "fix": 2.5364480018615723,
+          "total": 74.75711870193481
+        },
+        "times_ms": [
+          {
+            "fold": 11.602592468261719,
+            "radix": 61.15737533569336,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.375616073608398,
+            "radix": 60.845054626464844,
+            "fix": 2.5364480018615723
+          },
+          {
+            "fold": 11.323391914367676,
+            "radix": 60.82252883911133,
+            "fix": 2.4975359439849854
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8801931635353419
+      },
+      {
+        "config": [
+          256,
+          11,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 11328,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 80,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 37824,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.575296401977539,
+          "radix": 59.03257751464844,
+          "fix": 2.550784111022949,
+          "total": 73.15865802764893
+        },
+        "times_ms": [
+          {
+            "fold": 11.606687545776367,
+            "radix": 59.072513580322266,
+            "fix": 2.630687952041626
+          },
+          {
+            "fold": 11.575296401977539,
+            "radix": 59.03257751464844,
+            "fix": 2.550784111022949
+          },
+          {
+            "fold": 11.300864219665527,
+            "radix": 58.971134185791016,
+            "fix": 2.505728006362915
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8994247103627153
+      },
+      {
+        "config": [
+          256,
+          15,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 15424,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 113,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 33728,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.337727546691895,
+          "radix": 58.26457595825195,
+          "fix": 2.514944076538086,
+          "total": 72.11724758148193
+        },
+        "times_ms": [
+          {
+            "fold": 11.629952430725098,
+            "radix": 58.30758285522461,
+            "fix": 2.5518081188201904
+          },
+          {
+            "fold": 11.330559730529785,
+            "radix": 58.26457595825195,
+            "fix": 2.514944076538086
+          },
+          {
+            "fold": 11.337727546691895,
+            "radix": 58.16320037841797,
+            "fix": 2.4924159049987793
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9124128695108324
+      },
+      {
+        "config": [
+          256,
+          19,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 19520,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 29632,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599007606506348,
+          "radix": 58.237953186035156,
+          "fix": 2.6306560039520264,
+          "total": 72.46761679649353
+        },
+        "times_ms": [
+          {
+            "fold": 11.599007606506348,
+            "radix": 58.217472076416016,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.594752311706543,
+            "radix": 58.237953186035156,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.599871635437012,
+            "radix": 58.252288818359375,
+            "fix": 2.550784111022949
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9080015007507044
+      },
+      {
+        "config": [
+          256,
+          27,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 27712,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 188,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 21440,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.300864219665527,
+          "radix": 58.003456115722656,
+          "fix": 2.5139200687408447,
+          "total": 71.81824040412903
+        },
+        "times_ms": [
+          {
+            "fold": 11.618144035339355,
+            "radix": 58.215423583984375,
+            "fix": 2.5518081188201904
+          },
+          {
+            "fold": 11.300864219665527,
+            "radix": 58.003456115722656,
+            "fix": 2.5139200687408447
+          },
+          {
+            "fold": 11.293696403503418,
+            "radix": 57.95430374145508,
+            "fix": 2.4791040420532227
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9162115980115271
+      },
+      {
+        "config": [
+          256,
+          39,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 40000,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 9152,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.599583625793457,
+          "radix": 58.024864196777344,
+          "fix": 2.5516159534454346,
+          "total": 72.17606377601624
+        },
+        "times_ms": [
+          {
+            "fold": 11.615232467651367,
+            "radix": 58.024864196777344,
+            "fix": 2.6305599212646484
+          },
+          {
+            "fold": 11.599583625793457,
+            "radix": 58.04438400268555,
+            "fix": 2.5516159534454346
+          },
+          {
+            "fold": 11.303263664245605,
+            "radix": 57.88447952270508,
+            "fix": 2.5054080486297607
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9116693452727238
+      },
+      {
+        "config": [
+          64,
+          7,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 2336,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 64,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 46816,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.411264419555664,
+          "radix": 82.76681518554688,
+          "fix": 2.452064037322998,
+          "total": 96.63014364242554
+        },
+        "times_ms": [
+          {
+            "fold": 11.599552154541016,
+            "radix": 82.7318115234375,
+            "fix": 2.6298880577087402
+          },
+          {
+            "fold": 11.411264419555664,
+            "radix": 82.76681518554688,
+            "fix": 2.452064037322998
+          },
+          {
+            "fold": 11.285504341125488,
+            "radix": 82.8090591430664,
+            "fix": 2.43833589553833
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.6809542273944549
+      },
+      {
+        "config": [
+          64,
+          11,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 2880,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 72,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 46272,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.613471984863281,
+          "radix": 71.70425415039062,
+          "fix": 2.5207040309906006,
+          "total": 85.8384301662445
+        },
+        "times_ms": [
+          {
+            "fold": 11.613471984863281,
+            "radix": 71.75523376464844,
+            "fix": 2.6315839290618896
+          },
+          {
+            "fold": 11.640512466430664,
+            "radix": 71.70425415039062,
+            "fix": 2.5207040309906006
+          },
+          {
+            "fold": 11.248800277709961,
+            "radix": 71.65821075439453,
+            "fix": 2.4773759841918945
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.7665646340410224
+      },
+      {
+        "config": [
+          64,
+          15,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 3904,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 96,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 45248,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.354687690734863,
+          "radix": 66.6770248413086,
+          "fix": 2.477440118789673,
+          "total": 80.50915265083313
+        },
+        "times_ms": [
+          {
+            "fold": 11.593440055847168,
+            "radix": 66.69923400878906,
+            "fix": 2.522144079208374
+          },
+          {
+            "fold": 11.305120468139648,
+            "radix": 66.6770248413086,
+            "fix": 2.477440118789673
+          },
+          {
+            "fold": 11.354687690734863,
+            "radix": 66.57052612304688,
+            "fix": 2.464031934738159
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8173071339158127
+      },
+      {
+        "config": [
+          64,
+          19,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 4928,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 128,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 44224,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.598431587219238,
+          "radix": 63.337440490722656,
+          "fix": 2.6307520866394043,
+          "total": 77.5666241645813
+        },
+        "times_ms": [
+          {
+            "fold": 11.621503829956055,
+            "radix": 63.28540802001953,
+            "fix": 2.630880117416382
+          },
+          {
+            "fold": 11.598431587219238,
+            "radix": 63.337440490722656,
+            "fix": 2.6307520866394043
+          },
+          {
+            "fold": 11.5862398147583,
+            "radix": 63.3768310546875,
+            "fix": 2.551136016845703
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8483120867478617
+      },
+      {
+        "config": [
+          64,
+          27,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 6976,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 42176,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.60860824584961,
+          "radix": 64.29261016845703,
+          "fix": 2.6306560039520264,
+          "total": 78.53187441825867
+        },
+        "times_ms": [
+          {
+            "fold": 11.60860824584961,
+            "radix": 64.29261016845703,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.621088027954102,
+            "radix": 64.32300567626953,
+            "fix": 2.6306560039520264
+          },
+          {
+            "fold": 11.376768112182617,
+            "radix": 63.93328094482422,
+            "fix": 2.5208959579467773
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8378853210174289
+      },
+      {
+        "config": [
+          64,
+          39,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 64,
+          "shared_size_bytes": 10048,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 39104,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.597951889038086,
+          "radix": 58.405887603759766,
+          "fix": 2.5538558959960938,
+          "total": 72.55769538879395
+        },
+        "times_ms": [
+          {
+            "fold": 11.597951889038086,
+            "radix": 58.408958435058594,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.600895881652832,
+            "radix": 58.405887603759766,
+            "fix": 2.5538558959960938
+          },
+          {
+            "fold": 11.287551879882812,
+            "radix": 58.34137725830078,
+            "fix": 2.5323519706726074
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9068742392444504
+      },
+      {
+        "config": [
+          384,
+          7,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 384,
+          "shared_size_bytes": 13888,
+          "const_size_bytes": 0,
+          "local_size_bytes": 8,
+          "num_regs": 56,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 35264,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.598079681396484,
+          "radix": 59.34899139404297,
+          "fix": 2.5722880363464355,
+          "total": 73.51935911178589
+        },
+        "times_ms": [
+          {
+            "fold": 11.598079681396484,
+            "radix": 59.34899139404297,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.602944374084473,
+            "radix": 59.414527893066406,
+            "fix": 2.5722880363464355
+          },
+          {
+            "fold": 11.294719696044922,
+            "radix": 59.30393600463867,
+            "fix": 2.5231359004974365
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.8950119479005981
+      },
+      {
+        "config": [
+          384,
+          11,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 384,
+          "shared_size_bytes": 16960,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 80,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 32192,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.597824096679688,
+          "radix": 58.52774429321289,
+          "fix": 2.632704019546509,
+          "total": 72.75827240943909
+        },
+        "times_ms": [
+          {
+            "fold": 11.598143577575684,
+            "radix": 58.59328079223633,
+            "fix": 2.63372802734375
+          },
+          {
+            "fold": 11.597824096679688,
+            "radix": 58.52774429321289,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.594752311706543,
+            "radix": 58.48883056640625,
+            "fix": 2.5722880363464355
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9043742055440367
+      },
+      {
+        "config": [
+          384,
+          15,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 384,
+          "shared_size_bytes": 23104,
+          "const_size_bytes": 0,
+          "local_size_bytes": 56,
+          "num_regs": 80,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 26048,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.596799850463867,
+          "radix": 58.46527862548828,
+          "fix": 2.570240020751953,
+          "total": 72.6323184967041
+        },
+        "times_ms": [
+          {
+            "fold": 11.603551864624023,
+            "radix": 58.466304779052734,
+            "fix": 2.634752035140991
+          },
+          {
+            "fold": 11.596799850463867,
+            "radix": 58.46527862548828,
+            "fix": 2.570240020751953
+          },
+          {
+            "fold": 11.298815727233887,
+            "radix": 58.34342575073242,
+            "fix": 2.5231359004974365
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9059425083618798
+      },
+      {
+        "config": [
+          384,
+          19,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 384,
+          "shared_size_bytes": 29248,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 147,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 19904,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.573247909545898,
+          "radix": 58.27481460571289,
+          "fix": 2.6316800117492676,
+          "total": 72.47974252700806
+        },
+        "times_ms": [
+          {
+            "fold": 11.59779167175293,
+            "radix": 58.296321868896484,
+            "fix": 2.6316800117492676
+          },
+          {
+            "fold": 11.573247909545898,
+            "radix": 58.27481460571289,
+            "fix": 2.632704019546509
+          },
+          {
+            "fold": 11.497471809387207,
+            "radix": 58.196990966796875,
+            "fix": 2.5231359004974365
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9078495937333638
+      },
+      {
+        "config": [
+          384,
+          27,
+          4
+        ],
+        "attributes": {
+          "max_threads_per_block": 384,
+          "shared_size_bytes": 41536,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 168,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 7616,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 11.302911758422852,
+          "radix": 57.89081573486328,
+          "fix": 2.5128960609436035,
+          "total": 71.70662355422974
+        },
+        "times_ms": [
+          {
+            "fold": 11.612064361572266,
+            "radix": 58.087425231933594,
+            "fix": 2.554879903793335
+          },
+          {
+            "fold": 11.302911758422852,
+            "radix": 57.89081573486328,
+            "fix": 2.5128960609436035
+          },
+          {
+            "fold": 11.283455848693848,
+            "radix": 57.86111831665039,
+            "fix": 2.4975359439849854
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9176377515150999
+      },
+      {
+        "config": [
+          384,
+          39,
+          4
+        ],
+        "error": "ptxas error   : Entry function '_ZN3cub17CUB_300102_SM_8606detail10radix_sort30DeviceSegmentedRadixSortKernelI6PolicyLb0ELNS0_9SortOrderE0EjiPKiS7_iNS1_21identity_decomposer_tEEEvPKT2_PS9_PKT3_PSD_T4_T5_iiT7_' uses too much shared data (0xc340 bytes, 0xc000 max)\n\u0000"
+      }
+    ]
+  },
+  "cub_gpu0": {
+    "baseline_ms": 61.90643182396889,
+    "baseline_times": [
+      {
+        "zero": 0.7147520184516907,
+        "fold": 14.359552383422852,
+        "scan": 1.8094079494476318,
+        "scatter": 24.558591842651367,
+        "sort": 20.46156883239746
+      },
+      {
+        "zero": 0.7239680290222168,
+        "fold": 14.35647964477539,
+        "scan": 1.815551996231079,
+        "scatter": 24.564735412597656,
+        "sort": 20.44825553894043
+      },
+      {
+        "zero": 0.7219200134277344,
+        "fold": 14.355456352233887,
+        "scan": 1.814527988433838,
+        "scatter": 24.564735412597656,
+        "sort": 20.46566390991211
+      },
+      {
+        "zero": 0.7208960056304932,
+        "fold": 14.358528137207031,
+        "scan": 1.8114559650421143,
+        "scatter": 24.52684783935547,
+        "sort": 19.942399978637695
+      }
+    ],
+    "results": [
+      {
+        "config": [
+          256,
+          39,
+          6
+        ],
+        "attributes": {
+          "max_threads_per_block": 256,
+          "shared_size_bytes": 40192,
+          "const_size_bytes": 0,
+          "local_size_bytes": 0,
+          "num_regs": 255,
+          "ptx_version": 86,
+          "binary_version": 86,
+          "cache_mode_ca": 0,
+          "max_dynamic_shared_size_bytes": 8960,
+          "preferred_shared_memory_carveout": -1
+        },
+        "median_ms": {
+          "fold": 13.47481632232666,
+          "radix": 51.51744079589844,
+          "fix": 3.1139841079711914,
+          "total": 68.10624122619629
+        },
+        "times_ms": [
+          {
+            "fold": 13.490143775939941,
+            "radix": 51.51744079589844,
+            "fix": 3.082240104675293
+          },
+          {
+            "fold": 13.47276782989502,
+            "radix": 51.45292663574219,
+            "fix": 3.1139841079711914
+          },
+          {
+            "fold": 13.47481632232666,
+            "radix": 51.57990264892578,
+            "fix": 3.1252479553222656
+          }
+        ],
+        "indices_bitwise_equal": true,
+        "speedup": 0.9089685572040831
+      }
+    ]
+  }
+}

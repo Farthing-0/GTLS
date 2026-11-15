@@ -1,0 +1,11 @@
+{
+  "times_seconds": {
+    "baseline": 0.6033976087346673,
+    "candidate": 0.2514447569847107
+  },
+  "speedup": 2.3997223723036605,
+  "knots_coefficients_peaks_bitwise_equal": true,
+  "checked_certificates": 148,
+  "largest_error_budget_change": 7.235323451482145e-13,
+  "long_double_reconstruction_covered": true
+}

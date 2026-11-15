@@ -1,0 +1,645 @@
+{
+  "revisions": {
+    "main": "8f6c36c4a4ab5b18d1cb3201966f498ded44e7b2",
+    "optimized": "3fab6ccce95126898126da0bf02abd75cc4d4712"
+  },
+  "cases": [
+    {
+      "case": "0030d_600s",
+      "pattern": "constant",
+      "all_fields_bitwise_equal": true,
+      "fields": [
+        {
+          "field": "periods",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "periods__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "period",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDuration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "durationPoints",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDurations",
+          "bitwise_equal": true,
+          "shape": [
+            37
+          ]
+        },
+        {
+          "field": "duration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "depth",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "T0",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "SDE",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "chi2__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "transitTimes",
+          "bitwise_equal": true,
+          "shape": [
+            4
+          ]
+        },
+        {
+          "field": "power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "snr",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFit",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFitPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "raw_power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "possiblePeriodsIndices",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        },
+        {
+          "field": "possiblePeriods",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        }
+      ],
+      "reference": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_600s-constant/main",
+      "candidate": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_600s-constant/optimized",
+      "reference_median_seconds": 0.08797654323279858,
+      "candidate_median_seconds": 0.08681298233568668,
+      "speedup": 1.0134030748144633
+    },
+    {
+      "case": "0030d_600s",
+      "pattern": "random",
+      "all_fields_bitwise_equal": true,
+      "fields": [
+        {
+          "field": "periods",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "periods__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "period",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDuration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "durationPoints",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDurations",
+          "bitwise_equal": true,
+          "shape": [
+            37
+          ]
+        },
+        {
+          "field": "duration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "depth",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "T0",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "SDE",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "chi2__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "transitTimes",
+          "bitwise_equal": true,
+          "shape": [
+            4
+          ]
+        },
+        {
+          "field": "power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "snr",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFit",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFitPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "raw_power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "possiblePeriodsIndices",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        },
+        {
+          "field": "possiblePeriods",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        }
+      ],
+      "reference": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_600s-random/main",
+      "candidate": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_600s-random/optimized",
+      "reference_median_seconds": 0.08737744204699993,
+      "candidate_median_seconds": 0.09107065200805664,
+      "speedup": 0.9594467605136945
+    },
+    {
+      "case": "0030d_100s",
+      "pattern": "mixed",
+      "all_fields_bitwise_equal": true,
+      "fields": [
+        {
+          "field": "periods",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "periods__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "period",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDuration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "durationPoints",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDurations",
+          "bitwise_equal": true,
+          "shape": [
+            37
+          ]
+        },
+        {
+          "field": "duration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "depth",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "T0",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "SDE",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "chi2__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "transitTimes",
+          "bitwise_equal": true,
+          "shape": [
+            4
+          ]
+        },
+        {
+          "field": "power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "snr",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFit",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFitPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "raw_power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "possiblePeriodsIndices",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        },
+        {
+          "field": "possiblePeriods",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        }
+      ],
+      "reference": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_100s-mixed/main",
+      "candidate": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_100s-mixed/optimized",
+      "reference_median_seconds": 0.227212717756629,
+      "candidate_median_seconds": 0.24717007018625736,
+      "speedup": 0.9192565976350239
+    },
+    {
+      "case": "0030d_100s",
+      "pattern": "spikes",
+      "all_fields_bitwise_equal": true,
+      "fields": [
+        {
+          "field": "periods",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "periods__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "period",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDuration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "durationPoints",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "rawDurations",
+          "bitwise_equal": true,
+          "shape": [
+            37
+          ]
+        },
+        {
+          "field": "duration",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "depth",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "T0",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "SDE",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "chi2__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "transitTimes",
+          "bitwise_equal": true,
+          "shape": [
+            4
+          ]
+        },
+        {
+          "field": "power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "snr",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFit",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "snrFitPink",
+          "bitwise_equal": true,
+          "shape": []
+        },
+        {
+          "field": "raw_power",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_power__mask",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "raw_chi2",
+          "bitwise_equal": true,
+          "shape": [
+            2011
+          ]
+        },
+        {
+          "field": "possiblePeriodsIndices",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        },
+        {
+          "field": "possiblePeriods",
+          "bitwise_equal": true,
+          "shape": [
+            200
+          ]
+        }
+      ],
+      "reference": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_100s-spikes/main",
+      "candidate": "/home/farthing/GTLS/optimization-20261115/short-matrix/0030d_100s-spikes/optimized",
+      "reference_median_seconds": 0.21994632668793201,
+      "candidate_median_seconds": 0.2657644646242261,
+      "speedup": 0.8275987047362484
+    }
+  ],
+  "all_fields_bitwise_equal": true,
+  "nsys_smoke": {
+    "cuda_kernel_records": 1679,
+    "trace": "/home/farthing/GTLS/optimization-20261115/nsys-smoke/trace.nsys-rep"
+  }
+}
