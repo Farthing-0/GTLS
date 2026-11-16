@@ -121,6 +121,13 @@ search time. Decisions are local to each search and device; no offline timing
 table or previous curve's decisions are reused. Auto selects cascade prefixes,
 not arbitrary new tolerance values, and does not guarantee the fastest policy.
 
+For four-level screening, curves with at least 32,768 samples and batches with
+at least 128 periods use one fused GPU cascade. Candidate blocks stop refining
+once every candidate is strictly worse than a certified upper bound. The bounds,
+final exact evaluation, and tie ordering are unchanged. Smaller workloads retain
+separate kernels to avoid the extra register cost of fusion. These thresholds
+control execution cost, not the candidate acceptance criteria.
+
 ### Results
 
 `power()` returns a `gtlsResult` object with the following attributes:

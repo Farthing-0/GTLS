@@ -283,11 +283,13 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         np.testing.assert_array_equal(best.get(), expected)
     # Each refinement keeps existing pruned bounds and independently certifies
     # the survivors. Check every exact candidate, including overflow and ties.
+    cascade_certificates = []
     for tolerance in SCREEN_TOLERANCES[1:]:
         pos, coef, meta, mass_error = make_certificate(tolerance)
         before_lower, before_upper = lower.copy(), upper.copy()
         refined_args = screen_args[:12] + (cp.asarray(pos), cp.asarray(coef), cp.asarray(meta),
                                            *map(np.float64, mass_error)) + screen_args[17:]
+        cascade_certificates.extend(refined_args[12:17])
         module.get_function('refineCandidates'+suffix)((len(block_map), n), (core.SCREEN_THREADS,),
                                                        refined_args+extra)
         assert bool(cp.all(lower >= before_lower))
@@ -297,6 +299,25 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         best.fill(core.EMPTY_KEY)
         exact(grid, (256,), args+(lower, upper, np.int32(n)))
         np.testing.assert_array_equal(best.get(), expected)
+
+    if sparse:
+        # Fused levels may observe different upper-bound snapshots. They must
+        # still preserve every exact winner, including ties and overflow paths.
+        seeds = [core.EMPTY_KEY]
+        if pattern != 'overflow':
+            seeds.append(int(expected[0]) & 0xffffffff00000000)
+        for seed in seeds:
+            lower.fill(cp.nan)
+            upper.fill(np.uint64(seed))
+            module.get_function('screenCascade4'+suffix)(
+                (len(block_map), n), (core.SCREEN_THREADS,),
+                screen_args+extra+tuple(cascade_certificates))
+            if pattern != 'overflow':
+                assert np.all(lower.get() <= delta[None, :])
+            best.fill(core.EMPTY_KEY)
+            exact(grid, (256,), args+(lower, upper, np.int32(n)))
+            np.testing.assert_array_equal(best.get(), expected)
+
     candidates = cp.full((n, n), -1, dtype=cp.int32)
     counts = cp.zeros(n, dtype=cp.int32)
     module.get_function('compactCandidates')(((n+255)//256, n), (256,),
@@ -314,6 +335,16 @@ def test_screen_bounds_cover_every_exact_candidate(g, pattern, cheap_bound):
         module.get_function(f'searchChi2PackedCompactedG{g}')(((maximum*g+255)//256, n), (256,),
             packed_args+(lower, upper, np.int32(n), candidates, counts, np.int32(n), weight[0]))
         np.testing.assert_array_equal(best.get(), expected)
+
+    if sparse:
+        # Every block exits after initialization when all durations are masked.
+        mask.fill(False)
+        lower.fill(cp.nan)
+        upper.fill(np.uint64(0x8000000000000000))
+        module.get_function('screenCascade4'+suffix)(
+            (len(block_map), n), (core.SCREEN_THREADS,),
+            screen_args+extra+tuple(cascade_certificates))
+        assert bool(cp.all(cp.isposinf(lower)))
 
 
 @pytest.mark.parametrize('tolerance', SCREEN_TOLERANCES)

@@ -33,7 +33,12 @@ def test_invalid_screening_tolerances(value):
 
 
 @pytest.mark.parametrize('weighted', [False, True])
-def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monkeypatch, weighted):
+@pytest.mark.parametrize('fused', [False, True])
+@pytest.mark.parametrize('cheap_bound', [False, True])
+def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monkeypatch, weighted, fused, cheap_bound):
+    # Force each execution path independently of workload-size performance gates.
+    monkeypatch.setattr(core, 'FUSED_SCREEN_MIN_POINTS', 0 if fused else 2**31)
+    monkeypatch.setattr(core, 'FUSED_SCREEN_MIN_PERIODS', 0)
     rng = np.random.default_rng(119)
     t = np.arange(9216, dtype=float) / 720
     phase = (t - 1.1 + 1.85) % 3.7 - 1.85
@@ -45,7 +50,10 @@ def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monk
     periods = np.unique(np.r_[np.geomspace(0.7, 6.3, 48), 3.7])
     expected = gtls(t, y, dy, verbose=False).power(periods=periods, screening_tolerances=())
     observed = []
-    loader = core.load_module
+    cascades = []
+    def loader():
+        return cp.RawModule(code=core.KERNEL_SOURCE.read_text(),
+                            options=(f'-DGTLS_CHEAP_SCREEN_BOUNDS={int(cheap_bound)}',))
 
     class CheckedModule:
         def __init__(self):
@@ -55,6 +63,8 @@ def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monk
             kernel = self.module.get_function(name)
 
             def call(grid, block, args):
+                if name.startswith('screenCascade4'):
+                    cascades.append(name)
                 if name.startswith('refineCandidates'):
                     widths, selected, block_map = args[6], args[7], args[22]
                     assert bool(cp.all(widths[selected[block_map[:, 0]]] >= core.MIN_WIDTH))
@@ -64,7 +74,7 @@ def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monk
             return call
 
     monkeypatch.setattr(core, 'load_module', CheckedModule)
-    for schedule in [None, (0.05,), (0.015, 0.00025)]:
+    for schedule in [None, (0.05,), (0.015, 0.00025), (0.04, 0.012, 0.004, 0.0003)]:
         actual = gtls(t, y, dy, verbose=False).power(periods=periods, screening_tolerances=schedule)
         for name, value in vars(expected).items():
             np.testing.assert_array_equal(np.ma.getdata(getattr(actual, name)), np.ma.getdata(value),
@@ -73,6 +83,7 @@ def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monk
                 np.testing.assert_array_equal(np.ma.getmaskarray(getattr(actual, name)),
                                               np.ma.getmaskarray(value))
     assert observed, 'The test must exercise actual refinement kernels'
+    assert bool(cascades) == fused
 
 
 @pytest.mark.parametrize('weighted', [False, True])

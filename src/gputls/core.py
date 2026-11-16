@@ -74,6 +74,8 @@ EMPTY_KEY = 0xFFFFFFFFFFFFFFFF
 SCAN_THREADS = 512  # threads per row of the integer scan kernels
 SCREEN_SCAN_THREADS = 32  # 16 samples per thread: a 512-point screening tile
 SCREEN_THREADS = 32  # nearby starts share prefix cache lines across durations
+FUSED_SCREEN_MIN_POINTS = 32768
+FUSED_SCREEN_MIN_PERIODS = 128
 MAX_BATCH = 65535  # periods are the y dimension of the kernel grids
 BATCHES_MIN = 30  # the first pass is split into at least this many batches
 MEMORY_FRACTION = 0.9  # share of the free device memory used by one batch
@@ -457,18 +459,24 @@ class GPUSearch:
             # Tight certificates only visit survivors of the preceding pass. All
             # passes reuse the same prefix and bound buffers; final FP32 evaluation
             # and tie ordering are unchanged.
-            for level, certificate in enumerate(self.screenCertificates[:self.screening_levels]):
+            certificates = self.screenCertificates[:self.screening_levels]
+            # Fusion avoids three complete grid launches, but costs more registers
+            # in the first pass. Small curves/batches retain the separate kernels.
+            fuse = (len(certificates) == 4 and tSize >= FUSED_SCREEN_MIN_POINTS
+                    and nPeriods >= FUSED_SCREEN_MIN_PERIODS)
+            for level, certificate in enumerate(certificates[:1] if fuse else certificates):
                 active_map = self.refineMapGPU if level else self.screenMapGPU
                 if len(active_map) == 0:
                     continue
-                kernel = "refineCandidates" if level else "screenCandidates"
+                kernel = "screenCascade4" if fuse else "refineCandidates" if level else "screenCandidates"
                 kernel += "UniformSparse" if self.uniformWeight is not None else "MappedSparse"
                 uniform_args = ((self.uniformSquareGPU, self.uniformWeight)
                                 if self.uniformWeight is not None else ())
                 module.get_function(kernel)(
                     (len(active_map), nPeriods), (SCREEN_THREADS,),
                     screen_before + certificate + screen_after
-                    + (active_map, self.screenBudgetsGPU) + uniform_args)
+                    + (active_map, self.screenBudgetsGPU) + uniform_args
+                    + (tuple(value for cert in certificates[1:] for value in cert) if fuse else ()))
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):

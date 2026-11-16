@@ -1081,8 +1081,8 @@ __device__ __forceinline__ float cheapScreenLower32(float amplitude, double az, 
     return finite && isfinite(a) ? low : -__int_as_float(0x7f800000);
 }
 
-template <bool Refine, bool Mapped = false, bool Uniform = false, int PrefixStride = 1>
-__device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr,
+template <bool Refine, bool Mapped = false, bool Uniform = false, int PrefixStride = 1, bool ReportAlive = false>
+__device__ __forceinline__ bool screenCandidatesImpl(SCREEN_ARGS, const int2* blockMap = nullptr, const double4* budgets = nullptr,
     const float* uniformSquare = nullptr, float uniformWeight = 0) {
     int period = blockIdx.y;
     int d = 0;
@@ -1102,6 +1102,7 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
     float earlierUpper = __uint_as_float(high >= 0x80000000u ? high ^ 0x80000000u : ~high);
     unsigned long long key = 0xffffffffffffffffull;
     int end = Mapped ? offsets[d+1] : count;
+    bool alive = false;
     if (item < end && (!Refine || !(lower[(long long)period*count+item] > earlierUpper))) {
         float lo = -__int_as_float(0x7f800000);
         if (!Mapped) while (offsets[d + 1] <= item) ++d;
@@ -1264,8 +1265,14 @@ __device__ __forceinline__ void screenCandidatesImpl(SCREEN_ARGS, const int2* bl
         // Every pass is independently conservative; retain the tighter lower bound.
         long long address = (long long)period*count+item;
         lower[address] = Refine ? fmaxf(lower[address], lo) : lo;
+        if (ReportAlive) alive = !(lower[address] > earlierUpper);
     }
     storeAdjacentBest(key, upperKeys, period);
+    // Used only by the one-warp fused kernel. Strict comparison preserves ties
+    // and nonfinite bounds. If all lanes are dead against this old upper bound,
+    // they remain dead against any later, tighter upper bound.
+    if (ReportAlive) return __any_sync(0xffffffff, alive);
+    return true;
 }
 
 extern "C" __global__ void screenCandidates(SCREEN_ARGS) {
@@ -1336,6 +1343,52 @@ extern "C" __global__ void refineCandidatesMappedSparse(SCREEN_ARGS, const int2*
         selected, offsets, strides, lanes, mask, positions, coefficients, metadata,
         absMassError, weightMassError, nSelected, nDurations, tSize, size, depthMin, blockMap, budgets);
 }
+
+// Keep a candidate block on the GPU through all four certificates. There is no
+// grid-wide barrier between levels: a stale upper bound can only retain extra
+// work because upperKeys decreases monotonically and every level is certified
+// independently. Exact evaluation still runs after this whole kernel completes.
+#define CASCADE_CERT_ARGS \
+    const int* p1, const double2* c1, const double* m1, double a1, double w1, \
+    const int* p2, const double2* c2, const double* m2, double a2, double w2, \
+    const int* p3, const double2* c3, const double* m3, double a3, double w3
+#define CASCADE_CERT_VALUES p1,c1,m1,a1,w1,p2,c2,m2,a2,w2,p3,c3,m3,a3,w3
+#define SCREEN_DATA_VALUES \
+    lower,upperKeys,prefix,residual,invScale,overshoot,widths,selected,offsets,strides,lanes,mask
+#define SCREEN_BASE_VALUES \
+    SCREEN_DATA_VALUES,positions,coefficients,metadata,absMassError,weightMassError, \
+    nSelected,nDurations,tSize,size,depthMin
+#define CASCADE_TAIL \
+    nSelected,nDurations,tSize,size,depthMin,blockMap,budgets,uniformSquare,uniformWeight
+
+template<bool Uniform, int PrefixStride>
+__device__ __forceinline__ void screenCascade4Impl(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight, CASCADE_CERT_ARGS) {
+    if (!screenCandidatesImpl<false,true,Uniform,PrefixStride,true>(
+        SCREEN_DATA_VALUES,positions,coefficients,metadata,absMassError,weightMassError,CASCADE_TAIL)) return;
+    // Short templates have no certificate; their first-pass geometry checks
+    // initialized lower, and the remaining levels cannot improve it.
+    if (widths[selected[blockMap[blockIdx.x].x]]<512) return;
+    if (!screenCandidatesImpl<true,true,Uniform,PrefixStride,true>(SCREEN_DATA_VALUES,p1,c1,m1,a1,w1,CASCADE_TAIL)) return;
+    if (!screenCandidatesImpl<true,true,Uniform,PrefixStride,true>(SCREEN_DATA_VALUES,p2,c2,m2,a2,w2,CASCADE_TAIL)) return;
+    screenCandidatesImpl<true,true,Uniform,PrefixStride>(SCREEN_DATA_VALUES,p3,c3,m3,a3,w3,CASCADE_TAIL);
+}
+
+extern "C" __global__ void screenCascade4UniformSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, const float* uniformSquare, float uniformWeight, CASCADE_CERT_ARGS) {
+    screenCascade4Impl<true,16>(SCREEN_BASE_VALUES,blockMap,budgets,uniformSquare,uniformWeight,
+                                CASCADE_CERT_VALUES);
+}
+
+extern "C" __global__ void screenCascade4MappedSparse(SCREEN_ARGS, const int2* blockMap,
+    const double4* budgets, CASCADE_CERT_ARGS) {
+    screenCascade4Impl<false,8>(SCREEN_BASE_VALUES,blockMap,budgets,nullptr,0,CASCADE_CERT_VALUES);
+}
+#undef CASCADE_TAIL
+#undef SCREEN_BASE_VALUES
+#undef SCREEN_DATA_VALUES
+#undef CASCADE_CERT_VALUES
+#undef CASCADE_CERT_ARGS
 #undef SCREEN_ARGS
 
 #define SCREENED_EXACT(G) \
