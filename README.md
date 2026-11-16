@@ -12,6 +12,13 @@ in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 
 ## Features
 
+Version 2.2.5 adds online selection of screening cascade lengths with
+`screening_policy="auto"`, and fuses four-level screening on larger workloads
+with early termination of fully pruned candidate blocks. Conservative bounds,
+exact candidate evaluation, and tie ordering are preserved. Sliding-window
+noise statistics use the GPU on supported inputs. The TLS-compatible `snr` and
+`snrPink` fields remain; `snrFit` and `snrFitPink` have been removed.
+
 Version 2.2.4 aligns the final candidate's epoch fit and duration conversion
 with TLS2 2.0.4. The reported transit times and noise statistics now use those
 windows. This adds one CPU epoch fit after the GPU search; periodograms and
