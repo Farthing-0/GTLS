@@ -93,6 +93,21 @@ def validate_args(self, kwargs):
 
     self.T0_fit_margin = kwargs.get("T0_fit_margin", constants.T0_FIT_MARGIN)
     self.T0_refine_margin = kwargs.get("T0_refine_margin", constants.T0_REFINE_MARGIN)
+    self.screening_tolerances = kwargs.get("screening_tolerances")
+    self.screening_policy = kwargs.get("screening_policy", "fixed")
+    if self.screening_policy not in ("fixed", "auto"):
+        raise ValueError("screening_policy must be 'fixed' or 'auto'")
+    if self.screening_policy == "auto" and self.screening_tolerances is not None:
+        raise ValueError("screening_policy='auto' cannot be combined with screening_tolerances")
+    if self.screening_tolerances is not None:
+        try:
+            tolerances = numpy.asarray(self.screening_tolerances, dtype=float)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("screening_tolerances must be a decreasing sequence of positive finite values") from exc
+        if (tolerances.ndim != 1 or not numpy.all(numpy.isfinite(tolerances))
+                or numpy.any(tolerances <= 0) or numpy.any(numpy.diff(tolerances) >= 0)):
+            raise ValueError("screening_tolerances must be a decreasing sequence of positive finite values")
+        self.screening_tolerances = tuple(float(value) for value in tolerances)
 
     # If an impact parameter is given, it overrules the supplied inclination
     if "b" in kwargs:

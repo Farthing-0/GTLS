@@ -188,9 +188,10 @@ def pink_noise(data, width, window_std=None):
         # Bound the temporary memory of np.std to about 2**22 values per chunk
         chunk = max(1, 2 ** 22 // width)
         if (window_std is not None and 4096 <= datapoints <= np.iinfo(np.int32).max
-                and width <= 256 and isinstance(data, np.ndarray)
+                and width <= 1024 and isinstance(data, np.ndarray)
                 and data.ndim == 1 and data.dtype == np.float64 and np.all(np.isfinite(data))):
-            # The GPU preserves NumPy's per-window pairwise sum order. Retain
+            # windowStd's four-level tree covers widths through 1024, retaining
+            # NumPy's per-window pairwise sum order. Retain
             # the original CPU chunk reductions, including their boundaries.
             deviations = window_std(data, width)
             for i in range(0, datapoints, chunk):

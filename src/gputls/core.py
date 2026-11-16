@@ -1,4 +1,5 @@
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from .stats import (all_transit_times, calculate_transit_duration_in_days, final
                     intransit_stats, snr_stats, spectra)
 from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
                         bytes_per_period as workspace_bytes_per_period)
+from .screening_policy import BatchScreeningPolicy
 
 KERNEL_SOURCE = Path(__file__).with_name("kernels.cu")
 
@@ -169,7 +171,8 @@ class GPUSearch:
 
     def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
                  T0_refine_margin, R_star_min=constants.R_STAR_MIN, R_star_max=constants.R_STAR_MAX,
-                 M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX):
+                 M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX,
+                 screening_tolerances=None, screening_policy="fixed"):
         self.module = module
         self.t = t
         self.T0_fit_margin = T0_fit_margin
@@ -229,7 +232,12 @@ class GPUSearch:
 
         # Screening is useful for long templates and a sampled start grid. The final
         # every-point fit and small curves retain the adjacent-window path.
-        self.screening = (self.tSize >= 8192 and self.maxWidth >= MIN_WIDTH
+        tolerances = SCREEN_TOLERANCES if screening_tolerances is None else screening_tolerances
+        self.screening_tolerances = tuple(tolerances)
+        self.auto_screening = (BatchScreeningPolicy(len(tolerances), self.tSize)
+                               if screening_policy == "auto" else None)
+        self.screening_levels = len(tolerances)
+        self.screening = (bool(tolerances) and self.tSize >= 8192 and self.maxWidth >= MIN_WIDTH
                           and min(T0_fit_margin, T0_refine_margin) > 0)
         self.uniformWeight = None
         self.screenPrefixStride = 1
@@ -256,7 +264,7 @@ class GPUSearch:
             prefix_maxima = (np.array([max_z, max_w]) if point_error is None else
                              np.nextafter(np.array([max_z, max_w])+point_error, np.inf))
             self.screenCertificates = []
-            for tolerance in SCREEN_TOLERANCES:
+            for tolerance in tolerances:
                 pos, coef, meta, mass_error = certificates(
                     signal, durations, max_z, max_w, certificateSize, tolerance, point_error)
                 if self.uniformWeight is not None:
@@ -270,6 +278,7 @@ class GPUSearch:
         self.workspace = None
         self.screenMapKey = None
         self.screenMapGPU = None
+        self.refineMapGPU = None
         self.screenBudgetsGPU = None
         self.uniformSquareGPU = (cp.empty(len(self.durations), dtype=cp.float32)
                                  if self.uniformWeight is not None else None)
@@ -395,7 +404,13 @@ class GPUSearch:
             mapKey = (tuple(selected), tuple(strides))
             lanesGPU = cp.asarray(lanes)
             if mapKey != self.screenMapKey:
-                self.screenMapGPU = cp.asarray(screen_block_map(offsets, strides))
+                screen_map = screen_block_map(offsets, strides)
+                self.screenMapGPU = cp.asarray(screen_map)
+                # Short templates have no certificate at any level. Their first-pass
+                # geometry/depth checks remain necessary, but later passes cannot
+                # tighten -inf or improve an upper bound. Skip those blocks entirely.
+                self.refineMapGPU = cp.asarray(
+                    screen_map[self.durations[selected[screen_map[:, 0]]] >= MIN_WIDTH])
                 if self.screenBudgetsGPU is None:
                     self.screenBudgetsGPU = cp.empty((3*len(self.durations), 4), dtype=cp.float64)
                 module.get_function("prepareScreenBudgetsUniformSparse" if packed else "prepareScreenBudgetsSparse")(
@@ -442,15 +457,18 @@ class GPUSearch:
             # Tight certificates only visit survivors of the preceding pass. All
             # passes reuse the same prefix and bound buffers; final FP32 evaluation
             # and tie ordering are unchanged.
-            for level, certificate in enumerate(self.screenCertificates):
+            for level, certificate in enumerate(self.screenCertificates[:self.screening_levels]):
+                active_map = self.refineMapGPU if level else self.screenMapGPU
+                if len(active_map) == 0:
+                    continue
                 kernel = "refineCandidates" if level else "screenCandidates"
                 kernel += "UniformSparse" if self.uniformWeight is not None else "MappedSparse"
                 uniform_args = ((self.uniformSquareGPU, self.uniformWeight)
                                 if self.uniformWeight is not None else ())
                 module.get_function(kernel)(
-                    (len(self.screenMapGPU), nPeriods), (SCREEN_THREADS,),
+                    (len(active_map), nPeriods), (SCREEN_THREADS,),
                     screen_before + certificate + screen_after
-                    + (self.screenMapGPU, self.screenBudgetsGPU) + uniform_args)
+                    + (active_map, self.screenBudgetsGPU) + uniform_args)
             del prefixGPU
         yBegin = 0
         while yBegin < len(selected):
@@ -494,6 +512,71 @@ class GPUSearch:
         return bestGPU
 
     def chi2_batch(self, periods, size, refine):
+        policy = self.auto_screening
+        if policy is None or not self.screening:
+            return self._chi2_batch(periods, size, refine)
+        group = policy.group(periods)
+        # The two small candidate/alias passes cannot amortize a new pilot.
+        # Reuse a measured group or conservatively use the first screening pass.
+        if not refine and group not in policy.decisions:
+            if len(periods) >= 4 * policy.levels:
+                return self._calibrate_screening(periods, group)
+            # Tiny batches cannot amortize extra dispatches; use the first pass.
+            policy.decisions[group] = 1
+        levels = policy.decisions.get(group, 1)
+        policy.record_batch(group, levels, periods, refine)
+        previous = self.screening_levels
+        self.screening_levels = levels
+        try:
+            return self._chi2_batch(periods, size, refine)
+        finally:
+            self.screening_levels = previous
+
+    def _calibrate_screening(self, periods, group):
+        """Calibrate on disjoint parts of a real batch and return their results.
+
+        Strided partitions span the same period interval. Each requested period
+        is evaluated exactly once; calibration adds dispatches, not trial periods.
+        """
+        policy = self.auto_screening
+        started = time.perf_counter()
+        periods = np.asarray(periods)
+        # Allocate the production capacity once, outside competing trial timers.
+        # Otherwise the first subset pays for allocation and the following full
+        # batch reallocates a second, larger workspace. Both bias calibration.
+        self.reserve_workspace(len(periods))
+        result = np.empty(len(periods), dtype=np.float32)
+        timings = {level: [] for level in range(1, policy.levels+1)}
+        trials = []
+        previous = self.screening_levels
+        try:
+            # Rotate execution order across groups; do not systematically charge
+            # the first schedule for allocator/cache effects.
+            order = list(timings)
+            offset = group % len(order)
+            order = order[offset:] + order[:offset]
+            for level in order:
+                indices = np.arange(level-1, len(periods), policy.levels)
+                sample = periods[indices]
+                self.screening_levels = level
+                begin = time.perf_counter()
+                result[indices] = self._chi2_batch(sample, len(sample), False)
+                elapsed = time.perf_counter()-begin
+                timings[level].append(elapsed/len(sample))
+                trials.append(dict(levels=level, periods=len(sample), seconds=elapsed))
+        finally:
+            self.screening_levels = previous
+        levels = policy.choose(timings)
+        policy.decisions[group] = levels
+        for level in order:
+            policy.record_batch(group, level, periods[level-1::policy.levels], False)
+        policy.calibrations.append(dict(group=group, levels=levels, evaluated_periods=len(periods),
+            seconds_per_period=timings, trials=trials, extra_dispatches=policy.levels-1,
+            redundant_periods=0, wall_seconds=time.perf_counter()-started,
+            period_min=float(periods.min()), period_max=float(periods.max())))
+        return result
+
+    def _chi2_batch(self, periods, size, refine):
         """Lowest chi2 of each period of one batch, using its actual length.
 
         Each period is searched over its own plausible durations only, so results depend
@@ -643,14 +726,23 @@ def search_multi_periods(
     R_star_max=constants.R_STAR_MAX,
     M_star_min=constants.M_STAR_MIN,
     M_star_max=constants.M_STAR_MAX,
+    screening_tolerances=None,
+    screening_policy="fixed",
+    screening_diagnostics=None,
 ):
     set_cuda_device(GPUDeviceIDs[0])
     search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, T0_refine_margin, t, y, dy, transit_depth_min,
                             lc_arr, lc_cache_overview, R_star_min=R_star_min, R_star_max=R_star_max,
-                            M_star_min=M_star_min, M_star_max=M_star_max)
+                            M_star_min=M_star_min, M_star_max=M_star_max,
+                            screening_tolerances=screening_tolerances, screening_policy=screening_policy)
     try:
         return _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location)
     finally:
+        if screening_diagnostics is not None:
+            screening_diagnostics.update(policy=screening_policy, devices=[
+                dict(device_id=device_id, enabled=s.screening, tolerances=list(s.screening_tolerances),
+                     **(s.auto_screening.summary() if s.auto_screening is not None else {}))
+                for device_id, s in zip(search.device_ids, search.searches)])
         search.close()
 
 
@@ -703,10 +795,10 @@ def _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbos
     period = periods[periodIndex]
 
     rawDuration, durationPointsNum, transit_duration_in_days, transitDepth, T0, transit_times, \
-        snr, snr_pink, snrFit, snrFitPink = search_single_period(search.primary, period, t, y, dy)
+        snr, snr_pink = search_single_period(search.primary, period, t, y, dy)
 
     return periods, period, rawDuration, durationPointsNum, transit_duration_in_days, transitDepth, T0, \
-        SDE, chi2, transit_times, power, snr, snr_pink, snrFit, snrFitPink, raw_power, raw_chi2, \
+        SDE, chi2, transit_times, power, snr, snr_pink, raw_power, raw_chi2, \
         possiblePeriodsIndices, possiblePeriods
 
 
@@ -738,22 +830,11 @@ def search_single_period(search, period, t, y, dy):
     overshoot = single_lc_cache_overview["overshoot"][durationIndex]
     transitDepth = ((1 - transitMean) * overshoot).item()
 
-    dataOutTransit = np.concatenate((bestFlux[0:bestRowT0], bestFlux[bestRowT0 + durationPointsNum:]))
-
-    whiteNoise = np.std(dataOutTransit)
-    snrFit = transitDepth * (durationPointsNum ** 0.5) / whiteNoise
-    DataCumsum = np.cumsum(dataOutTransit)
-    DataSlideAvg = (DataCumsum[durationPointsNum:] - DataCumsum[:-durationPointsNum]) / durationPointsNum
-    redNoise = np.std(DataSlideAvg)
-
     # Keep the GPU-selected template/depth, but fit its epoch and convert its
     # duration with TLS2's final-candidate conventions. The periodogram is fixed.
     signal = search.lc_arr[durationsBool][durationIndex]
     T0 = final_T0_fit(signal, 1 - transitDepth, t, y, dy, period, search.T0_fit_margin)
     transit_times = np.asarray(all_transit_times(T0, t, period))
-
-    snrFitPink = transitDepth / (
-        (whiteNoise ** 2 / (durationPointsNum)) + (redNoise ** 2 / (len(transit_times)))) ** 0.5
 
     transit_duration_in_days = calculate_transit_duration_in_days(t, period, transit_times, rawDuration)
 
@@ -782,4 +863,4 @@ def search_single_period(search, period, t, y, dy):
     snr_pink = np.mean(snr_pink_per_transit) * (len(transit_times) ** (0.5))
 
     return rawDuration, durationPointsNum, transit_duration_in_days, transitDepth, T0, transit_times, \
-        snr, snr_pink, snrFit, snrFitPink
+        snr, snr_pink

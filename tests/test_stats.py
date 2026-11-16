@@ -42,7 +42,9 @@ def test_gpu_window_std_matches_numpy_at_pairwise_split_boundaries(pattern):
         data.fill(.3)
     source = cp.asarray(data)
     kernel = core.load_module().get_function('windowStd')
-    for width in [1, 7, 8, 9, 64, 125, 128, 129, 248, 249, 255, 256]:
+    for width in [1, 7, 8, 9, 64, 125, 128, 129, 248, 249, 255, 256,
+                  257, 263, 264, 384, 495, 496, 503, 504, 511, 512, 513,
+                  520, 584, 1015, 1016, 1023, 1024]:
         count = len(data) - width + 1
         output = cp.empty(count, cp.float64)
         kernel(((count+255)//256,), (256,), (source, output, np.int32(count), np.int32(width)))
@@ -50,9 +52,10 @@ def test_gpu_window_std_matches_numpy_at_pairwise_split_boundaries(pattern):
         assert output.get().tobytes() == expected.tobytes(), (pattern, width)
 
 
-def test_pink_noise_reuses_workspace_and_original_outer_chunk_reductions():
+@pytest.mark.parametrize('width', [125, 257, 584, 1024])
+def test_pink_noise_reuses_workspace_and_original_outer_chunk_reductions(width):
     data = 1 + np.random.default_rng(56378).normal(0, .01, 70000)
-    width = 125  # More than two original chunks.
+    # More than two original chunks, including the wider short-cadence windows.
     module = core.load_module()
     module.get_function('windowStd')
     search = SimpleNamespace(tGPU=cp.empty(1), module=module,
@@ -65,7 +68,10 @@ def test_pink_noise_reuses_workspace_and_original_outer_chunk_reductions():
         def alloc_postprocess(self, device_id, mem_size, mem_ptr):
             self.sizes.append(mem_size)
 
+    calls = []
+
     def window_std(values, width):
+        calls.append(width)
         with Allocations() as allocations:
             result = core.GPUSearch.window_standard_deviations(search, values, width)
         assert not allocations.sizes
@@ -73,4 +79,16 @@ def test_pink_noise_reuses_workspace_and_original_outer_chunk_reductions():
 
     expected = stats.pink_noise(data, width)
     actual = stats.pink_noise(data, width, window_std)
+    assert calls == [width]
+    assert np.asarray(actual).tobytes() == np.asarray(expected).tobytes()
+
+
+def test_pink_noise_keeps_cpu_fallback_above_gpu_width_limit():
+    data = 1 + np.random.default_rng(81).normal(0, .001, 6000)
+
+    def unsupported(*args):
+        pytest.fail('A window wider than 1024 must use the CPU fallback')
+
+    expected = stats.pink_noise(data, 1025)
+    actual = stats.pink_noise(data, 1025, unsupported)
     assert np.asarray(actual).tobytes() == np.asarray(expected).tobytes()

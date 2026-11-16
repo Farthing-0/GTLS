@@ -100,10 +100,26 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `transit_template` | `"default"` | `"default"`, `"grazing"` or `"box"` |
 | `T0_fit_margin` | `0.01` | Epoch step of the coarse search as a fraction of the duration (0 to 0.125; 0 tests every cadence) |
 | `T0_refine_margin` | `0.01` | Epoch step when the strongest peaks are re-searched, as a fraction of the duration (0 to 0.125; 0 tests every cadence). 0.01 is the T0 resolution of TLS |
+| `screening_tolerances` | `None` | Optional strictly decreasing positive certificate tolerances. `None` uses `(0.05, 0.015, 0.005, 0.00025)`; `(0.05,)` uses one pass; `()` disables screening. Controls pruning cost, not the search grid or final statistic. The best schedule depends on the data and GPU |
+| `screening_policy` | `"fixed"` | `"auto"` measures 1–4 leading levels of the standard cascade per period band and device, then reuses the chosen length. Cannot be combined with explicit `screening_tolerances`. Calibration is included in the search and may outweigh savings on short searches; `"fixed"` retains the behavior above |
 | `GPUDeviceID` | `0` | CUDA device to run on |
 | `GPUDeviceIDs` | `None` | List of CUDA devices to split the search across (e.g. `[0, 1]`); overrides `GPUDeviceID`. Results are identical to a single-GPU run |
 | `bar_location` | `0` | Position of the progress bar, useful when running several searches in parallel |
 | `fast` | `False` | Return only `(periods, power)`, skipping the refinement and transit statistics |
+
+With `screening_policy="auto"`, `model.screening_diagnostics` records the choices
+and calibration batches for that call. Each calibration batch is split into four
+interleaved subsets covering a similar period range; every period is evaluated
+once. The policy compares wall time per period and prefers fewer levels within
+5% of the fastest measurement. Period bands span factors of 32 for fewer than
+32,768 samples and factors of 8 for larger curves. Small batches (fewer than 16
+periods) use one level without calibration; candidate refinement reuses a known
+band or uses one level. Existing screening eligibility checks still apply.
+`calibration_seconds` measures the entire calibration batches, including useful
+search work, not just incremental overhead. It is already included in total
+search time. Decisions are local to each search and device; no offline timing
+table or previous curve's decisions are reused. Auto selects cascade prefixes,
+not arbitrary new tolerance values, and does not guarantee the fastest policy.
 
 ### Results
 
@@ -117,13 +133,17 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `depth` | Fractional transit depth (`1 - in-transit flux`). Note: TLS reports the in-transit flux level instead |
 | `SDE` | Signal Detection Efficiency of the best period |
 | `snr`, `snrPink` | Signal-to-noise ratio with white and pink (correlated) noise |
-| `snrFit`, `snrFitPink` | Signal-to-noise ratio from the fitted transit depth |
 | `transitTimes` | Mid-transit times within the light curve |
 | `periods`, `power` | Periodogram: trial periods and SDE power |
 | `chi2` | Minimum chi² of each period after refinement |
 | `raw_chi2`, `raw_power` | Minimum chi² and power of the coarse search, before refinement |
 | `possiblePeriods`, `possiblePeriodsIndices` | Periods that were refined, and their indices in `periods` |
 | `rawDuration`, `rawDurations`, `durationPoints` | Best duration as a fraction of the period, the duration grid, and the best duration in data points |
+
+`snrPink` uses GPU window standard deviations for finite `float64` inputs with
+at least 4096 windows and window widths up to 1024 points. Wider windows and
+other unsupported inputs retain the CPU path. The GPU reduction preserves
+NumPy's summation order, including the final CPU chunk reductions.
 
 ## Examples
 

@@ -134,6 +134,8 @@ VALID_PARAMETERS = [
     "oversampling_factor",
     "T0_fit_margin",
     "T0_refine_margin",
+    "screening_tolerances",
+    "screening_policy",
     "use_threads",
     "show_progress_bar",
     "transit_template",

@@ -59,6 +59,7 @@ def test_adjacent_keys_match_direct(g, q, zero_template):
 def test_tail_uses_only_valid_periods(monkeypatch):
     """A large planned capacity must not launch duplicate periods in a short tail."""
     search = object.__new__(core.GPUSearch)
+    search.auto_screening = None
     search.constant_residual = 1.0
     seen = []
 

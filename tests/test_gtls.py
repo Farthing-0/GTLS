@@ -48,6 +48,8 @@ def test_synthetic_injection_recovery():
     assert abs(result.T0 - TRUE_T0) < 0.02
     assert 0.008 < result.depth < 0.015
     assert result.SDE > 20
+    assert np.isfinite(result.snr) and np.isfinite(result.snrPink)
+    assert not {'snrFit', 'snrFitPink'} & vars(result).keys()
 
     # The search must be deterministic
     again = gtls(t, y, verbose=False).power(GPUDeviceID=GPU_DEVICE)

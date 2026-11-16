@@ -1428,23 +1428,28 @@ __device__ __forceinline__ double windowStdLeaf(const double *x, int n, double m
     for (;i<n;++i) result=__dadd_rn(result,windowStdValue<Squared>(x,i,mean));
     return result;
 }
-template<bool Squared>
-__device__ __forceinline__ double windowStdMiddle(const double *x, int n, double mean) {
-    if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
-    int half=(n/2)&~7;
-    return __dadd_rn(windowStdLeaf<Squared>(x,half,mean),windowStdLeaf<Squared>(x+half,n-half,mean));
-}
-template<bool Squared>
-__device__ __forceinline__ double windowStdPairwise(const double *x, int n, double mean) {
-    if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
-    int half=(n/2)&~7;
-    return __dadd_rn(windowStdMiddle<Squared>(x,half,mean),windowStdMiddle<Squared>(x+half,n-half,mean));
-}
+// Four splits cover all widths through 1024, including uneven splits rounded
+// down to a multiple of eight (e.g. 1023 -> 504 + 519). Every leaf must be <=128;
+// truncating the tree based only on a power-of-two width changes rounding.
+// Keep this limit in sync with the GPU eligibility check in stats.pink_noise.
+template<bool Squared, int Depth> struct WindowStdTree {
+    __device__ __forceinline__ static double sum(const double *x, int n, double mean) {
+        if (n<=128) return windowStdLeaf<Squared>(x,n,mean);
+        int half=(n/2)&~7;
+        return __dadd_rn(WindowStdTree<Squared,Depth-1>::sum(x,half,mean),
+                        WindowStdTree<Squared,Depth-1>::sum(x+half,n-half,mean));
+    }
+};
+template<bool Squared> struct WindowStdTree<Squared,0> {
+    __device__ __forceinline__ static double sum(const double *x, int n, double mean) {
+        return windowStdLeaf<Squared>(x,n,mean);
+    }
+};
 extern "C" __global__ void windowStd(const double *x,double *out,int count,int width) {
     int i=blockIdx.x*blockDim.x+threadIdx.x;
     if(i>=count) return;
-    double mean=__ddiv_rn(windowStdPairwise<false>(x+i,width,0.),double(width));
-    double variance=__ddiv_rn(windowStdPairwise<true>(x+i,width,mean),double(width));
+    double mean=__ddiv_rn(WindowStdTree<false,4>::sum(x+i,width,0.),double(width));
+    double variance=__ddiv_rn(WindowStdTree<true,4>::sum(x+i,width,mean),double(width));
     out[i]=__dsqrt_rn(variance);
 }
 

@@ -30,7 +30,16 @@ class gtls(object):
         Accepts the TLS keyword arguments (``period_min``, ``period_max``, ``periods``,
         ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``T0_refine_margin``, ``GPUDeviceID``,
         ``GPUDeviceIDs`` (list of devices to split the search across), ``bar_location``
-        and ``fast`` (return only ``(periods, power)``).
+        and ``fast`` (return only ``(periods, power)``). ``screening_tolerances``
+        optionally selects a decreasing sequence of positive certificate tolerances;
+        ``None`` uses the standard cascade and ``()`` disables screening. These
+        tolerances affect pruning work, not the final statistic or search grid.
+        ``screening_policy="auto"`` chooses a prefix of the standard cascade
+        using timed, disjoint parts of a production batch in each period band.
+        It cannot be combined with explicit ``screening_tolerances``. The default
+        policy is ``"fixed"``. Per-call timing and choices are available in
+        ``self.screening_diagnostics``; calibration time includes useful search
+        work and is already part of the total search time.
         """
         self, kwargs = validate_args(self, kwargs)
 
@@ -92,6 +101,7 @@ class gtls(object):
 
         periods = np.sort(periods)
 
+        self.screening_diagnostics = {}
         result = core.search_multi_periods(
             periods=periods,
             t=self.t,
@@ -111,17 +121,20 @@ class gtls(object):
             R_star_max=self.R_star_max,
             M_star_min=self.M_star_min,
             M_star_max=self.M_star_max,
+            screening_tolerances=self.screening_tolerances,
+            screening_policy=self.screening_policy,
+            screening_diagnostics=self.screening_diagnostics,
         )
         if self.fast:
             return result
 
         self.periods, self.period, self.rawDuration, durationPoints, self.duration, self.Depth, self.bestT0, \
-            SDE, chi2, self.transitTimes, power, snr, snrPink, snrFit, snrFitPink, raw_power, raw_chi2, \
+            SDE, chi2, self.transitTimes, power, snr, snrPink, raw_power, raw_chi2, \
             possiblePeriodsIndices, possiblePeriods = result
         self.rawDurations = durations
         return gtlsResult(self.periods, self.period, self.rawDuration, durationPoints, durations, self.duration,
-                          self.Depth, self.bestT0, SDE, chi2, self.transitTimes, power, snr, snrPink, snrFit,
-                          snrFitPink, raw_power, raw_chi2, possiblePeriodsIndices, possiblePeriods)
+                          self.Depth, self.bestT0, SDE, chi2, self.transitTimes, power, snr, snrPink,
+                          raw_power, raw_chi2, possiblePeriodsIndices, possiblePeriods)
 
     # Useful tools
 
