@@ -48,7 +48,8 @@ def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monk
         dy *= np.exp(rng.normal(0, 0.15, len(t)))
     y = 1 - 0.002 * shape + rng.normal(0, dy)
     periods = np.unique(np.r_[np.geomspace(0.7, 6.3, 48), 3.7])
-    expected = gtls(t, y, dy, verbose=False).power(periods=periods, screening_tolerances=())
+    # Exercise the complete exact-template cascade, including the longest rows.
+    expected = gtls(t, y, dy, verbose=False).power(periods=periods, screening_tolerances=(), backend="fused")
     observed = []
     cascades = []
     def loader():
@@ -75,7 +76,7 @@ def test_screening_schedules_preserve_all_results_and_skip_short_refinement(monk
 
     monkeypatch.setattr(core, 'load_module', CheckedModule)
     for schedule in [None, (0.05,), (0.015, 0.00025), (0.04, 0.012, 0.004, 0.0003)]:
-        actual = gtls(t, y, dy, verbose=False).power(periods=periods, screening_tolerances=schedule)
+        actual = gtls(t, y, dy, verbose=False).power(periods=periods, screening_tolerances=schedule, backend="fused")
         for name, value in vars(expected).items():
             np.testing.assert_array_equal(np.ma.getdata(getattr(actual, name)), np.ma.getdata(value),
                                           err_msg=f'{name}, schedule={schedule}, weighted={weighted}')

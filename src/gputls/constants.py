@@ -107,6 +107,7 @@ BAR_LOCATION = 0
 # Warn the user if unknown **kwargs are given as parameters.
 # "use_threads", "show_progress_bar" and "verbose" are accepted for TLS compatibility but ignored.
 VALID_PARAMETERS = [
+    "backend",
     "R_star",
     "R_star_min",
     "R_star_max",

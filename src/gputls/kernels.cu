@@ -858,6 +858,134 @@ extern "C" __global__ void scanScreeningUniformPacked(const float2* weighted, do
     scanScreeningUniformImpl<true>(weighted, prefix, size);
 }
 
+// Centered double prefixes for the TLS2 piecewise-linear correlation. Stored
+// entry q corresponds to TLS2's exclusive double-prefix entry q + 2.
+extern "C" __global__ void scanApproximateTemplates(const float2* weighted, double* prefix,
+        int size, int packed, int uniform, double meanResidual, double meanWeight) {
+    constexpr int ITEMS = 16;
+    int components = uniform ? 1 : 2;
+    long long source = (long long)blockIdx.x * size;
+    double* row = prefix + source * components;
+    double carryZ = 0., carryW = 0., carryDZ = 0., carryDW = 0.;
+    for (int tile = 0; tile < size; tile += ITEMS * blockDim.x) {
+        int begin = tile + ITEMS * threadIdx.x;
+        double dz[ITEMS], dw[ITEMS], z = 0., w = 0., zz = 0., ww = 0.;
+        #pragma unroll
+        for (int i = 0; i < ITEMS; ++i) {
+            if (begin + i < size) {
+                long long index = source + begin + i;
+                z += (packed ? ((const float*)weighted)[index] : weighted[index].x) - meanResidual;
+                if (!uniform) w += packed ? 0. : weighted[index].y - meanWeight;
+            }
+            zz += z;
+            ww += w;
+            dz[i] = zz;
+            dw[i] = ww;
+        }
+        double zTotal, wTotal = 0., dzTotal, dwTotal = 0.;
+        double beforeZ = carryZ + (warpInclusiveScan(z, &zTotal) - z);
+        double blockDZ = zz + ITEMS * beforeZ;
+        double beforeDZ = carryDZ + (warpInclusiveScan(blockDZ, &dzTotal) - blockDZ);
+        double beforeW = 0., beforeDW = 0.;
+        if (!uniform) {
+            beforeW = carryW + (warpInclusiveScan(w, &wTotal) - w);
+            double blockDW = ww + ITEMS * beforeW;
+            beforeDW = carryDW + (warpInclusiveScan(blockDW, &dwTotal) - blockDW);
+        }
+        #pragma unroll
+        for (int i = 0; i < ITEMS; ++i) {
+            if (begin + i < size) {
+                long long index = (long long)(begin + i) * components;
+                row[index] = beforeDZ + dz[i] + (i + 1) * beforeZ;
+                if (!uniform) row[index + 1] = beforeDW + dw[i] + (i + 1) * beforeW;
+            }
+        }
+        carryZ += zTotal;
+        carryW += wTotal;
+        carryDZ += dzTotal;
+        carryDW += dwTotal;
+    }
+}
+
+__device__ __forceinline__ double scoringPrefix(const double* prefix, int index, int components, int channel) {
+    return index >= 0 ? prefix[(long long)index * components + channel] : 0.;
+}
+
+__device__ __forceinline__ double templateCorrelation(const double* prefix, const int* positions,
+        const double* coefficients, int count, int start, int components, int channel) {
+    double sum = 0.;
+    for (int i = 0; i < count; ++i) {
+        int index = start + positions[i] - 2;
+        sum = fma(coefficients[i], scoringPrefix(prefix, index, components, channel), sum);
+    }
+    return sum;
+}
+
+extern "C" __global__ void remapTemplateKeys(unsigned long long* best, const int* selected,
+        int n, int nPeriods) {
+    int period = blockIdx.x * blockDim.x + threadIdx.x;
+    if (period < nPeriods && best[period] != 0xffffffffffffffffull) {
+        unsigned int location = (unsigned int)best[period];
+        unsigned int global = (unsigned int)selected[location / n] * n + location % n;
+        best[period] = (best[period] & 0xffffffff00000000ull) | global;
+    }
+}
+
+extern "C" __global__ void searchApproximateTemplates(unsigned long long* best, const bool* periodMask,
+        const long long* cumulative, const double* prefix, const int4* metadata, const double4* sums,
+        const int* positions, const double* coefficients, const int* widths, const float* overshoot,
+        const int* selected, const int* offsets, const int* strides, int nSelected, int nDurations,
+        int n, int size, int uniform, int meanSquareWeight, float invScale, float depthMin,
+        double meanResidual, double meanWeight) {
+    int period = blockIdx.y;
+    int item = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long key = 0xffffffffffffffffull;
+    if (item < offsets[nSelected]) {
+        int row = 0;
+        while (item >= offsets[row + 1]) ++row;
+        int duration = selected[row];
+        if (periodMask[(long long)period * nDurations + duration]) {
+            int start = (item - offsets[row]) * strides[row];
+            int width = widths[duration];
+            const long long* residual = cumulative + (long long)period * size;
+            long long sum = residual[start + width - 1] - (start ? residual[start - 1] : 0);
+            double depth = (double)sum * invScale / width;
+            if (depth > depthMin) {
+                int4 meta = metadata[duration];
+                double4 totals = sums[duration];
+                int components = uniform ? 1 : 2;
+                const double* folded = prefix + (long long)period * size * components;
+                double ar = templateCorrelation(folded, positions + meta.x, coefficients + meta.x,
+                                                meta.y, start, components, 0) + meanResidual * totals.x;
+                double a2;
+                if (uniform) {
+                    a2 = totals.z * meanWeight;
+                } else if (meanSquareWeight) {
+                    int end = start + meta.w - 1;
+                    double weight = scoringPrefix(folded, end, 2, 1) - scoringPrefix(folded, end - 1, 2, 1)
+                                  - scoringPrefix(folded, start - 1, 2, 1) + scoringPrefix(folded, start - 2, 2, 1);
+                    a2 = totals.z * (meanWeight + weight / meta.w);
+                } else {
+                    int off = meta.x + meta.y;
+                    a2 = templateCorrelation(folded, positions + off, coefficients + off,
+                                            meta.z, start, 2, 1) + meanWeight * totals.y;
+                }
+                double amplitude = depth * overshoot[duration] * 2.;
+                double delta = amplitude * (amplitude * a2 - 2. * ar);
+                if (delta < 0.) {
+                    key = ((unsigned long long)orderedKey((float)delta) << 32)
+                        | (unsigned int)(duration * (long long)n + start);
+                }
+            }
+        }
+    }
+    for (int shift = 16; shift > 0; shift >>= 1) {
+        unsigned long long other = __shfl_down_sync(0xffffffff, key, shift);
+        if (other < key) key = other;
+    }
+    if ((threadIdx.x & 31) == 0 && key != 0xffffffffffffffffull) atomicMin(best + period, key);
+}
+
 extern "C" __global__ void scanScreeningUniformSparse(const float2* weighted, double* prefix, int size) {
     scanScreeningUniformImpl<true, 16>(weighted, prefix, size);
 }

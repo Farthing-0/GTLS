@@ -30,7 +30,10 @@ class gtls(object):
         Accepts the TLS keyword arguments (``period_min``, ``period_max``, ``periods``,
         ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``T0_refine_margin``, ``GPUDeviceID``,
         ``GPUDeviceIDs`` (list of devices to split the search across), ``bar_location``
-        and ``fast`` (return only ``(periods, power)``). ``screening_tolerances``
+        and ``fast`` (return only ``(periods, power)``). ``backend="fused-pl"``
+        (default) uses the TLS2 piecewise-linear scoring templates. Select
+        ``backend="fused"`` for full-template scores throughout the search.
+        ``TLS_BACKEND`` can set the default backend. ``screening_tolerances``
         optionally selects a decreasing sequence of positive certificate tolerances;
         ``None`` uses the standard cascade and ``()`` disables screening. These
         tolerances affect pruning work, not the final statistic or search grid.
@@ -124,6 +127,7 @@ class gtls(object):
             screening_tolerances=self.screening_tolerances,
             screening_policy=self.screening_policy,
             screening_diagnostics=self.screening_diagnostics,
+            backend=self.backend,
         )
         if self.fast:
             return result

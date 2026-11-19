@@ -1,3 +1,4 @@
+import os
 import warnings
 
 import numpy
@@ -54,6 +55,9 @@ def validate_args(self, kwargs):
         if key not in constants.VALID_PARAMETERS:
             warnings.warn("Ignoring unknown parameter: " + str(key))
 
+    self.backend = kwargs.get("backend") or os.environ.get("TLS_BACKEND") or "fused-pl"
+    if self.backend not in ("fused-pl", "fused"):
+        raise ValueError(f"Unknown backend {self.backend!r}. Available: 'fused-pl', 'fused'")
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
     # Multi-GPU: GPUDeviceIDs overrides GPUDeviceID; the first device does the final fit
     device_ids = kwargs.get("GPUDeviceIDs")

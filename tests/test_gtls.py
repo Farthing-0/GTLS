@@ -11,6 +11,7 @@ from unittest import SkipTest
 import batman
 import cupy as cp
 import numpy as np
+import pytest
 
 from gputls import core, gtls
 from gputls.helpers import cleaned_array
@@ -64,6 +65,26 @@ def test_fast_mode():
     assert len(periods) == len(power)
     assert np.all(np.isfinite(power))
     assert abs(periods[np.argmax(power)] - TRUE_PERIOD) < 0.05
+
+
+def test_tls2_template_backend_default_and_exact_override(monkeypatch):
+    monkeypatch.delenv("TLS_BACKEND", raising=False)
+    t, y = synthetic_light_curve()
+    periods = np.linspace(6.8, 8.6, 25)
+    model = gtls(t, y, verbose=False)
+    default = model.power(periods=periods, GPUDeviceID=GPU_DEVICE, fast=True)
+    assert model.backend == "fused-pl"
+    explicit = model.power(periods=periods, GPUDeviceID=GPU_DEVICE, fast=True, backend="fused-pl")
+    np.testing.assert_array_equal(default, explicit)
+
+    monkeypatch.setenv("TLS_BACKEND", "fused")
+    exact = model.power(periods=periods, GPUDeviceID=GPU_DEVICE, fast=True)
+    assert model.backend == "fused"
+    assert np.max(np.abs(default[1] - exact[1])) > 1e-5
+    overridden = model.power(periods=periods, GPUDeviceID=GPU_DEVICE, fast=True, backend="fused-pl")
+    np.testing.assert_array_equal(default, overridden)
+    with pytest.raises(ValueError, match="Unknown backend"):
+        model.power(backend="unknown")
 
 
 def test_kepler_custom_periods():

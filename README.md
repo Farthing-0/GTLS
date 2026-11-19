@@ -96,6 +96,7 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 
 | Argument | Default | Description |
 | --- | --- | --- |
+| `backend` | `"fused-pl"` | TLS2 piecewise-linear template scoring on CUDA. Set `"fused"` for full-template scoring. The `TLS_BACKEND` environment variable supplies a default when `backend` is omitted |
 | `period_min`, `period_max` | `0`, `inf` | Limits of the automatic period grid (days) |
 | `periods` | `[]` | Custom array of trial periods; overrides the automatic grid |
 | `R_star`, `M_star` | `1.0`, `1.0` | Stellar radius and mass (solar units) used for the period grid |
@@ -113,6 +114,12 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `GPUDeviceIDs` | `None` | List of CUDA devices to split the search across (e.g. `[0, 1]`); overrides `GPUDeviceID`. Results are identical to a single-GPU run |
 | `bar_location` | `0` | Position of the progress bar, useful when running several searches in parallel |
 | `fast` | `False` | Return only `(periods, power)`, skipping the refinement and transit statistics |
+
+`fused-pl` uses the TLS2 2.0.4 template fit and its default length cutoff of
+64 samples and relative tolerance of 0.02. It uses the selected width and depth
+to fit the final epoch with the full template. `TLS_PL_EPS` and
+`TLS_PL_A2_SPREAD_MAX` adjust the template tolerance and the weight-spread limit
+for the window-mean weighted square term.
 
 With `screening_policy="auto"`, `model.screening_diagnostics` records the choices
 and calibration batches for that call. Each calibration batch is split into four

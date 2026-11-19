@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +17,7 @@ from .screening import (certificates, MIN_WIDTH, SCREEN_TOLERANCES,
                         uniform_sparse_certificate, sparse_certificate, prefix_quantization)
 from .stats import (all_transit_times, calculate_transit_duration_in_days, final_T0_fit,
                     intransit_stats, snr_stats, spectra)
+from .template_approximation import TLS2_PL_A2_SPREAD_MAX, TLS2_PL_EPS, scoring_templates
 from .workspace import (BatchWorkspace, LAYOUT_ALLOWANCE, bucket_count,
                         bytes_per_period as workspace_bytes_per_period)
 from .screening_policy import BatchScreeningPolicy
@@ -174,9 +176,10 @@ class GPUSearch:
     def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
                  T0_refine_margin, R_star_min=constants.R_STAR_MIN, R_star_max=constants.R_STAR_MAX,
                  M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX,
-                 screening_tolerances=None, screening_policy="fixed"):
+                 screening_tolerances=None, screening_policy="fixed", backend="fused-pl"):
         self.module = module
         self.t = t
+        self.backend = backend
         self.T0_fit_margin = T0_fit_margin
         self.T0_refine_margin = T0_refine_margin
         self.duration_limits = duration_limit_args(R_star_min, R_star_max, M_star_min, M_star_max)
@@ -231,6 +234,22 @@ class GPUSearch:
         self.signalGPU = cp.asarray(signal)
         self.overshootGPU = cp.asarray(self.lc_cache_overview["overshoot"]).astype(cp.float32)
         self.widthsGPU = cp.asarray(durations).astype(cp.int32)
+
+        self.scoring_prefix_bytes = 0
+        self.approximate_durations = np.zeros(len(durations), dtype=bool)
+        if backend == "fused-pl":
+            eps = float(os.environ.get("TLS_PL_EPS", TLS2_PL_EPS))
+            scoring = scoring_templates(self.lc_arr, eps)
+            if scoring is not None:
+                self.approximate_durations = scoring[0][:, 1] > 0
+                self.pl_metadata, self.pl_sums, self.pl_positions, self.pl_coefficients = map(cp.asarray, scoring)
+                weights = 1.0 / np.asarray(dy, dtype=np.float64)**2
+                self.pl_mean_weight = np.mean(weights)
+                self.pl_mean_residual = np.mean((1.0 - y) * weights)
+                limit = float(os.environ.get("TLS_PL_A2_SPREAD_MAX", TLS2_PL_A2_SPREAD_MAX))
+                self.pl_uniform = bool(np.all(weights == weights[0]))
+                self.pl_mean_square_weight = limit > 0 and np.std(weights) <= limit * self.pl_mean_weight
+                self.scoring_prefix_bytes = 8 if self.pl_uniform else 16
 
         # Screening is useful for long templates and a sampled start grid. The final
         # every-point fit and small curves retain the adjacent-window path.
@@ -289,7 +308,8 @@ class GPUSearch:
                                  if self.screenPrefixStride > 1 else self.patchedDatasSize)
         self.weightedPointBytes = 4 if self.uniformWeight is not None else 8
         self.maxScreenStarts = (int(np.sum(-(-self.tSize // start_strides(
-            self.durations, min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
+            self.durations[~self.approximate_durations],
+            min(T0_fit_margin, T0_refine_margin))))) if self.screening else 0)
 
     def close(self):
         """Release device resources even if a compiler/debugger retains this object."""
@@ -308,7 +328,8 @@ class GPUSearch:
                                             self.maxScreenStarts, self.screening,
                                             prefix_bytes=self.screenPrefixBytes,
                                             weighted_bytes=self.weightedPointBytes,
-                                            prefix_points=self.screenPrefixSize)
+                                            prefix_points=self.screenPrefixSize,
+                                            scoring_prefix_bytes=self.scoring_prefix_bytes)
         return self.workspace
 
     def duration_mask(self, periods):
@@ -332,13 +353,15 @@ class GPUSearch:
              cp.asarray(self.durations).astype(cp.int32), durationBoolArrayGPU))
         return durationBoolArrayGPU
 
-    def best_keys(self, periods, periodMaskGPU, margin):
+    def best_keys(self, periods, periodMaskGPU, margin, approximate=False, global_locations=False):
         """Packed lowest chi2 and its location of each period (see searchChi2 and decode_keys).
 
         periodMaskGPU (periods x durations, from duration_mask) selects the durations searched
         for each period. The location is durationIndex * tSize + start, with durationIndex
-        counting the durations used by any period of the batch. Start points are tested about
-        margin of a duration apart (every point for margin = 0).
+        counting the durations selected for the native kernel. Request global
+        locations when the result will be used to fit the selected candidate.
+        Start points are tested about margin of a duration apart (every point
+        for margin = 0).
         """
         module = self.module
         tSize = self.tSize
@@ -350,7 +373,8 @@ class GPUSearch:
         index_bytes = workspace.index_bytes
 
         durationsBool = cp.any(periodMaskGPU, axis=0).get()
-        selected = np.flatnonzero(durationsBool).astype(np.int32)
+        approximate_rows = durationsBool & self.approximate_durations if approximate else np.zeros_like(durationsBool)
+        selected = np.flatnonzero(durationsBool & ~approximate_rows).astype(np.int32)
         strides = start_strides(self.durations[selected], margin)
         offsets = np.concatenate(([0], np.cumsum(-(-tSize // strides))))
         if offsets[-1] >= 2 ** 31:
@@ -392,7 +416,7 @@ class GPUSearch:
         # duration, so an incomplete group never consumes starts from the next duration.
         bestGPU = cp.full(nPeriods, EMPTY_KEY, dtype=cp.uint64)
         lanes = lanes_per_window(strides)
-        screening = self.screening and margin > 0
+        screening = self.screening and margin > 0 and len(selected) > 0
         if not screening and not packed and np.any(lanes >= 8):
             adjacent = np.where(lanes == 32, 4, np.where(lanes >= 8, 2, 1))
             group_counts = (np.diff(offsets) + adjacent - 1) // adjacent
@@ -517,7 +541,36 @@ class GPUSearch:
                     + ((lowerGPU, upperGPU, np.int32(nBounds)) if screening else ()) + compact_args
                     + ((self.uniformWeight,) if packed else ()))
             yBegin = yEnd
+        if global_locations and len(selected):
+            module.get_function("remapTemplateKeys")(
+                ((nPeriods + 127) // 128,), (128,),
+                (bestGPU, selectedGPU, np.int32(tSize), np.int32(nPeriods)))
+        if np.any(approximate_rows):
+            self._score_approximate(bestGPU, periodMaskGPU, weightedGPU, cumResidualGPU, workspace,
+                                    approximate_rows, margin, packed)
         return bestGPU
+
+    def _score_approximate(self, best, period_mask, weighted, cumulative, workspace, rows, margin, packed):
+        """Score eligible TLS2 templates on centered FP64 double prefixes."""
+        selected = np.flatnonzero(rows).astype(np.int32)
+        strides = start_strides(self.durations[selected], margin)
+        offsets = np.concatenate(([0], np.cumsum(-(-self.tSize // strides))))
+        if offsets[-1] >= 2**31:
+            raise ValueError("Too many approximate start points per period")
+        n_periods = len(best)
+        size = self.patchedDatasSize
+        prefix = workspace.view('scratch', (n_periods, size, self.scoring_prefix_bytes // 8), cp.float64)
+        self.module.get_function("scanApproximateTemplates")(
+            (n_periods,), (32,), (weighted, prefix, np.int32(size), np.int32(packed),
+                                  np.int32(self.pl_uniform), self.pl_mean_residual, self.pl_mean_weight))
+        self.module.get_function("searchApproximateTemplates")(
+            ((int(offsets[-1]) + 255) // 256, n_periods), (256,),
+            (best, period_mask, cumulative, prefix, self.pl_metadata, self.pl_sums,
+             self.pl_positions, self.pl_coefficients, self.widthsGPU, self.overshootGPU,
+             cp.asarray(selected), cp.asarray(offsets, dtype=cp.int32), cp.asarray(strides),
+             np.int32(len(selected)), np.int32(len(self.durations)), np.int32(self.tSize), np.int32(size),
+             np.int32(self.pl_uniform), np.int32(self.pl_mean_square_weight), self.fixedInvScale,
+             self.transit_depth_min, self.pl_mean_residual, self.pl_mean_weight))
 
     def chi2_batch(self, periods, size, refine):
         policy = self.auto_screening
@@ -599,7 +652,8 @@ class GPUSearch:
             return np.full(valid_range, self.constant_residual, dtype=np.float32)
 
         margin = self.T0_refine_margin if refine else self.T0_fit_margin
-        chi2, _ = decode_keys(self.best_keys(periods, periodMaskGPU, margin)[:valid_range], self.base)
+        keys = self.best_keys(periods, periodMaskGPU, margin, approximate=True)
+        chi2, _ = decode_keys(keys[:valid_range], self.base)
         chi2 = cp.where(cp.isfinite(chi2), chi2, self.constant_residual)
         return chi2.astype(cp.float32).get()
 
@@ -631,7 +685,8 @@ class MultiGPUSearch:
         return (workspace_bytes_per_period(s.tSize, s.patchedDatasSize, s.maxScreenStarts, s.screening,
                                            prefix_bytes=s.screenPrefixBytes,
                                            weighted_bytes=s.weightedPointBytes,
-                                           prefix_points=s.screenPrefixSize)
+                                           prefix_points=s.screenPrefixSize,
+                                           scoring_prefix_bytes=s.scoring_prefix_bytes)
                 + len(s.durations) + 128)
 
     @staticmethod
@@ -737,12 +792,14 @@ def search_multi_periods(
     screening_tolerances=None,
     screening_policy="fixed",
     screening_diagnostics=None,
+    backend="fused-pl",
 ):
     set_cuda_device(GPUDeviceIDs[0])
     search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, T0_refine_margin, t, y, dy, transit_depth_min,
                             lc_arr, lc_cache_overview, R_star_min=R_star_min, R_star_max=R_star_max,
                             M_star_min=M_star_min, M_star_max=M_star_max,
-                            screening_tolerances=screening_tolerances, screening_policy=screening_policy)
+                            screening_tolerances=screening_tolerances, screening_policy=screening_policy,
+                            backend=backend)
     try:
         return _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location)
     finally:
@@ -811,21 +868,26 @@ def _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbos
 
 
 def search_single_period(search, period, t, y, dy):
-    """Refit duration, T0 and depth at the best period, since the coarse search skips start points."""
+    """Fit the final epoch with the full template at the selected period."""
     tSize = search.tSize
     maxDuration = search.maxDuration
 
     periodMaskGPU = search.duration_mask(np.array([period]))
-    durationsBool = periodMaskGPU[0].get()
-    durations = search.durations[durationsBool]
-    single_lc_cache_overview = search.lc_cache_overview[durationsBool]
+    allowed = np.flatnonzero(periodMaskGPU[0].get())
 
-    chi2, location = decode_keys(search.best_keys(np.array([period]), periodMaskGPU, margin=0), search.base)
-    bestLocation = int(location[0]) if bool(cp.isfinite(chi2[0])) else 0
+    approximate = search.backend == "fused-pl"
+    margin = search.T0_refine_margin if approximate else 0
+    chi2, location = decode_keys(search.best_keys(np.array([period]), periodMaskGPU, margin=margin,
+                                                 approximate=approximate, global_locations=approximate), search.base)
+    fallback = int(allowed[0]) * tSize if approximate else 0
+    bestLocation = int(location[0]) if bool(cp.isfinite(chi2[0])) else fallback
 
-    durationIndex = np.floor(bestLocation / (tSize)).astype(int)
-    durationPointsNum = durations[durationIndex]
-    rawDuration = single_lc_cache_overview["duration"][durationIndex]
+    row = bestLocation // tSize
+    durationIndex = row if approximate else allowed[row]
+    durationPointsNum = search.durations[durationIndex]
+    template = search.lc_cache_overview[durationIndex]
+    signal = search.lc_arr[durationIndex]
+    rawDuration = template["duration"]
 
     _, bestFlux, _ = foldCPU(t, y, dy, period)
     bestFlux = np.concatenate((bestFlux, bestFlux[:maxDuration]))
@@ -835,12 +897,10 @@ def search_single_period(search, period, t, y, dy):
     transitMean = bestFlux[bestRowT0:bestRowT0 + durationPointsNum].mean()
 
     # Transit Depth
-    overshoot = single_lc_cache_overview["overshoot"][durationIndex]
+    overshoot = template["overshoot"]
     transitDepth = ((1 - transitMean) * overshoot).item()
 
-    # Keep the GPU-selected template/depth, but fit its epoch and convert its
-    # duration with TLS2's final-candidate conventions. The periodogram is fixed.
-    signal = search.lc_arr[durationsBool][durationIndex]
+    # TLS2 fits the epoch with the full shape at the selected width and depth.
     T0 = final_T0_fit(signal, 1 - transitDepth, t, y, dy, period, search.T0_fit_margin)
     transit_times = np.asarray(all_transit_times(T0, t, period))
 
