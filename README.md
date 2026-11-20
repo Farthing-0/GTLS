@@ -12,6 +12,10 @@ in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 
 ## Features
 
+Version 2.2.7 adds TLS2-style phase coarsening with local refinement and
+duration scouting to `fused-pl`. GTLS now computes the periodogram in one pass
+over the period grid.
+
 Version 2.2.6 defaults to TLS2-style piecewise-linear template scoring on CUDA
 (`backend="fused-pl"`). Use `backend="fused"` for full-template scoring. The
 final epoch fit uses the full template at the selected width and depth.
@@ -39,7 +43,6 @@ epoch-search margins are unchanged by this correction.
 - Drop-in replacement for the `transitleastsquares` search API
 - Limb-darkened transit templates (default, grazing and box-shaped)
 - Batches trial periods automatically to fit the free GPU memory
-- Refines the strongest peaks and their period aliases (P/2, 2P, 2P/3, 3P/2) with a finer epoch search, and fits the best period at every cadence
 - Supports multi-GPU machines: pick a device with `GPUDeviceID` or split one search across several with `GPUDeviceIDs`
 
 ## Requirements
