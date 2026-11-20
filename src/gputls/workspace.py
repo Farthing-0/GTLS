@@ -17,7 +17,7 @@ def bucket_count(n):
 
 
 def bytes_per_period(n, patched, starts=0, screening=False, prefix_bytes=24, weighted_bytes=8,
-                     prefix_points=None, scoring_prefix_bytes=0):
+                     prefix_points=None, scoring_prefix_bytes=0, scout_bytes=0):
     # Sort: index(4N), compact phase key(4N), count(4B), cursor(4B), B=ceil(N/3).
     # Equal weights use12 bytes per sparse prefix node and4P weighted residuals;
     # general weights use24 bytes per sparse node and8P weighted pairs.
@@ -25,12 +25,12 @@ def bytes_per_period(n, patched, starts=0, screening=False, prefix_bytes=24, wei
     prefix_points = patched if prefix_points is None else prefix_points
     scratch = max(8*n+8*bucket_count(n), prefix_bytes*prefix_points if screening else 0,
                   scoring_prefix_bytes*patched)
-    return scratch + (8+weighted_bytes)*patched + 4*starts
+    return scratch + (8+weighted_bytes)*patched + 4*starts + scout_bytes
 
 
 class BatchWorkspace:
     def __init__(self, capacity, n, patched, starts=0, screening=False, prefix_bytes=24, weighted_bytes=8,
-                 prefix_points=None, scoring_prefix_bytes=0):
+                 prefix_points=None, scoring_prefix_bytes=0, scout_bytes=0):
         self.capacity = int(capacity)
         self.n = int(n)
         self.patched = int(patched)
@@ -44,7 +44,8 @@ class BatchWorkspace:
         self.regions = {}
         total = 0
         for name, size in [('scratch', scratch), ('weighted', capacity*weighted_bytes*patched),
-                           ('cumulative', capacity*8*patched), ('lower', capacity*4*starts)]:
+                           ('cumulative', capacity*8*patched), ('lower', capacity*4*starts),
+                           ('scouts', capacity*scout_bytes)]:
             total = (total+ALIGNMENT-1)//ALIGNMENT*ALIGNMENT
             self.regions[name] = (total, size)
             total += size

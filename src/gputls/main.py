@@ -32,8 +32,10 @@ class gtls(object):
         ``GPUDeviceIDs`` (list of devices to split the search across), ``bar_location``
         and ``fast`` (return only ``(periods, power)``). ``backend="fused-pl"``
         (default) uses the TLS2 piecewise-linear scoring templates and a
-        threefold phase grid with local refinement. Use ``T0_coarsen=1`` to
-        scan the normal phase grid, or ``backend="fused"`` for full-template scoring.
+        threefold phase grid with local refinement and duration scouting. Use
+        ``T0_coarsen=1`` for the normal phase grid, ``scout_every=0`` to scan
+        every duration over the full phase grid, or ``backend="fused"`` for
+        full-template scoring.
         ``TLS_BACKEND`` can set the default backend. ``screening_tolerances``
         optionally selects a decreasing sequence of positive certificate tolerances;
         ``None`` uses the standard cascade and ``()`` disables screening. These
@@ -116,6 +118,7 @@ class gtls(object):
             lc_cache_overview=self.lc_cache_overview,
             T0_fit_margin=self.T0_fit_margin,
             T0_coarsen=self.T0_coarsen,
+            scout_every=self.scout_every,
             oversampling_factor=self.oversampling_factor,
             verbose=self.verbose,
             GPUDeviceIDs=self.GPUDeviceIDs,

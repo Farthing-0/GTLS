@@ -1030,56 +1030,212 @@ extern "C" __global__ void searchApproximateTemplates(PHASE_SCORE_ARGS,
     if ((threadIdx.x & 31) == 0 && key != 0xffffffffffffffffull) atomicMin(best + period, key);
 }
 
-// Each block scans one period and template width. TLS2's fine pass samples
-// two normal-grid starts on either side of the coarse winner, clipped at
-// the endpoints. A tied fine score keeps the coarse winner.
+// A period/width block keeps the first best start in window visitation order.
+// The upper 32 bits of order store the window ordinal; the lower bits store
+// the trial start. This preserves TLS2's strict replacement on equal scores.
+struct DurationPhaseChoice {
+    unsigned int score;
+    unsigned long long order;
+};
+
+__device__ __forceinline__ bool betterPhase(DurationPhaseChoice a, DurationPhaseChoice b) {
+    return a.score < b.score || (a.score == b.score && a.order < b.order);
+}
+
+__device__ __forceinline__ DurationPhaseChoice reduceDurationPhases(DurationPhaseChoice choice) {
+    for (int shift = 16; shift > 0; shift >>= 1) {
+        DurationPhaseChoice other = {__shfl_down_sync(0xffffffff, choice.score, shift),
+                                    __shfl_down_sync(0xffffffff, choice.order, shift)};
+        if (betterPhase(other, choice)) choice = other;
+    }
+    __shared__ DurationPhaseChoice perWarp[4];
+    if ((threadIdx.x & 31) == 0) perWarp[threadIdx.x / 32] = choice;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        for (int warp = 1; warp < 4; ++warp) if (betterPhase(perWarp[warp], choice)) choice = perWarp[warp];
+    }
+    return choice;
+}
+
+#define WINDOW_DATA_ARGS const float2* weighted, const float* signals, int maxWidth, int packed, float weight
+#define WINDOW_DATA weighted, signals, maxWidth, packed, weight
+
+__device__ __forceinline__ void scanDurationWindow(DurationPhaseChoice& choice, const PhaseScoreInputs& input,
+        int period, int duration, int lo, int hi, int stride, unsigned int ordinal, WINDOW_DATA_ARGS) {
+    for (long long start = lo + (long long)threadIdx.x * stride; start < hi; start += (long long)blockDim.x * stride) {
+        float delta = phaseWindowScore(input, period, duration, (int)start, WINDOW_DATA);
+        if (isfinite(delta)) {
+            DurationPhaseChoice candidate = {orderedKey(delta), ((unsigned long long)ordinal << 32) | (unsigned int)start};
+            if (betterPhase(candidate, choice)) choice = candidate;
+        }
+    }
+}
+
+__device__ __forceinline__ DurationPhaseChoice refineDurationPhase(DurationPhaseChoice choice,
+        const PhaseScoreInputs& input, int period, int duration, int normal, int coarse, int nShifts,
+        WINDOW_DATA_ARGS) {
+    if (choice.score == 0xffffffffu || coarse == normal) return choice;
+    int center = (unsigned int)choice.order;
+    for (int displacement = -2; displacement <= 2; ++displacement) {
+        long long start = center + (long long)displacement * normal;
+        if (displacement == 0 || start < 0 || start >= nShifts) continue;
+        float delta = phaseWindowScore(input, period, duration, (int)start, WINDOW_DATA);
+        if (isfinite(delta) && orderedKey(delta) < choice.score) {
+            choice = {orderedKey(delta), (unsigned int)start};
+        }
+    }
+    return choice;
+}
+
+__device__ __forceinline__ void recordDurationPhase(unsigned long long* best, DurationPhaseChoice choice,
+        int period, int duration, int n) {
+    if (choice.score >= orderedKey(0.f)) return;
+    unsigned int location = (unsigned int)(duration * (long long)n + (unsigned int)choice.order % n);
+    atomicMin(best + period, ((unsigned long long)choice.score << 32) | location);
+}
+
 extern "C" __global__ void searchCoarsePhase(PHASE_SCORE_ARGS, const int* selected, const int* strides,
-        const float2* weighted, const float* signals, int maxWidth, int packed, float weight) {
+        WINDOW_DATA_ARGS) {
     int period = blockIdx.x;
     int row = blockIdx.y;
     int duration = selected[row];
     if (!periodMask[(long long)period * nDurations + duration]) return;
     const PhaseScoreInputs input = PHASE_SCORE_INPUTS;
     int normal = strides[row];
-    int stride = 3 * normal;
-    unsigned long long key = 0xffffffffffffffffull;
-    for (long long start = (long long)threadIdx.x * stride; start < n; start += (long long)blockDim.x * stride) {
-        float delta = phaseWindowScore(input, period, duration, (int)start, weighted, signals, maxWidth,
-                                       packed, weight);
-        if (isfinite(delta)) {
-            unsigned long long candidate = ((unsigned long long)orderedKey(delta) << 32) | (unsigned int)start;
-            if (candidate < key) key = candidate;
-        }
-    }
-    for (int shift = 16; shift > 0; shift >>= 1) {
-        unsigned long long other = __shfl_down_sync(0xffffffff, key, shift);
-        if (other < key) key = other;
-    }
-    __shared__ unsigned long long perWarp[4];
-    if ((threadIdx.x & 31) == 0) perWarp[threadIdx.x / 32] = key;
-    __syncthreads();
-    if (threadIdx.x != 0) return;
-    for (int warp = 1; warp < 4; ++warp) {
-        if (perWarp[warp] < key) key = perWarp[warp];
-    }
-    if (key == 0xffffffffffffffffull) return;
-    int center = (unsigned int)key;
-    for (int displacement = -2; displacement <= 2; ++displacement) {
-        long long start = center + (long long)displacement * normal;
-        if (displacement == 0 || start < 0 || start >= n) continue;
-        float delta = phaseWindowScore(input, period, duration, (int)start, weighted, signals, maxWidth,
-                                       packed, weight);
-        unsigned int score = orderedKey(delta);
-        if (isfinite(delta) && score < (unsigned int)(key >> 32)) {
-            key = ((unsigned long long)score << 32) | (unsigned int)start;
-        }
-    }
-    if ((unsigned int)(key >> 32) < orderedKey(0.f)) {
-        unsigned int location = (unsigned int)(duration * (long long)n + (unsigned int)key);
-        atomicMin(best + period, (key & 0xffffffff00000000ull) | location);
+    int coarse = 3 * normal;
+    DurationPhaseChoice choice = {0xffffffffu, 0xffffffffffffffffull};
+    scanDurationWindow(choice, input, period, duration, 0, n, coarse, 0, WINDOW_DATA);
+    choice = reduceDurationPhases(choice);
+    if (threadIdx.x == 0) {
+        choice = refineDurationPhase(choice, input, period, duration, normal, coarse, n, WINDOW_DATA);
+        recordDurationPhase(best, choice, period, duration, n);
     }
 }
 
+// Invalid and restricted widths are distinct. A scout with no valid window
+// stays at -1. A successful scout stores the unwrapped window center.
+extern "C" __global__ void prepareDurationScouts(int* states, const bool* mask, int nPeriods,
+        int nDurations, int scoutEvery) {
+    int period = blockIdx.x * blockDim.x + threadIdx.x;
+    if (period >= nPeriods) return;
+    long long base = (long long)period * nDurations;
+    int allowed = 0;
+    for (int d = 0; d < nDurations; ++d) allowed += mask[base + d];
+    int ordinal = 0;
+    for (int d = 0; d < nDurations; ++d) {
+        int state = -3;
+        if (mask[base + d]) {
+            state = allowed <= scoutEvery || ordinal % scoutEvery == 0 || ordinal == allowed - 1 ? -1 : -2;
+            ++ordinal;
+        }
+        states[base + d] = state;
+    }
+}
+
+__device__ __forceinline__ int scoutShiftCount(const PhaseScoreInputs& input, int n, int duration, int normal) {
+    int width = input.widths[duration];
+    int length = input.metadata ? input.metadata[duration].w : 0;
+    int available = input.size - max(width, length) + 1;
+    return normal == 1 ? min(n, available) : available;
+}
+
+extern "C" __global__ void searchDurationScouts(PHASE_SCORE_ARGS, const int* selected,
+        const int* normalStrides, const int* coarseStrides, WINDOW_DATA_ARGS, int* states) {
+    int period = blockIdx.x;
+    int row = blockIdx.y;
+    int duration = selected[row];
+    long long offset = (long long)period * nDurations + duration;
+    if (states[offset] != -1) return;
+    const PhaseScoreInputs input = PHASE_SCORE_INPUTS;
+    int normal = normalStrides[row];
+    int coarse = coarseStrides[row];
+    int nShifts = scoutShiftCount(input, n, duration, normal);
+    DurationPhaseChoice choice = {0xffffffffu, 0xffffffffffffffffull};
+    scanDurationWindow(choice, input, period, duration, 0, nShifts, coarse, 0, WINDOW_DATA);
+    choice = reduceDurationPhases(choice);
+    if (threadIdx.x == 0) {
+        choice = refineDurationPhase(choice, input, period, duration, normal, coarse, nShifts, WINDOW_DATA);
+        if (choice.score != 0xffffffffu) {
+            states[offset] = (unsigned int)choice.order + widths[duration] / 2;
+            recordDurationPhase(best, choice, period, duration, n);
+        }
+    }
+}
+
+extern "C" __global__ void collectDurationScouts(const int* states, const int* widths,
+        const unsigned long long* best, int* centers, int nPeriods, int nDurations, int columns) {
+    int period = blockIdx.x * blockDim.x + threadIdx.x;
+    if (period >= nPeriods) return;
+    const int* row = states + (long long)period * nDurations;
+    int* output = centers + (long long)period * columns;
+    bool restricted = false;
+    for (int d = 0; d < nDurations; ++d) restricted |= row[d] == -2;
+    output[0] = 0;
+    if (!restricted) return;
+    int count = 0;
+    for (int d = 0; d < nDurations; ++d) {
+        int center = row[d];
+        if (center < 0) continue;
+        bool duplicate = false;
+        for (int j = 0; j < count; ++j) {
+            if (abs(output[2 + j] - center) <= widths[d] / 4) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate) output[2 + count++] = center;
+    }
+    output[0] = count;
+    output[1] = (int)(best[period] >> 32);
+}
+
+__device__ __forceinline__ int floorToStride(int value, int stride) {
+    int remainder = value % stride;
+    return value - remainder - (remainder < 0 ? stride : 0);
+}
+
+extern "C" __global__ void searchNearDurationScouts(PHASE_SCORE_ARGS, const int* selected,
+        const int* normalStrides, const int* coarseStrides, WINDOW_DATA_ARGS, const int* states,
+        const int* centers, int columns) {
+    int period = blockIdx.x;
+    int row = blockIdx.y;
+    int duration = selected[row];
+    if (states[(long long)period * nDurations + duration] != -2) return;
+    const int* anchors = centers + (long long)period * columns;
+    if (anchors[0] == 0) return;
+    const PhaseScoreInputs input = PHASE_SCORE_INPUTS;
+    int normal = normalStrides[row];
+    int coarse = coarseStrides[row];
+    int nShifts = scoutShiftCount(input, n, duration, normal);
+    int width = widths[duration];
+    DurationPhaseChoice choice = {0xffffffffu, 0xffffffffffffffffull};
+    for (int j = 0; j < anchors[0]; ++j) {
+        int start = anchors[2 + j] - width / 2;
+        int lo = floorToStride(start - width, coarse);
+        int hi = start + width + 1;
+        // Encounter order is the same as TLS2: left wrap, right wrap, main
+        // interval. Repeated starts keep their first visit on equal scores.
+        if (lo < 0) {
+            scanDurationWindow(choice, input, period, duration, max(0, floorToStride(lo + n, coarse)),
+                               min(nShifts, n), coarse, 3u*j, WINDOW_DATA);
+            lo = 0;
+        }
+        if (hi > nShifts) {
+            scanDurationWindow(choice, input, period, duration, 0, min(nShifts, hi - n),
+                               coarse, 3u*j + 1u, WINDOW_DATA);
+            hi = nShifts;
+        }
+        scanDurationWindow(choice, input, period, duration, lo, hi, coarse, 3u*j + 2u, WINDOW_DATA);
+    }
+    choice = reduceDurationPhases(choice);
+    if (threadIdx.x == 0) {
+        choice = refineDurationPhase(choice, input, period, duration, normal, coarse, nShifts, WINDOW_DATA);
+        if (choice.score < (unsigned int)anchors[1]) recordDurationPhase(best, choice, period, duration, n);
+    }
+}
+
+#undef WINDOW_DATA_ARGS
+#undef WINDOW_DATA
 #undef PHASE_SCORE_ARGS
 #undef PHASE_SCORE_INPUTS
 

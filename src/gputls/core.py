@@ -161,7 +161,7 @@ class GPUSearch:
     def __init__(self, module, t, y, dy, transit_depth_min, lc_arr, lc_cache_overview, T0_fit_margin,
                  T0_coarsen=1, R_star_min=constants.R_STAR_MIN, R_star_max=constants.R_STAR_MAX,
                  M_star_min=constants.M_STAR_MIN, M_star_max=constants.M_STAR_MAX,
-                 screening_tolerances=None, screening_policy="fixed", backend="fused-pl"):
+                 screening_tolerances=None, screening_policy="fixed", backend="fused-pl", scout_every=0):
         self.module = module
         self.t = t
         self.backend = backend
@@ -181,6 +181,10 @@ class GPUSearch:
         self.tSize = len(t)
         self.nBuckets = bucket_count(self.tSize)
         self.patchedDatasSize = int(self.tSize + maxDuration)
+        self.scout_every = scout_every if scout_every > 1 and self.tSize >= 2000 and len(durations) > scout_every else 0
+        # Anchor count, scout score, every Nth anchor, and the longest allowed width.
+        self.scout_columns = (len(durations)-1)//self.scout_every + 4 if self.scout_every else 0
+        self.scout_bytes = 4 * (len(durations) + self.scout_columns) if self.scout_every else 0
 
         self.tGPU = cp.asarray(t).astype(cp.float64)
         # 1 - y is formed in float64, so the float32 residuals keep their full precision
@@ -316,7 +320,8 @@ class GPUSearch:
                                             prefix_bytes=self.screenPrefixBytes,
                                             weighted_bytes=self.weightedPointBytes,
                                             prefix_points=self.screenPrefixSize,
-                                            scoring_prefix_bytes=self.scoring_prefix_bytes)
+                                            scoring_prefix_bytes=self.scoring_prefix_bytes,
+                                            scout_bytes=self.scout_bytes)
         return self.workspace
 
     def duration_mask(self, periods):
@@ -362,7 +367,10 @@ class GPUSearch:
         durationsBool = cp.any(periodMaskGPU, axis=0).get()
         approximate_rows = durationsBool & self.approximate_durations if approximate else np.zeros_like(durationsBool)
         coarse_rows = durationsBool & (self.T0_coarsen > 1) & (self.T0_coarsen * margin * self.durations >= 2)
-        selected = np.flatnonzero(durationsBool & ~(approximate_rows | coarse_rows)).astype(np.int32)
+        # The per-period mask decides when to scout, independently of batch boundaries.
+        scout_rows = durationsBool if approximate and self.scout_every and np.any(durationsBool) else None
+        selected = (np.empty(0, dtype=np.int32) if scout_rows is not None else
+                    np.flatnonzero(durationsBool & ~(approximate_rows | coarse_rows)).astype(np.int32))
         strides = start_strides(self.durations[selected], margin)
         offsets = np.concatenate(([0], np.cumsum(-(-tSize // strides))))
         if offsets[-1] >= 2 ** 31:
@@ -533,13 +541,13 @@ class GPUSearch:
             module.get_function("remapTemplateKeys")(
                 ((nPeriods + 127) // 128,), (128,),
                 (bestGPU, selectedGPU, np.int32(tSize), np.int32(nPeriods)))
-        if np.any(approximate_rows | coarse_rows):
+        if scout_rows is not None or np.any(approximate_rows | coarse_rows):
             self._score_template_phases(bestGPU, periodMaskGPU, weightedGPU, cumResidualGPU, workspace,
-                                         approximate_rows, coarse_rows, margin, packed)
+                                         approximate_rows, coarse_rows, margin, packed, scout_rows)
         return bestGPU
 
     def _score_template_phases(self, best, period_mask, weighted, cumulative, workspace,
-                               approximate_rows, coarse_rows, margin, packed):
+                               approximate_rows, coarse_rows, margin, packed, scout_rows):
         """Use one shared prefix for the full and threefold phase grids."""
         n_periods = len(best)
         size = self.patchedDatasSize
@@ -554,6 +562,12 @@ class GPUSearch:
                 np.int32(len(self.durations)), np.int32(self.tSize), np.int32(size),
                 np.int32(self.pl_uniform), np.int32(self.pl_mean_square_weight), self.fixedInvScale,
                 self.transit_depth_min, self.pl_mean_residual, self.pl_mean_weight)
+        template_args = (weighted, self.signalGPU, np.int32(self.maxWidth), np.int32(packed),
+                         self.uniformWeight or np.float32(0))
+        if scout_rows is not None:
+            self._search_duration_scouts(workspace, best, period_mask, scout_rows, coarse_rows, margin,
+                                         args, template_args)
+            return
         selected = np.flatnonzero(approximate_rows & ~coarse_rows).astype(np.int32)
         if selected.size:
             strides = start_strides(self.durations[selected], margin)
@@ -569,8 +583,27 @@ class GPUSearch:
             strides = start_strides(self.durations[selected], margin)
             self.module.get_function("searchCoarsePhase")(
                 (n_periods, int(selected.size)), (128,),
-                args + (cp.asarray(selected), cp.asarray(strides), weighted, self.signalGPU,
-                        np.int32(self.maxWidth), np.int32(packed), self.uniformWeight or np.float32(0)))
+                args + (cp.asarray(selected), cp.asarray(strides)) + template_args)
+
+    def _search_duration_scouts(self, workspace, best, period_mask, rows, coarse_rows, margin, args, template_args):
+        n_periods = len(best)
+        n_durations = len(self.durations)
+        state = workspace.view('scouts', (n_periods, n_durations), cp.int32)
+        centers = workspace.view('scouts', (n_periods, self.scout_columns), cp.int32, state.nbytes)
+        periods_grid = ((n_periods+127)//128,)
+        self.module.get_function("prepareDurationScouts")(
+            periods_grid, (128,), (state, period_mask, np.int32(n_periods), np.int32(n_durations), np.int32(self.scout_every)))
+        selected = np.flatnonzero(rows).astype(np.int32)
+        normal = start_strides(self.durations[selected], margin)
+        coarse = np.where(coarse_rows[selected], normal*3, normal).astype(np.int32)
+        search_args = args + (cp.asarray(selected), cp.asarray(normal), cp.asarray(coarse)) + template_args
+        grid = (n_periods, int(selected.size))
+        self.module.get_function("searchDurationScouts")(grid, (128,), search_args + (state,))
+        self.module.get_function("collectDurationScouts")(
+            periods_grid, (128,), (state, self.widthsGPU, best, centers, np.int32(n_periods),
+                                   np.int32(n_durations), np.int32(self.scout_columns)))
+        self.module.get_function("searchNearDurationScouts")(
+            grid, (128,), search_args + (state, centers, np.int32(self.scout_columns)))
 
     def chi2_batch(self, periods, size, refine=False, *, return_locations=False):
         batch_options = {"return_locations": True} if return_locations else {}
@@ -694,7 +727,8 @@ class MultiGPUSearch:
                                            prefix_bytes=s.screenPrefixBytes,
                                            weighted_bytes=s.weightedPointBytes,
                                            prefix_points=s.screenPrefixSize,
-                                           scoring_prefix_bytes=s.scoring_prefix_bytes)
+                                           scoring_prefix_bytes=s.scoring_prefix_bytes,
+                                           scout_bytes=s.scout_bytes)
                 + len(s.durations) + 128)
 
     @staticmethod
@@ -807,13 +841,14 @@ def search_multi_periods(
     screening_policy="fixed",
     screening_diagnostics=None,
     backend="fused-pl",
+    scout_every=0,
 ):
     set_cuda_device(GPUDeviceIDs[0])
     search = MultiGPUSearch(GPUDeviceIDs, T0_fit_margin, T0_coarsen, t, y, dy, transit_depth_min,
                             lc_arr, lc_cache_overview, R_star_min=R_star_min, R_star_max=R_star_max,
                             M_star_min=M_star_min, M_star_max=M_star_max,
                             screening_tolerances=screening_tolerances, screening_policy=screening_policy,
-                            backend=backend)
+                            backend=backend, scout_every=scout_every)
     try:
         return _search_multi_periods(search, periods, t, y, dy, oversampling_factor, verbose, fast, bar_location)
     finally:

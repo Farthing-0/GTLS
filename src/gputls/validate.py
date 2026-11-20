@@ -64,6 +64,15 @@ def validate_args(self, kwargs):
     if str(self.T0_coarsen) not in ("1", "3"):
         raise ValueError("T0_coarsen must be 1 or 3")
     self.T0_coarsen = int(self.T0_coarsen)
+    scout_every = kwargs.get("scout_every")
+    if scout_every is None:
+        scout_every = os.environ.get("TLS_SCOUT_EVERY", 4 if self.backend == "fused-pl" else 0)
+    try:
+        self.scout_every = int(str(scout_every))
+    except ValueError:
+        raise ValueError("scout_every must be a non-negative integer") from None
+    if not 0 <= self.scout_every < 2**31:
+        raise ValueError("scout_every must be a non-negative 32-bit integer")
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
     # Multi-GPU: GPUDeviceIDs overrides GPUDeviceID; the first device does the final fit
     device_ids = kwargs.get("GPUDeviceIDs")

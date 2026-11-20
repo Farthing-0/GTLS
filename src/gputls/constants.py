@@ -128,6 +128,7 @@ VALID_PARAMETERS = [
     "oversampling_factor",
     "T0_fit_margin",
     "T0_coarsen",
+    "scout_every",
     "T0_refine_margin",
     "screening_tolerances",
     "screening_policy",

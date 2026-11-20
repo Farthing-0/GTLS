@@ -112,6 +112,7 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `transit_template` | `"default"` | `"default"`, `"grazing"` or `"box"` |
 | `T0_fit_margin` | `0.01` | Normal phase step as a fraction of the duration (0 to 0.125). A value of 0 tests each folded sample |
 | `T0_coarsen` | `3` for `"fused-pl"`, `1` for `"fused"` | Use a threefold phase step followed by local refinement, or set `1` to scan the normal phase grid. `TLS_T0_COARSEN` supplies an environment default |
+| `scout_every` | `4` for `"fused-pl"`, `0` for `"fused"` | Spacing between transit durations selected to scan all phases. Set `0` or `1` to disable, or use `TLS_SCOUT_EVERY` to set the environment default |
 | `screening_tolerances` | `None` | Optional strictly decreasing positive certificate tolerances. `None` uses `(0.05, 0.015, 0.005, 0.00025)`; `(0.05,)` uses one pass; `()` disables screening. Controls pruning cost, not the search grid or final statistic. The best schedule depends on the data and GPU |
 | `screening_policy` | `"fixed"` | `"auto"` measures 1–4 leading levels of the standard cascade per period band and device, then reuses the chosen length. Cannot be combined with explicit `screening_tolerances`. Calibration is included in the search and may outweigh savings on short searches; `"fixed"` retains the behavior above |
 | `GPUDeviceID` | `0` | CUDA device to run on |
@@ -129,6 +130,12 @@ with the full template. The legacy `T0_refine_margin` keyword is deprecated.
 `TLS_PL_EPS` and
 `TLS_PL_A2_SPREAD_MAX` adjust the template tolerance and the weight-spread limit
 for the window-mean weighted square term.
+
+Duration scouting follows TLS2 for light curves with at least 2,000 samples.
+When a trial period has more than `scout_every` allowed widths, the first,
+every `scout_every`-th thereafter, and the longest scan the full phase grid.
+The remaining widths search windows around the best phases from those scans.
+The certificate screening options apply to the search path without scouting.
 
 With `screening_policy="auto"`, `model.screening_diagnostics` records the choices
 and calibration batches for that call. Each calibration batch is split into four

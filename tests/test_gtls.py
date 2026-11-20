@@ -119,6 +119,51 @@ def test_tls2_phase_switch_and_one_scan_per_period(monkeypatch):
         model.power(T0_coarsen=2)
 
 
+def test_duration_scout_switch(monkeypatch):
+    monkeypatch.delenv("TLS_BACKEND", raising=False)
+    monkeypatch.delenv("TLS_SCOUT_EVERY", raising=False)
+    t, y = synthetic_light_curve()
+    model = gtls(t, y, verbose=False)
+    options = dict(periods=np.linspace(1.04, 1.08, 12), GPUDeviceID=GPU_DEVICE, fast=True)
+    visits = []
+    search_scouts = core.GPUSearch._search_duration_scouts
+
+    def track(search, *args):
+        visits.append(search.scout_every)
+        return search_scouts(search, *args)
+
+    monkeypatch.setattr(core.GPUSearch, "_search_duration_scouts", track)
+    default = model.power(**options)
+    assert model.scout_every == 4
+    assert visits and set(visits) == {4}
+    visits.clear()
+
+    model.power(**options, backend="fused")
+    assert model.scout_every == 0
+
+    monkeypatch.setenv("TLS_SCOUT_EVERY", "0")
+    disabled = model.power(**options)
+    assert model.scout_every == 0
+    np.testing.assert_array_equal(disabled, model.power(**options, scout_every=1))
+    assert not visits
+    np.testing.assert_array_equal(default, model.power(**options, scout_every=4))
+    with pytest.raises(ValueError, match="scout_every"):
+        model.power(scout_every=-1)
+
+
+def test_duration_scout_mask_uses_allowed_ordinals():
+    with cp.cuda.Device(GPU_DEVICE):
+        mask = cp.asarray([[True, False, True, True, True, False, True, True],
+                           [False, True, False, True, False, True, False, True],
+                           [False] * 8])
+        states = cp.empty(mask.shape, dtype=cp.int32)
+        kernel = core.load_module().get_function("prepareDurationScouts")
+        kernel((1,), (128,), (states, mask, np.int32(3), np.int32(8), np.int32(4)))
+        np.testing.assert_array_equal(states.get(), [[-1, -3, -2, -2, -2, -3, -1, -1],
+                                                     [-3, -1, -3, -1, -3, -1, -3, -1],
+                                                     [-3] * 8])
+
+
 @pytest.mark.parametrize("start", [91, 92])
 def test_coarse_phase_kernel_refines_between_coarse_starts(start):
     with cp.cuda.Device(GPU_DEVICE):
