@@ -931,12 +931,82 @@ extern "C" __global__ void remapTemplateKeys(unsigned long long* best, const int
     }
 }
 
-extern "C" __global__ void searchApproximateTemplates(unsigned long long* best, const bool* periodMask,
-        const long long* cumulative, const double* prefix, const int4* metadata, const double4* sums,
-        const int* positions, const double* coefficients, const int* widths, const float* overshoot,
-        const int* selected, const int* offsets, const int* strides, int nSelected, int nDurations,
-        int n, int size, int uniform, int meanSquareWeight, float invScale, float depthMin,
-        double meanResidual, double meanWeight) {
+struct PhaseScoreInputs {
+    const long long* cumulative;
+    const double* prefix;
+    const int4* metadata;
+    const double4* sums;
+    const int* positions;
+    const double* coefficients;
+    const int* widths;
+    const float* overshoot;
+    int size;
+    int uniform;
+    int meanSquareWeight;
+    float invScale;
+    float depthMin;
+    double meanResidual;
+    double meanWeight;
+};
+
+__device__ __forceinline__ float phaseWindowScore(const PhaseScoreInputs& p, int period, int duration,
+        int start, const float2* weighted, const float* signals, int maxWidth, int packed, float weight) {
+    int width = p.widths[duration];
+    const long long* residual = p.cumulative + (long long)period * p.size;
+    long long sum = residual[start + width - 1] - (start ? residual[start - 1] : 0);
+    int4 meta = p.metadata ? p.metadata[duration] : make_int4(0, 0, 0, 0);
+    if (meta.y == 0) {
+        float depth = __fdiv_rn(__ll2float_rn(sum) * p.invScale, (float)width);
+        if (!(depth > p.depthMin)) return __int_as_float(0x7f800000);
+        float crossTerm = 0.f, squareTerm = 0.f;
+        const float* signal = signals + (long long)duration * maxWidth;
+        long long offset = (long long)period * p.size + start;
+        for (int i = 0; i < width; ++i) {
+            float a = signal[i];
+            float2 point = packed ? make_float2(((const float*)weighted)[offset + i], weight)
+                                  : weighted[offset + i];
+            crossTerm = fmaf(a, point.x, crossTerm);
+            squareTerm = fmaf(a * a, point.y, squareTerm);
+        }
+        float amplitude = depth * p.overshoot[duration] * 2.f;
+        return amplitude * (amplitude * squareTerm - 2.f * crossTerm);
+    }
+
+    double depth = (double)sum * p.invScale / width;
+    if (!(depth > p.depthMin)) return __int_as_float(0x7f800000);
+    double4 totals = p.sums[duration];
+    int components = p.uniform ? 1 : 2;
+    const double* folded = p.prefix + (long long)period * p.size * components;
+    double ar = templateCorrelation(folded, p.positions + meta.x, p.coefficients + meta.x,
+                                    meta.y, start, components, 0) + p.meanResidual * totals.x;
+    double a2;
+    if (p.uniform) {
+        a2 = totals.z * p.meanWeight;
+    } else if (p.meanSquareWeight) {
+        int end = start + meta.w - 1;
+        double w = scoringPrefix(folded, end, 2, 1) - scoringPrefix(folded, end - 1, 2, 1)
+                 - scoringPrefix(folded, start - 1, 2, 1) + scoringPrefix(folded, start - 2, 2, 1);
+        a2 = totals.z * (p.meanWeight + w / meta.w);
+    } else {
+        int off = meta.x + meta.y;
+        a2 = templateCorrelation(folded, p.positions + off, p.coefficients + off,
+                                 meta.z, start, 2, 1) + p.meanWeight * totals.y;
+    }
+    double amplitude = depth * p.overshoot[duration] * 2.;
+    return (float)(amplitude * (amplitude * a2 - 2. * ar));
+}
+
+#define PHASE_SCORE_ARGS unsigned long long* best, const bool* periodMask, \
+    const long long* cumulative, const double* prefix, const int4* metadata, const double4* sums, \
+    const int* positions, const double* coefficients, const int* widths, const float* overshoot, \
+    int nDurations, int n, int size, int uniform, int meanSquareWeight, float invScale, float depthMin, \
+    double meanResidual, double meanWeight
+#define PHASE_SCORE_INPUTS {cumulative, prefix, metadata, sums, positions, coefficients, widths, \
+    overshoot, size, uniform, meanSquareWeight, invScale, depthMin, meanResidual, meanWeight}
+
+extern "C" __global__ void searchApproximateTemplates(PHASE_SCORE_ARGS,
+        const int* selected, const int* offsets, const int* strides, int nSelected) {
+    const PhaseScoreInputs input = PHASE_SCORE_INPUTS;
     int period = blockIdx.y;
     int item = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned long long key = 0xffffffffffffffffull;
@@ -946,36 +1016,10 @@ extern "C" __global__ void searchApproximateTemplates(unsigned long long* best, 
         int duration = selected[row];
         if (periodMask[(long long)period * nDurations + duration]) {
             int start = (item - offsets[row]) * strides[row];
-            int width = widths[duration];
-            const long long* residual = cumulative + (long long)period * size;
-            long long sum = residual[start + width - 1] - (start ? residual[start - 1] : 0);
-            double depth = (double)sum * invScale / width;
-            if (depth > depthMin) {
-                int4 meta = metadata[duration];
-                double4 totals = sums[duration];
-                int components = uniform ? 1 : 2;
-                const double* folded = prefix + (long long)period * size * components;
-                double ar = templateCorrelation(folded, positions + meta.x, coefficients + meta.x,
-                                                meta.y, start, components, 0) + meanResidual * totals.x;
-                double a2;
-                if (uniform) {
-                    a2 = totals.z * meanWeight;
-                } else if (meanSquareWeight) {
-                    int end = start + meta.w - 1;
-                    double weight = scoringPrefix(folded, end, 2, 1) - scoringPrefix(folded, end - 1, 2, 1)
-                                  - scoringPrefix(folded, start - 1, 2, 1) + scoringPrefix(folded, start - 2, 2, 1);
-                    a2 = totals.z * (meanWeight + weight / meta.w);
-                } else {
-                    int off = meta.x + meta.y;
-                    a2 = templateCorrelation(folded, positions + off, coefficients + off,
-                                            meta.z, start, 2, 1) + meanWeight * totals.y;
-                }
-                double amplitude = depth * overshoot[duration] * 2.;
-                double delta = amplitude * (amplitude * a2 - 2. * ar);
-                if (delta < 0.) {
-                    key = ((unsigned long long)orderedKey((float)delta) << 32)
-                        | (unsigned int)(duration * (long long)n + start);
-                }
+            float delta = phaseWindowScore(input, period, duration, start, nullptr, nullptr, 0, 0, 0.f);
+            if (delta < 0.f) {
+                key = ((unsigned long long)orderedKey(delta) << 32)
+                    | (unsigned int)(duration * (long long)n + start);
             }
         }
     }
@@ -985,6 +1029,59 @@ extern "C" __global__ void searchApproximateTemplates(unsigned long long* best, 
     }
     if ((threadIdx.x & 31) == 0 && key != 0xffffffffffffffffull) atomicMin(best + period, key);
 }
+
+// Each block scans one period and template width. TLS2's fine pass samples
+// two normal-grid starts on either side of the coarse winner, clipped at
+// the endpoints. A tied fine score keeps the coarse winner.
+extern "C" __global__ void searchCoarsePhase(PHASE_SCORE_ARGS, const int* selected, const int* strides,
+        const float2* weighted, const float* signals, int maxWidth, int packed, float weight) {
+    int period = blockIdx.x;
+    int row = blockIdx.y;
+    int duration = selected[row];
+    if (!periodMask[(long long)period * nDurations + duration]) return;
+    const PhaseScoreInputs input = PHASE_SCORE_INPUTS;
+    int normal = strides[row];
+    int stride = 3 * normal;
+    unsigned long long key = 0xffffffffffffffffull;
+    for (long long start = (long long)threadIdx.x * stride; start < n; start += (long long)blockDim.x * stride) {
+        float delta = phaseWindowScore(input, period, duration, (int)start, weighted, signals, maxWidth,
+                                       packed, weight);
+        if (isfinite(delta)) {
+            unsigned long long candidate = ((unsigned long long)orderedKey(delta) << 32) | (unsigned int)start;
+            if (candidate < key) key = candidate;
+        }
+    }
+    for (int shift = 16; shift > 0; shift >>= 1) {
+        unsigned long long other = __shfl_down_sync(0xffffffff, key, shift);
+        if (other < key) key = other;
+    }
+    __shared__ unsigned long long perWarp[4];
+    if ((threadIdx.x & 31) == 0) perWarp[threadIdx.x / 32] = key;
+    __syncthreads();
+    if (threadIdx.x != 0) return;
+    for (int warp = 1; warp < 4; ++warp) {
+        if (perWarp[warp] < key) key = perWarp[warp];
+    }
+    if (key == 0xffffffffffffffffull) return;
+    int center = (unsigned int)key;
+    for (int displacement = -2; displacement <= 2; ++displacement) {
+        long long start = center + (long long)displacement * normal;
+        if (displacement == 0 || start < 0 || start >= n) continue;
+        float delta = phaseWindowScore(input, period, duration, (int)start, weighted, signals, maxWidth,
+                                       packed, weight);
+        unsigned int score = orderedKey(delta);
+        if (isfinite(delta) && score < (unsigned int)(key >> 32)) {
+            key = ((unsigned long long)score << 32) | (unsigned int)start;
+        }
+    }
+    if ((unsigned int)(key >> 32) < orderedKey(0.f)) {
+        unsigned int location = (unsigned int)(duration * (long long)n + (unsigned int)key);
+        atomicMin(best + period, (key & 0xffffffff00000000ull) | location);
+    }
+}
+
+#undef PHASE_SCORE_ARGS
+#undef PHASE_SCORE_INPUTS
 
 extern "C" __global__ void scanScreeningUniformSparse(const float2* weighted, double* prefix, int size) {
     scanScreeningUniformImpl<true, 16>(weighted, prefix, size);

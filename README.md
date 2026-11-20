@@ -110,8 +110,8 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `duration_grid_step` | `1.1` | Multiplicative step of the duration grid |
 | `transit_depth_min` | `1e-5` | Minimum depth of a trial transit |
 | `transit_template` | `"default"` | `"default"`, `"grazing"` or `"box"` |
-| `T0_fit_margin` | `0.01` | Epoch step of the coarse search as a fraction of the duration (0 to 0.125; 0 tests every cadence) |
-| `T0_refine_margin` | `0.01` | Epoch step when the strongest peaks are re-searched, as a fraction of the duration (0 to 0.125; 0 tests every cadence). 0.01 is the T0 resolution of TLS |
+| `T0_fit_margin` | `0.01` | Normal phase step as a fraction of the duration (0 to 0.125). A value of 0 tests each folded sample |
+| `T0_coarsen` | `3` for `"fused-pl"`, `1` for `"fused"` | Use a threefold phase step followed by local refinement, or set `1` to scan the normal phase grid. `TLS_T0_COARSEN` supplies an environment default |
 | `screening_tolerances` | `None` | Optional strictly decreasing positive certificate tolerances. `None` uses `(0.05, 0.015, 0.005, 0.00025)`; `(0.05,)` uses one pass; `()` disables screening. Controls pruning cost, not the search grid or final statistic. The best schedule depends on the data and GPU |
 | `screening_policy` | `"fixed"` | `"auto"` measures 1–4 leading levels of the standard cascade per period band and device, then reuses the chosen length. Cannot be combined with explicit `screening_tolerances`. Calibration is included in the search and may outweigh savings on short searches; `"fixed"` retains the behavior above |
 | `GPUDeviceID` | `0` | CUDA device to run on |
@@ -120,8 +120,13 @@ print(result.period, result.T0, result.duration, result.depth, result.SDE)
 | `fast` | `False` | Return only `(periods, power)`, skipping the refinement and transit statistics |
 
 `fused-pl` uses the TLS2 2.0.4 template fit and its default length cutoff of
-64 samples and relative tolerance of 0.02. It uses the selected width and depth
-to fit the final epoch with the full template. `TLS_PL_EPS` and
+64 samples and relative tolerance of 0.02. With `T0_coarsen=3`, widths with
+`3 * T0_fit_margin * width >= 2` first scan every third normal-grid start.
+Each width then tests up to two normal-grid starts on each side of its coarse
+winner. The periodogram is computed in one pass over the period grid. The
+highest peak supplies the selected width and depth for the final epoch fit
+with the full template. The legacy `T0_refine_margin` keyword is deprecated.
+`TLS_PL_EPS` and
 `TLS_PL_A2_SPREAD_MAX` adjust the template tolerance and the weight-spread limit
 for the window-mean weighted square term.
 
@@ -161,8 +166,8 @@ control execution cost, not the candidate acceptance criteria.
 | `transitTimes` | Mid-transit times within the light curve |
 | `periods`, `power` | Periodogram: trial periods and SDE power |
 | `chi2` | Minimum chi² of each period after refinement |
-| `raw_chi2`, `raw_power` | Minimum chi² and power of the coarse search, before refinement |
-| `possiblePeriods`, `possiblePeriodsIndices` | Periods that were refined, and their indices in `periods` |
+| `raw_chi2`, `raw_power` | Unmasked residuals and periodogram power from the single period-grid scan |
+| `possiblePeriods`, `possiblePeriodsIndices` | Legacy fields, returned as empty lists |
 | `rawDuration`, `rawDurations`, `durationPoints` | Best duration as a fraction of the period, the duration grid, and the best duration in data points |
 
 `snrPink` uses GPU window standard deviations for finite `float64` inputs with

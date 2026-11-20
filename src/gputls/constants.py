@@ -88,14 +88,7 @@ SDE_MEDIAN_KERNEL_SIZE = 30
 
 # Step between trial transit start points in the coarse period search, as a fraction
 # of the transit duration (clipped to [0, 0.125]); 0 tests every cadence (slowest).
-# Both search stages default to a 1% duration step.
 T0_FIT_MARGIN = 0.01
-
-# Step between trial transit start points when the best candidate periods are re-searched,
-# as a fraction of the transit duration (clipped to [0, 0.125]); 0 tests every cadence.
-# 0.01 equals the T0 resolution of TLS. The final fit of the best period always tests
-# every cadence.
-T0_REFINE_MARGIN = 0.01
 
 # Some cases yield empty period grids. Example: R_star=5, M_star=1
 # Then: Warn and return the default grid
@@ -134,6 +127,7 @@ VALID_PARAMETERS = [
     "transit_depth_min",
     "oversampling_factor",
     "T0_fit_margin",
+    "T0_coarsen",
     "T0_refine_margin",
     "screening_tolerances",
     "screening_policy",

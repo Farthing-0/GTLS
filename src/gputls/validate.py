@@ -58,6 +58,12 @@ def validate_args(self, kwargs):
     self.backend = kwargs.get("backend") or os.environ.get("TLS_BACKEND") or "fused-pl"
     if self.backend not in ("fused-pl", "fused"):
         raise ValueError(f"Unknown backend {self.backend!r}. Available: 'fused-pl', 'fused'")
+    self.T0_coarsen = kwargs.get("T0_coarsen", os.environ.get("TLS_T0_COARSEN"))
+    if self.T0_coarsen is None:
+        self.T0_coarsen = 3 if self.backend == "fused-pl" else 1
+    if str(self.T0_coarsen) not in ("1", "3"):
+        raise ValueError("T0_coarsen must be 1 or 3")
+    self.T0_coarsen = int(self.T0_coarsen)
     self.GPUDeviceID = kwargs.get("GPUDeviceID", constants.GPU_DEVICE_ID)
     # Multi-GPU: GPUDeviceIDs overrides GPUDeviceID; the first device does the final fit
     device_ids = kwargs.get("GPUDeviceIDs")
@@ -96,7 +102,9 @@ def validate_args(self, kwargs):
     self.a = kwargs.get("a", constants.DEFAULT_A)
 
     self.T0_fit_margin = kwargs.get("T0_fit_margin", constants.T0_FIT_MARGIN)
-    self.T0_refine_margin = kwargs.get("T0_refine_margin", constants.T0_REFINE_MARGIN)
+    if "T0_refine_margin" in kwargs:
+        warnings.warn("T0_refine_margin is deprecated. The period grid uses T0_fit_margin in a single pass.",
+                      DeprecationWarning, stacklevel=3)
     self.screening_tolerances = kwargs.get("screening_tolerances")
     self.screening_policy = kwargs.get("screening_policy", "fixed")
     if self.screening_policy not in ("fixed", "auto"):
@@ -199,5 +207,4 @@ def validate_args(self, kwargs):
 
     # Clip the T0 steps to [0, 0.125] (sensible limit 12.5% of transit duration)
     self.T0_fit_margin = min(max(self.T0_fit_margin, 0), 0.125)
-    self.T0_refine_margin = min(max(self.T0_refine_margin, 0), 0.125)
     return self, kwargs

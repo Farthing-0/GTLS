@@ -28,11 +28,12 @@ class gtls(object):
         """Run the search and return a :class:`gtlsResult`.
 
         Accepts the TLS keyword arguments (``period_min``, ``period_max``, ``periods``,
-        ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``T0_refine_margin``, ``GPUDeviceID``,
+        ``R_star``, ``M_star``, ``T0_fit_margin``, ...) plus ``T0_coarsen``, ``GPUDeviceID``,
         ``GPUDeviceIDs`` (list of devices to split the search across), ``bar_location``
         and ``fast`` (return only ``(periods, power)``). ``backend="fused-pl"``
-        (default) uses the TLS2 piecewise-linear scoring templates. Select
-        ``backend="fused"`` for full-template scores throughout the search.
+        (default) uses the TLS2 piecewise-linear scoring templates and a
+        threefold phase grid with local refinement. Use ``T0_coarsen=1`` to
+        scan the normal phase grid, or ``backend="fused"`` for full-template scoring.
         ``TLS_BACKEND`` can set the default backend. ``screening_tolerances``
         optionally selects a decreasing sequence of positive certificate tolerances;
         ``None`` uses the standard cascade and ``()`` disables screening. These
@@ -114,7 +115,7 @@ class gtls(object):
             lc_arr=self.lc_arr,
             lc_cache_overview=self.lc_cache_overview,
             T0_fit_margin=self.T0_fit_margin,
-            T0_refine_margin=self.T0_refine_margin,
+            T0_coarsen=self.T0_coarsen,
             oversampling_factor=self.oversampling_factor,
             verbose=self.verbose,
             GPUDeviceIDs=self.GPUDeviceIDs,

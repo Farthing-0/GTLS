@@ -69,6 +69,7 @@ def test_fast_mode():
 
 def test_tls2_template_backend_default_and_exact_override(monkeypatch):
     monkeypatch.delenv("TLS_BACKEND", raising=False)
+    monkeypatch.delenv("TLS_T0_COARSEN", raising=False)
     t, y = synthetic_light_curve()
     periods = np.linspace(6.8, 8.6, 25)
     model = gtls(t, y, verbose=False)
@@ -85,6 +86,59 @@ def test_tls2_template_backend_default_and_exact_override(monkeypatch):
     np.testing.assert_array_equal(default, overridden)
     with pytest.raises(ValueError, match="Unknown backend"):
         model.power(backend="unknown")
+
+
+def test_tls2_phase_switch_and_one_scan_per_period(monkeypatch):
+    monkeypatch.delenv("TLS_BACKEND", raising=False)
+    monkeypatch.delenv("TLS_T0_COARSEN", raising=False)
+    t, y = synthetic_light_curve()
+    periods = np.linspace(6.8, 8.6, 25)
+    visits = []
+    best_keys = core.GPUSearch.best_keys
+
+    def track(search, trial_periods, *args, **kwargs):
+        visits.extend(trial_periods)
+        return best_keys(search, trial_periods, *args, **kwargs)
+
+    monkeypatch.setattr(core.GPUSearch, "best_keys", track)
+    model = gtls(t, y, verbose=False)
+    result = model.power(periods=periods, GPUDeviceID=GPU_DEVICE)
+    np.testing.assert_array_equal(np.sort(visits), periods)
+    assert model.T0_coarsen == 3
+    assert result.period == result.periods[np.argmax(result.power)]
+    assert result.possiblePeriods == result.possiblePeriodsIndices == []
+    np.testing.assert_array_equal(result.raw_power, result.power)
+
+    monkeypatch.setenv("TLS_T0_COARSEN", "1")
+    off = model.power(periods=periods, GPUDeviceID=GPU_DEVICE, fast=True)
+    assert model.T0_coarsen == 1
+    explicit = model.power(periods=periods, GPUDeviceID=GPU_DEVICE, fast=True, T0_coarsen=3)
+    np.testing.assert_array_equal(result.power, explicit[1])
+    assert np.any(result.power != off[1])
+    with pytest.raises(ValueError, match="T0_coarsen"):
+        model.power(T0_coarsen=2)
+
+
+@pytest.mark.parametrize("start", [91, 92])
+def test_coarse_phase_kernel_refines_between_coarse_starts(start):
+    with cp.cuda.Device(GPU_DEVICE):
+        n, width = 240, 70
+        template = (0.5 * np.sin(np.linspace(0, np.pi, width))**2).astype(np.float32)
+        residual = np.zeros(n + width, dtype=np.float32)
+        residual[start:start + width] = 0.02 * template
+        cumulative = np.cumsum(np.rint(residual * 2**25), dtype=np.int64)
+        best = cp.full(1, core.EMPTY_KEY, dtype=cp.uint64)
+        null = np.uint64(0)
+        kernel = core.load_module().get_function("searchCoarsePhase")
+        kernel((1, 1), (128,), (
+            best, cp.asarray([[True]]), cp.asarray(cumulative), null, null, null, null, null,
+            cp.asarray([width], dtype=cp.int32), cp.asarray([0.5 / template.mean()], dtype=cp.float32),
+            np.int32(1), np.int32(n), np.int32(n + width), np.int32(0), np.int32(0),
+            np.float32(2**-25), np.float32(1e-5), np.float64(0), np.float64(0),
+            cp.asarray([0], dtype=cp.int32), cp.asarray([1], dtype=cp.int32), cp.asarray(residual),
+            cp.asarray(template), np.int32(width), np.int32(1), np.float32(1)))
+        _, locations = core.decode_keys(best, 0.)
+        assert int(locations[0]) == start
 
 
 def test_kepler_custom_periods():
