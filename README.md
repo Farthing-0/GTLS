@@ -12,6 +12,10 @@ in parallel on an NVIDIA GPU, which makes it several times faster than CPU TLS.
 
 ## Features
 
+Version 2.2.6 defaults to TLS2-style piecewise-linear template scoring on CUDA
+(`backend="fused-pl"`). Use `backend="fused"` for full-template scoring. The
+final epoch fit uses the full template at the selected width and depth.
+
 Version 2.2.5 adds online selection of screening cascade lengths with
 `screening_policy="auto"`, and fuses four-level screening on larger workloads
 with early termination of fully pruned candidate blocks. Conservative bounds,
